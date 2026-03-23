@@ -1,11 +1,99 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-gray-50 text-gray-900;
+:root {
+  --bg: #fbf4f5;
+  --bg-soft: #f7ebee;
+  --text: #2b0f14;
+  --muted: #72535a;
+  --card: rgba(255, 255, 255, 0.84);
+  --card-border: rgba(176, 129, 140, 0.3);
+  --brand: #b91c1c;
+  --brand-accent: #991b1b;
+  --brand-warm: #7f1d1d;
 }
 
-.dark body {
-  @apply bg-gray-900 text-white;
+.dark {
+  --bg: #15070a;
+  --bg-soft: #260b11;
+  --text: #ffeef2;
+  --muted: #cdaeb7;
+  --card: rgba(44, 15, 24, 0.72);
+  --card-border: rgba(137, 64, 84, 0.42);
+  --brand: #ef4444;
+  --brand-accent: #f87171;
+  --brand-warm: #fb7185;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  font-family: "Manrope", sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+  background:
+    radial-gradient(800px 400px at 10% -10%, rgba(248, 113, 113, 0.22), transparent 60%),
+    radial-gradient(900px 500px at 100% 10%, rgba(190, 24, 93, 0.16), transparent 60%),
+    linear-gradient(145deg, var(--bg), var(--bg-soft));
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+p,
+li {
+  line-height: 1.65;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Sora", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.glass-panel {
+  backdrop-filter: blur(14px);
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 14px 40px rgba(57, 19, 29, 0.1);
+}
+
+.dark .glass-panel {
+  box-shadow: 0 16px 42px rgba(2, 8, 14, 0.45);
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(130, 82, 94, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(130, 82, 94, 0.12) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 16px;
+  }
 }

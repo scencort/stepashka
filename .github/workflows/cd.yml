@@ -1,0 +1,14 @@
+name: CD
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -t stepashka-backend:latest ./backend
+      - name: Build frontend image
+        run: docker build -t stepashka-frontend:latest ./frontend

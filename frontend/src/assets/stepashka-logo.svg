@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="stepashka-red" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BE123C"/>
+      <stop offset="0.55" stop-color="#B91C1C"/>
+      <stop offset="1" stop-color="#7F1D1D"/>
+    </linearGradient>
+    <linearGradient id="stepashka-ear" x1="150" y1="34" x2="364" y2="182" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCD34D"/>
+      <stop offset="1" stop-color="#F97316"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="48" y="48" width="416" height="416" rx="120" fill="url(#stepashka-red)"/>
+
+  <path d="M180 86C180 58 198 36 224 36C250 36 268 58 268 86V146H180V86Z" fill="url(#stepashka-ear)"/>
+  <path d="M244 86C244 58 262 36 288 36C314 36 332 58 332 86V146H244V86Z" fill="url(#stepashka-ear)"/>
+
+  <rect x="132" y="128" width="248" height="226" rx="108" fill="#FFF7ED"/>
+
+  <circle cx="208" cy="222" r="16" fill="#7F1D1D"/>
+  <circle cx="304" cy="222" r="16" fill="#7F1D1D"/>
+
+  <path d="M256 244L270 268H242L256 244Z" fill="#EA580C"/>
+  <path d="M198 292C214 312 234 322 256 322C278 322 298 312 314 292" stroke="#7F1D1D" stroke-width="16" stroke-linecap="round"/>
+
+  <path d="M132 356C152 330 182 316 214 316H298C330 316 360 330 380 356V376H132V356Z" fill="#FDE68A"/>
+
+  <rect x="176" y="386" width="160" height="22" rx="11" fill="#F8FAFC"/>
+  <rect x="196" y="393" width="120" height="8" rx="4" fill="#B91C1C"/>
+</svg>

@@ -1,73 +1,119 @@
-# React + TypeScript + Vite
+# Степашка: образовательная веб-платформа
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Фронтенд React + TypeScript + Vite, работающий через backend API и PostgreSQL.
 
-Currently, two official plugins are available:
+## Что реализовано
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Публичные страницы: лендинг, вход, регистрация.
+- Основные разделы: панель, курсы, задания.
+- Дополнительные рабочие вкладки:
+  - Учебные траектории
+  - Интеллектуальная проверка
+  - Конструктор заданий
+  - Аналитика и успеваемость
+  - Роли и доступы
+  - Обратная связь
+  - Справочный центр
+- Адаптивный интерфейс для телефонов:
+  - мобильное выезжающее меню
+  - нижняя навигация
+  - адаптивные всплывающие окна
 
-## React Compiler
+## Технологии
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- Framer Motion
+- React Router
 
-## Expanding the ESLint configuration
+## Источник данных
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Проект больше не использует локальные массивы как основной источник.
+Рабочие данные (курсы, уведомления, траектории, аналитика, роли, обратная связь, FAQ, проверки) загружаются с backend API, который работает с PostgreSQL.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Запуск с PostgreSQL
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+1. Поднимите PostgreSQL и backend в корне репозитория:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+docker compose up --build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. В папке frontend создайте .env на основе .env.example и проверьте URL API:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_API_URL=http://localhost:4000/api
 ```
+
+3. Установите зависимости и запустите фронтенд:
+
+```bash
+npm install
+npm run dev
+```
+
+## Локальная проверка фронтенда
+
+1. Установить зависимости:
+
+```bash
+npm install
+```
+
+2. Запустить проект:
+
+```bash
+npm run dev
+```
+
+3. Сборка проекта:
+
+```bash
+npm run build
+```
+
+4. Проверка качества и готовности к деплою:
+
+```bash
+npm run check
+```
+
+## Подготовка к деплою
+
+Проект подготовлен как SPA-приложение с fallback на index.html.
+
+Backend подготовлен для контейнерного деплоя с PostgreSQL:
+
+- docker-compose.yml в корне
+- backend/Dockerfile
+- backend/.env.example
+
+### Netlify
+
+В проекте есть файл netlify.toml с нужными параметрами:
+
+- команда сборки: npm run build
+- папка публикации: dist
+- fallback-редирект на /index.html
+
+### Vercel
+
+В проекте есть файл vercel.json с rewrite на /index.html для всех маршрутов.
+
+## Структура маршрутов
+
+- /
+- /login
+- /register
+- /dashboard
+- /course
+- /task
+- /learning-paths
+- /ai-review
+- /assignment-builder
+- /analytics
+- /roles-access
+- /feedback
+- /help-center
