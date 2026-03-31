@@ -53,7 +53,7 @@ export default function LearningPaths() {
         className="space-y-6"
       >
         <motion.div variants={fadeInUp} className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-2xl font-bold">Траектории обучения</h2>
+          <h2 className="text-2xl md:text-3xl font-bold">Траектории обучения</h2>
           <div className="flex flex-wrap gap-2">
             {(["all", "in progress", "planned", "completed"] as const).map((item) => (
               <Button

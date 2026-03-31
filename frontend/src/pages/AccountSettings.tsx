@@ -1,4 +1,4 @@
-import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
+﻿import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { useSearchParams } from "react-router-dom"
 import Cropper, { type Area, type Point } from "react-easy-crop"
@@ -499,8 +499,8 @@ export default function AccountSettings() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-5">
-        <h2 className="text-2xl font-bold">Профиль и настройки аккаунта</h2>
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+        <h2 className="text-2xl md:text-3xl font-bold">Профиль и настройки аккаунта</h2>
 
         {loading && <Card><p className="text-sm text-slate-500">Загрузка профиля...</p></Card>}
 
@@ -606,7 +606,7 @@ export default function AccountSettings() {
                   <input
                     value={profile.name}
                     onChange={(event) => updateProfileField("name", event.target.value)}
-                    className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+                    className="mt-1 w-full rounded-xl glass-input px-3 py-2"
                   />
                   {profileErrors.name && <p className="text-xs text-rose-600 mt-1">{profileErrors.name}</p>}
                 </label>
@@ -616,7 +616,7 @@ export default function AccountSettings() {
                   <input
                     value={profile.email}
                     onChange={(event) => updateProfileField("email", event.target.value)}
-                    className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+                    className="mt-1 w-full rounded-xl glass-input px-3 py-2"
                   />
                   {profileErrors.email && <p className="text-xs text-rose-600 mt-1">{profileErrors.email}</p>}
                 </label>
@@ -629,7 +629,7 @@ export default function AccountSettings() {
                     value={profile.phone}
                     onChange={(event) => updateProfileField("phone", event.target.value)}
                     placeholder="+7 ..."
-                    className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+                    className="mt-1 w-full rounded-xl glass-input px-3 py-2"
                   />
                   {profileErrors.phone && <p className="text-xs text-rose-600 mt-1">{profileErrors.phone}</p>}
                 </label>
@@ -640,7 +640,7 @@ export default function AccountSettings() {
                     value={profile.timezone}
                     onChange={(event) => updateProfileField("timezone", event.target.value)}
                     placeholder="Europe/Moscow"
-                    className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+                    className="mt-1 w-full rounded-xl glass-input px-3 py-2"
                   />
                   {profileErrors.timezone && <p className="text-xs text-rose-600 mt-1">{profileErrors.timezone}</p>}
                 </label>
@@ -657,7 +657,7 @@ export default function AccountSettings() {
                   value={profile.bio}
                   onChange={(event) => updateProfileField("bio", event.target.value)}
                   placeholder="Краткая информация о вас"
-                  className="mt-1 w-full h-28 rounded-xl glass-panel px-3 py-2 outline-none"
+                  className="mt-1 w-full h-28 rounded-xl glass-input px-3 py-2"
                 />
                 </label>
               )}
@@ -669,7 +669,7 @@ export default function AccountSettings() {
                   <select
                     value={profile.language}
                     onChange={(event) => updateProfileField("language", event.target.value as "ru" | "en")}
-                    className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+                    className="mt-1 w-full rounded-xl glass-input px-3 py-2"
                   >
                     <option value="ru">Русский</option>
                     <option value="en">English</option>
@@ -718,7 +718,7 @@ export default function AccountSettings() {
                       value={emailConfirmCode}
                       onChange={(event) => setEmailConfirmCode(event.target.value)}
                       placeholder="6-значный код"
-                      className="w-full md:max-w-[220px] rounded-xl glass-panel px-3 py-2 outline-none"
+                      className="w-full md:max-w-[220px] rounded-xl glass-input px-3 py-2"
                     />
                     <Button variant="outline" onClick={confirmEmailChange} disabled={saving} className={actionButtonClass}>Подтвердить email</Button>
                   </div>
@@ -740,7 +740,7 @@ export default function AccountSettings() {
                     type="password"
                     value={currentPassword}
                     onChange={(event) => setCurrentPassword(event.target.value)}
-                    className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+                    className="mt-1 w-full rounded-xl glass-input px-3 py-2"
                   />
                 </label>
                 <label className="block">
@@ -749,7 +749,7 @@ export default function AccountSettings() {
                     type="password"
                     value={newPassword}
                     onChange={(event) => setNewPassword(event.target.value)}
-                    className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+                    className="mt-1 w-full rounded-xl glass-input px-3 py-2"
                   />
                 </label>
                 <label className="block">
@@ -758,7 +758,7 @@ export default function AccountSettings() {
                     type="password"
                     value={confirmPassword}
                     onChange={(event) => setConfirmPassword(event.target.value)}
-                    className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+                    className="mt-1 w-full rounded-xl glass-input px-3 py-2"
                   />
                 </label>
               </div>
@@ -780,7 +780,7 @@ export default function AccountSettings() {
                         value={twoFactorCode}
                         onChange={(event) => setTwoFactorCode(event.target.value)}
                         placeholder="Код 2FA"
-                        className="w-full md:max-w-[220px] rounded-xl glass-panel px-3 py-2 outline-none"
+                        className="w-full md:max-w-[220px] rounded-xl glass-input px-3 py-2"
                       />
                       <Button onClick={confirmEnable2fa} disabled={saving} className={actionButtonClass}>Подтвердить включение</Button>
                     </div>
@@ -794,7 +794,7 @@ export default function AccountSettings() {
                       value={disable2faPassword}
                       onChange={(event) => setDisable2faPassword(event.target.value)}
                       placeholder="Введите пароль для отключения"
-                      className="w-full md:max-w-[280px] rounded-xl glass-panel px-3 py-2 outline-none"
+                      className="w-full md:max-w-[280px] rounded-xl glass-input px-3 py-2"
                     />
                     <Button variant="outline" onClick={disable2fa} disabled={saving} className={actionButtonClass}>Отключить 2FA</Button>
                   </div>

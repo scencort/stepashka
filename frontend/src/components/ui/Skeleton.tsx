@@ -3,5 +3,7 @@ type Props = {
 }
 
 export default function Skeleton({ className = "" }: Props) {
-  return <div className={`animate-pulse rounded-xl bg-slate-200/70 dark:bg-slate-700/60 ${className}`} />
+  return <div className={`animate-pulse rounded-[24px] bg-zinc-200/70 dark:bg-zinc-800/80 ${className}`} />
 }
+
+

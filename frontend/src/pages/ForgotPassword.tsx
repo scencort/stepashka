@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { Mail, KeyRound } from "lucide-react"
@@ -84,7 +84,7 @@ export default function ForgotPassword() {
                 <input
                   type="email"
                   placeholder="Email"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl glass-input"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />

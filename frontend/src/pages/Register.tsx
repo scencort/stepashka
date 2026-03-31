@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import Button from "../components/ui/Button"
@@ -86,7 +86,7 @@ export default function Register() {
             <input
               type="text"
               placeholder="Имя"
-              className="w-full pl-11 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-11 pr-4 py-3 rounded-xl glass-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -97,7 +97,7 @@ export default function Register() {
             <input
               type="email"
               placeholder="Email"
-              className="w-full pl-11 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-11 pr-4 py-3 rounded-xl glass-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -108,7 +108,7 @@ export default function Register() {
             <input
               type={passwordVisible ? "text" : "password"}
               placeholder="Пароль"
-              className="w-full pl-11 pr-11 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-11 pr-11 py-3 rounded-xl glass-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />

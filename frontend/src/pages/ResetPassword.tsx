@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+﻿import { useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { motion } from "framer-motion"
 import { Lock, ShieldCheck, Mail, KeyRound } from "lucide-react"
@@ -97,7 +97,7 @@ export default function ResetPassword() {
             <input
               type="email"
               placeholder="Email"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-10 pr-4 py-3 rounded-xl glass-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -108,7 +108,7 @@ export default function ResetPassword() {
             <input
               type="text"
               placeholder="Код из email"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-10 pr-4 py-3 rounded-xl glass-input"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               maxLength={6}
@@ -120,7 +120,7 @@ export default function ResetPassword() {
             <input
               type="password"
               placeholder="Новый пароль"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-10 pr-4 py-3 rounded-xl glass-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -131,7 +131,7 @@ export default function ResetPassword() {
             <input
               type="password"
               placeholder="Подтвердите пароль"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-10 pr-4 py-3 rounded-xl glass-input"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
             />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+﻿import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
@@ -96,8 +96,8 @@ export default function TeacherStudio() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-5">
-        <h2 className="text-2xl font-bold">Кабинет преподавателя</h2>
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+        <h2 className="text-2xl md:text-3xl font-bold">Кабинет преподавателя</h2>
 
         {loading && (
           <div className="space-y-3">
@@ -113,23 +113,23 @@ export default function TeacherStudio() {
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <Card>
                 <p className="text-sm text-slate-500">Заданий в системе</p>
-                <p className="text-2xl font-bold">{data.stats.assignments}</p>
+                <p className="text-2xl font-bold mt-2">{data.stats.assignments}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">AI reviews</p>
-                <p className="text-2xl font-bold">{data.stats.reviews}</p>
+                <p className="text-2xl font-bold mt-2">{data.stats.reviews}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Средний прогресс</p>
-                <p className="text-2xl font-bold">{data.stats.avgProgress}%</p>
+                <p className="text-2xl font-bold mt-2">{data.stats.avgProgress}%</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Опубликовано</p>
-                <p className="text-2xl font-bold">{data.stats.publishedCount}</p>
+                <p className="text-2xl font-bold mt-2">{data.stats.publishedCount}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Черновики</p>
-                <p className="text-2xl font-bold">{data.stats.draftCount}</p>
+                <p className="text-2xl font-bold mt-2">{data.stats.draftCount}</p>
               </Card>
             </div>
 

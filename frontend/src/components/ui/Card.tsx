@@ -11,11 +11,11 @@ export default function Card({ children, className = "" }: Props) {
     <motion.div
       {...smooth}
       className={`
-        p-5
-        rounded-2xl
+        p-7
+        rounded-[24px]
         glass-panel
-        hover:shadow-2xl
-        transition-all duration-200
+        hover:shadow-xl dark:hover:shadow-zinc-900/50
+        transition-all duration-500
         ${className}
       `}
     >
@@ -23,3 +23,4 @@ export default function Card({ children, className = "" }: Props) {
     </motion.div>
   )
 }
+

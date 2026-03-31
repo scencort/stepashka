@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+﻿import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
@@ -132,8 +132,8 @@ export default function AiReview() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-5">
-        <h2 className="text-2xl font-bold">AI-проверка</h2>
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+        <h2 className="text-2xl md:text-3xl font-bold">AI-проверка</h2>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
           <Card className="xl:col-span-2 space-y-3">
@@ -142,7 +142,7 @@ export default function AiReview() {
               value={code}
               onChange={(event) => setCode(event.target.value)}
               placeholder="Вставьте код для проверки"
-              className="w-full h-[360px] rounded-xl glass-panel p-3 bg-[#19070b] text-rose-200 outline-none"
+              className="w-full h-[360px] rounded-xl glass-input p-3 bg-[#19070b] text-rose-200"
             />
             <Button onClick={runCheck} className="w-full md:w-auto">Запустить проверку</Button>
           </Card>
@@ -203,7 +203,7 @@ export default function AiReview() {
                 value={chatInput}
                 onChange={(event) => setChatInput(event.target.value)}
                 placeholder="Спросите про архитектуру, баг, SQL, тесты, оптимизацию..."
-                className="w-full min-h-[96px] rounded-xl glass-panel p-3 outline-none"
+                className="w-full min-h-[96px] rounded-xl glass-input p-3"
               />
               <Button onClick={askAi} disabled={chatLoading} className="md:self-end md:min-w-[160px]">
                 {chatLoading ? "Думаю..." : "Спросить AI"}

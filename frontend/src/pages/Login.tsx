@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import Button from "../components/ui/Button"
@@ -120,7 +120,7 @@ export default function Login() {
             <input
               type="email"
               placeholder="Email"
-              className="w-full pl-11 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-11 pr-4 py-3 rounded-xl glass-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={twoFactorMode}
@@ -132,7 +132,7 @@ export default function Login() {
             <input
               type={passwordVisible ? "text" : "password"}
               placeholder="Пароль"
-              className="w-full pl-11 pr-11 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-11 pr-11 py-3 rounded-xl glass-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={twoFactorMode}
@@ -154,7 +154,7 @@ export default function Login() {
               <input
                 type="text"
                 placeholder="Код 2FA"
-                className="w-full pl-11 pr-4 py-3 rounded-xl glass-panel outline-none"
+                className="w-full pl-11 pr-4 py-3 rounded-xl glass-input"
                 value={twoFactorCode}
                 onChange={(e) => setTwoFactorCode(e.target.value)}
               />

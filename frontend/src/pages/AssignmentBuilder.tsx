@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
@@ -113,8 +113,8 @@ export default function AssignmentBuilder() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-5">
-        <h2 className="text-2xl font-bold">Конструктор заданий</h2>
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+        <h2 className="text-2xl md:text-3xl font-bold">Конструктор заданий</h2>
 
         <Card className="space-y-4">
           <label className="block">
@@ -123,7 +123,7 @@ export default function AssignmentBuilder() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Например: Сумма двух чисел"
-              className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+              className="mt-1 w-full rounded-xl glass-input px-3 py-2"
             />
           </label>
 
@@ -133,7 +133,7 @@ export default function AssignmentBuilder() {
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Опишите задачу"
-              className="mt-1 w-full h-32 rounded-xl glass-panel px-3 py-2 outline-none"
+              className="mt-1 w-full h-32 rounded-xl glass-input px-3 py-2"
             />
           </label>
 
@@ -143,7 +143,7 @@ export default function AssignmentBuilder() {
               <select
                 value={status}
                 onChange={(event) => setStatus(event.target.value as "draft" | "ready" | "published")}
-                className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+                className="mt-1 w-full rounded-xl glass-input px-3 py-2"
               >
                 <option value="draft">Draft</option>
                 <option value="ready">Ready for review</option>
@@ -156,7 +156,7 @@ export default function AssignmentBuilder() {
               <select
                 value={difficulty}
                 onChange={(event) => setDifficulty(event.target.value as "junior" | "middle" | "senior")}
-                className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+                className="mt-1 w-full rounded-xl glass-input px-3 py-2"
               >
                 <option value="junior">Junior</option>
                 <option value="middle">Middle</option>
@@ -176,7 +176,7 @@ export default function AssignmentBuilder() {
               value={tags}
               onChange={(event) => setTags(event.target.value)}
               placeholder="arrays, two-pointers, complexity"
-              className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
+              className="mt-1 w-full rounded-xl glass-input px-3 py-2"
             />
           </label>
         </Card>
@@ -194,13 +194,13 @@ export default function AssignmentBuilder() {
                   value={test.input}
                   onChange={(event) => updateTest(test.id, "input", event.target.value)}
                   placeholder={`Входные данные ${index + 1}`}
-                  className="md:col-span-2 rounded-xl glass-panel px-3 py-2 outline-none"
+                  className="md:col-span-2 rounded-xl glass-input px-3 py-2"
                 />
                 <input
                   value={test.expected}
                   onChange={(event) => updateTest(test.id, "expected", event.target.value)}
                   placeholder={`Ожидаемый результат ${index + 1}`}
-                  className="md:col-span-2 rounded-xl glass-panel px-3 py-2 outline-none"
+                  className="md:col-span-2 rounded-xl glass-input px-3 py-2"
                 />
                 <button
                   onClick={() => removeTest(test.id)}

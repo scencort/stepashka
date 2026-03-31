@@ -1,4 +1,4 @@
-import MainLayout from "../layout/MainLayout"
+﻿import MainLayout from "../layout/MainLayout"
 import { useEffect, useState } from "react"
 import Button from "../components/ui/Button"
 import Card from "../components/ui/Card"
@@ -94,14 +94,14 @@ export default function Task() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-5">
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h2 className="text-2xl font-bold">AI Code Review</h2>
+          <h2 className="text-2xl md:text-3xl font-bold">AI Code Review</h2>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            className="rounded-xl glass-panel px-3 py-2 outline-none text-sm w-full sm:w-auto"
+            className="rounded-xl glass-input px-3 py-2 text-sm w-full sm:w-auto"
           >
             {LANGUAGES.map((l) => (
               <option key={l.value} value={l.value}>{l.label}</option>

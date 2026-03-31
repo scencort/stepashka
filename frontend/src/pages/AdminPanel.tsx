@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
@@ -205,8 +205,8 @@ export default function AdminPanel() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-5">
-        <h2 className="text-2xl font-bold">Админ-панель</h2>
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+        <h2 className="text-2xl md:text-3xl font-bold">Админ-панель</h2>
 
         {loading && (
           <div className="space-y-3">
@@ -222,57 +222,57 @@ export default function AdminPanel() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card>
                 <p className="text-sm text-slate-500">Пользователи</p>
-                <p className="text-2xl font-bold">{data.users}</p>
+                <p className="text-2xl font-bold mt-2">{data.users}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Студенты</p>
-                <p className="text-2xl font-bold">{data.students}</p>
+                <p className="text-2xl font-bold mt-2">{data.students}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Преподаватели</p>
-                <p className="text-2xl font-bold">{data.teachers}</p>
+                <p className="text-2xl font-bold mt-2">{data.teachers}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Администраторы</p>
-                <p className="text-2xl font-bold">{data.admins}</p>
+                <p className="text-2xl font-bold mt-2">{data.admins}</p>
               </Card>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card>
                 <p className="text-sm text-slate-500">Обращений всего</p>
-                <p className="text-2xl font-bold">{feedbackStats.total}</p>
+                <p className="text-2xl font-bold mt-2">{feedbackStats.total}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Новые</p>
-                <p className="text-2xl font-bold">{feedbackStats.opened}</p>
+                <p className="text-2xl font-bold mt-2">{feedbackStats.opened}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">В работе</p>
-                <p className="text-2xl font-bold">{feedbackStats.inProgress}</p>
+                <p className="text-2xl font-bold mt-2">{feedbackStats.inProgress}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Закрытые</p>
-                <p className="text-2xl font-bold">{feedbackStats.closed}</p>
+                <p className="text-2xl font-bold mt-2">{feedbackStats.closed}</p>
               </Card>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card>
                 <p className="text-sm text-slate-500">Всего курсов</p>
-                <p className="text-2xl font-bold">{data.courses}</p>
+                <p className="text-2xl font-bold mt-2">{data.courses}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Опубликовано</p>
-                <p className="text-2xl font-bold">{data.publishedCourses}</p>
+                <p className="text-2xl font-bold mt-2">{data.publishedCourses}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Очередь модерации</p>
-                <p className="text-2xl font-bold">{data.moderationQueue}</p>
+                <p className="text-2xl font-bold mt-2">{data.moderationQueue}</p>
               </Card>
               <Card>
                 <p className="text-sm text-slate-500">Ожидаемая выручка</p>
-                <p className="text-2xl font-bold">{new Intl.NumberFormat("ru-RU").format(data.estimatedRevenue)} ₽</p>
+                <p className="text-2xl font-bold mt-2">{new Intl.NumberFormat("ru-RU").format(data.estimatedRevenue)} ₽</p>
               </Card>
             </div>
 
@@ -361,7 +361,7 @@ export default function AdminPanel() {
                     value={courseQuery}
                     onChange={(event) => setCourseQuery(event.target.value)}
                     placeholder="Поиск курса"
-                    className="rounded-xl glass-panel px-3 py-2 text-sm outline-none"
+                    className="rounded-xl glass-input px-3 py-2 text-sm"
                   />
                   <div className="flex gap-2">
                     {([
@@ -427,7 +427,7 @@ export default function AdminPanel() {
                     value={userQuery}
                     onChange={(event) => setUserQuery(event.target.value)}
                     placeholder="Поиск пользователя"
-                    className="rounded-xl glass-panel px-3 py-2 text-sm outline-none"
+                    className="rounded-xl glass-input px-3 py-2 text-sm"
                   />
                   <div className="flex gap-2">
                     {([
@@ -465,7 +465,7 @@ export default function AdminPanel() {
                             onChange={(event) => changeUserRole(item, event.target.value as AdminUser["role"])}
                             aria-label="Роль пользователя"
                             disabled={actionId === item.id || isCurrent}
-                            className="rounded-xl glass-panel px-3 py-2 outline-none text-sm"
+                            className="rounded-xl glass-input px-3 py-2 text-sm"
                           >
                             <option value="student">Студент</option>
                             <option value="teacher">Преподаватель</option>

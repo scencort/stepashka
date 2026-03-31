@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+﻿import { useEffect, useState } from "react"
 import MainLayout from "../layout/MainLayout"
 import { motion } from "framer-motion"
 import { useNavigate } from "react-router-dom"
@@ -133,7 +133,7 @@ export default function Dashboard() {
         variants={staggerContainer}
         initial="initial"
         animate="animate"
-        className="space-y-6 px-4 md:px-0"
+        className="space-y-6"
       >
 
         {/* Title */}
@@ -209,7 +209,7 @@ export default function Dashboard() {
                 max={50}
                 value={weeklyGoal}
                 onChange={(event) => updateWeeklyGoal(Number(event.target.value || 10))}
-                className="mt-1 w-full md:max-w-[180px] rounded-xl glass-panel px-3 py-2 outline-none"
+                className="mt-1 w-full md:max-w-[180px] rounded-xl glass-input px-3 py-2"
               />
             </label>
 

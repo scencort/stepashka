@@ -72,9 +72,9 @@ export default function Analytics() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-5">
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <h2 className="text-2xl font-bold">Аналитика и успеваемость</h2>
+          <h2 className="text-2xl md:text-3xl font-bold">Аналитика и успеваемость</h2>
           <div className="flex gap-2">
             <button
               onClick={() => setPeriod("week")}

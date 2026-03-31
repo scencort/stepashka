@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+﻿import { useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
@@ -77,8 +77,8 @@ export default function HelpCenter() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-5">
-        <h2 className="text-2xl font-bold">Справка</h2>
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+        <h2 className="text-2xl md:text-3xl font-bold">Справка</h2>
 
         <Card>
           <div className="flex gap-2">
@@ -87,7 +87,7 @@ export default function HelpCenter() {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") askAi() }}
               placeholder="Поиск по вопросам или задайте вопрос AI..."
-              className="flex-1 rounded-xl glass-panel px-3 py-2 outline-none"
+              className="flex-1 rounded-xl glass-input px-3 py-2"
             />
             <button
               onClick={askAi}

@@ -1,4 +1,4 @@
-import MainLayout from "../layout/MainLayout"
+﻿import MainLayout from "../layout/MainLayout"
 import { motion } from "framer-motion"
 import { useEffect, useMemo, useRef, useState, cloneElement } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
@@ -1371,7 +1371,7 @@ export default function Course() {
               value={newCourseTitle}
               onChange={(event) => setNewCourseTitle(event.target.value)}
               placeholder="Название курса"
-              className="w-full px-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full px-4 py-3 rounded-xl glass-input"
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1379,7 +1379,7 @@ export default function Course() {
                 value={newCourseType}
                 onChange={(event) => setNewCourseType(event.target.value)}
                 aria-label="Course type"
-                className="px-4 py-3 rounded-xl glass-panel outline-none"
+                className="px-4 py-3 rounded-xl glass-input"
               >
                 <option>Frontend</option>
                 <option>Backend</option>
@@ -1389,7 +1389,7 @@ export default function Course() {
                 value={newCourseLevel}
                 onChange={(event) => setNewCourseLevel(event.target.value)}
                 aria-label="Course level"
-                className="px-4 py-3 rounded-xl glass-panel outline-none"
+                className="px-4 py-3 rounded-xl glass-input"
               >
                 <option>Начальный</option>
                 <option>Средний</option>

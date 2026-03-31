@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
@@ -76,8 +76,8 @@ export default function RolesAccess() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-5">
-        <h2 className="text-2xl font-bold">Роли и доступ</h2>
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+        <h2 className="text-2xl md:text-3xl font-bold">Роли и доступ</h2>
 
         <Card className="space-y-3">
           <p className="font-semibold">Пригласить участника</p>
@@ -87,7 +87,7 @@ export default function RolesAccess() {
               value={invite}
               onChange={(event) => setInvite(event.target.value)}
               placeholder="Имя участника"
-              className="w-full rounded-xl glass-panel px-3 py-2 outline-none"
+              className="w-full rounded-xl glass-input px-3 py-2"
             />
             <Button onClick={addInvite}>Добавить</Button>
           </div>
@@ -116,7 +116,7 @@ export default function RolesAccess() {
                   value={item.role}
                   onChange={(event) => changeRole(item.id, event.target.value as Member["role"])}
                   aria-label="Роль участника"
-                  className="rounded-xl glass-panel px-3 py-2 outline-none"
+                  className="rounded-xl glass-input px-3 py-2"
                 >
                   <option value="student">Студент</option>
                   <option value="instructor">Преподаватель</option>

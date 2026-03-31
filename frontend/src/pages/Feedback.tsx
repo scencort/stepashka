@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
@@ -76,8 +76,8 @@ export default function Feedback() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-5">
-        <h2 className="text-2xl font-bold">Обратная связь</h2>
+      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+        <h2 className="text-2xl md:text-3xl font-bold">Обратная связь</h2>
 
         <Card className="space-y-3">
           <p className="font-semibold">Новое предложение</p>
@@ -86,7 +86,7 @@ export default function Feedback() {
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder="Что можно улучшить на платформе?"
-            className="w-full h-28 rounded-xl glass-panel px-3 py-2 outline-none"
+            className="w-full h-28 rounded-xl glass-input px-3 py-2"
           />
           <Button onClick={submit} className="w-full md:w-auto">Отправить</Button>
         </Card>
