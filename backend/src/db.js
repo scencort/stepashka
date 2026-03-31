@@ -281,4 +281,533 @@ export async function initDb() {
        ('gamification_enabled', true, 'XP, уровни и бейджи')`
     )
   }
+
+  const teacherRow = await pool.query(
+    `SELECT id FROM users WHERE email = 'teacher@stepashka.dev' LIMIT 1`
+  )
+  const teacherId = teacherRow.rows[0]?.id || null
+
+  const pythonCourseRow = await pool.query(
+    `INSERT INTO courses (title, slug, description, level, category, price_cents, teacher_id, status, rating, students_count, duration_hours)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', 4.9, 1420, 84)
+     ON CONFLICT (slug)
+     DO UPDATE SET
+       title = EXCLUDED.title,
+       description = EXCLUDED.description,
+       level = EXCLUDED.level,
+       category = EXCLUDED.category,
+       status = 'published',
+       duration_hours = GREATEST(courses.duration_hours, EXCLUDED.duration_hours),
+       updated_at = NOW()
+     RETURNING id`,
+    [
+      'Python Backend с FastAPI',
+      'python-backend-fastapi',
+      'Расширенный курс по Python: много теории, практические кейсы и проверка кода по тестам.',
+      'Intermediate',
+      'Programming',
+      249000,
+      teacherId,
+    ]
+  )
+
+  const pythonCourseId = pythonCourseRow.rows[0].id
+
+  const modules = [
+    { order: 1, title: 'База Python: синтаксис и типы' },
+    { order: 2, title: 'Условия, циклы и функции' },
+    { order: 3, title: 'Коллекции, строки и ошибки' },
+    { order: 4, title: 'ООП и модули' },
+    { order: 5, title: 'FastAPI: маршруты и валидация' },
+    { order: 6, title: 'База данных и SQLAlchemy' },
+    { order: 7, title: 'Тестирование и отладка' },
+    { order: 8, title: 'Проектный мини-кейс' },
+  ]
+
+  const moduleIdByOrder = new Map()
+  for (const module of modules) {
+    const moduleRow = await pool.query(
+      `INSERT INTO course_modules (course_id, title, module_order)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (course_id, module_order)
+       DO UPDATE SET title = EXCLUDED.title
+       RETURNING id`,
+      [pythonCourseId, module.title, module.order]
+    )
+    moduleIdByOrder.set(module.order, moduleRow.rows[0].id)
+  }
+
+  const lessons = [
+    {
+      moduleOrder: 1,
+      lessonOrder: 1,
+      title: 'Переменные, типы и приведение',
+      lessonType: 'text',
+      contentText:
+        'Python динамически типизирован, но это не отменяет аккуратную работу с типами. Разбираем int, float, str, bool, приведение типов и типичные ошибки при смешивании строк и чисел.',
+    },
+    {
+      moduleOrder: 1,
+      lessonOrder: 2,
+      title: 'Индексация, срезы и строки',
+      lessonType: 'text',
+      contentText:
+        'Подробно изучаем индексацию с нуля, отрицательные индексы, срезы и операции над строками. Понимание строковых операций важно для API, логирования и обработки входных данных.',
+    },
+    {
+      moduleOrder: 2,
+      lessonOrder: 1,
+      title: 'Условия и логические выражения',
+      lessonType: 'text',
+      contentText:
+        'Разбираем if/elif/else, приоритет операторов, составные условия и читаемость кода. Отдельно обсуждаем, как минимизировать вложенность и делать ветвления понятными.',
+    },
+    {
+      moduleOrder: 2,
+      lessonOrder: 2,
+      title: 'Циклы for/while и шаблон елочки',
+      lessonType: 'interactive',
+      contentText:
+        'Учимся писать циклы и формировать текстовый вывод построчно. На практике строим елочку: первая строка *, вторая ** и так далее.',
+    },
+    {
+      moduleOrder: 2,
+      lessonOrder: 3,
+      title: 'Функции, аргументы и return',
+      lessonType: 'text',
+      contentText:
+        'Пишем функции с позиционными и именованными аргументами, разбираем return, области видимости и простые принципы декомпозиции.',
+    },
+    {
+      moduleOrder: 3,
+      lessonOrder: 1,
+      title: 'Списки, словари, множества',
+      lessonType: 'text',
+      contentText:
+        'Сравниваем коллекции Python, выбираем структуры данных под задачу, изучаем итерацию, фильтрацию и базовые алгоритмические приемы.',
+    },
+    {
+      moduleOrder: 3,
+      lessonOrder: 2,
+      title: 'Исключения и защищенный код',
+      lessonType: 'text',
+      contentText:
+        'Разбираем try/except/finally, типы исключений и стратегию обработки ошибок в API. Учимся выдавать корректные сообщения, а не скрывать ошибки.',
+    },
+    {
+      moduleOrder: 4,
+      lessonOrder: 1,
+      title: 'ООП: классы и методы',
+      lessonType: 'text',
+      contentText:
+        'Практика с классами, self, инкапсуляцией и простым наследованием. Когда ООП помогает, а когда лучше оставить функциональный подход.',
+    },
+    {
+      moduleOrder: 4,
+      lessonOrder: 2,
+      title: 'Модули и структура проекта',
+      lessonType: 'text',
+      contentText:
+        'Структурируем проект: package layout, импорты, __init__.py и разделение ответственности между файлами.',
+    },
+    {
+      moduleOrder: 5,
+      lessonOrder: 1,
+      title: 'FastAPI роуты и схемы Pydantic',
+      lessonType: 'interactive',
+      contentText:
+        'Создаем endpoint, описываем модели запросов и ответов, делаем базовую валидацию payload через Pydantic.',
+    },
+    {
+      moduleOrder: 5,
+      lessonOrder: 2,
+      title: 'HTTP-ошибки и статус-коды',
+      lessonType: 'text',
+      contentText:
+        'Учимся правильно возвращать 200/201/400/404/422/500. Корректные статус-коды делают API предсказуемым для клиента.',
+    },
+    {
+      moduleOrder: 6,
+      lessonOrder: 1,
+      title: 'SQLAlchemy модели и CRUD',
+      lessonType: 'interactive',
+      contentText:
+        'Базовое моделирование сущностей, создание записей, чтение и обновление. Работаем с таблицами, связями и транзакциями.',
+    },
+    {
+      moduleOrder: 7,
+      lessonOrder: 1,
+      title: 'Тесты на pytest: основы',
+      lessonType: 'text',
+      contentText:
+        'Пишем unit- и интеграционные тесты, проверяем сценарии успеха и ошибок, добавляем понятные ассершены.',
+    },
+    {
+      moduleOrder: 8,
+      lessonOrder: 1,
+      title: 'Мини-проект: API заметок',
+      lessonType: 'interactive',
+      contentText:
+        'Собираем небольшой API-сервис заметок: список, создание, валидация и простые тесты для ключевых сценариев.',
+    },
+  ]
+
+  const lessonIdByKey = new Map()
+  for (const lesson of lessons) {
+    const moduleId = moduleIdByOrder.get(lesson.moduleOrder)
+    if (!moduleId) {
+      continue
+    }
+
+    const lessonRow = await pool.query(
+      `INSERT INTO lessons (module_id, title, lesson_type, content_text, lesson_order)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (module_id, lesson_order)
+       DO UPDATE SET
+         title = EXCLUDED.title,
+         lesson_type = EXCLUDED.lesson_type,
+         content_text = EXCLUDED.content_text
+       RETURNING id`,
+      [moduleId, lesson.title, lesson.lessonType, lesson.contentText, lesson.lessonOrder]
+    )
+
+    lessonIdByKey.set(`${lesson.moduleOrder}:${lesson.lessonOrder}`, lessonRow.rows[0].id)
+  }
+
+  const assignments = [
+    {
+      moduleOrder: 2,
+      lessonOrder: 2,
+      title: 'Елочка через цикл',
+      assignmentType: 'code',
+      description:
+        'Напишите цикл, который печатает елочку минимум из двух строк. Для примера: первая строка "*", вторая "**". Используйте цикл (for или while) и print.',
+      tests: [
+        { name: 'Есть цикл и print', type: 'includesAll', tokens: ['for', 'print'] },
+        { name: 'Есть символ *', type: 'regex', pattern: '\\*' },
+        { name: 'Елочка 1..2', type: 'treePattern', levels: [1, 2] },
+      ],
+      rubric: { tests: 70, quality: 15, style: 15 },
+      maxScore: 100,
+    },
+    {
+      moduleOrder: 5,
+      lessonOrder: 1,
+      title: 'FastAPI endpoint c валидацией',
+      assignmentType: 'code',
+      description:
+        'Реализуйте endpoint POST /orders с валидацией входных данных и возвратом корректного HTTP-статуса.',
+      tests: [
+        { name: 'Используется FastAPI', type: 'includesAny', tokens: ['FastAPI', 'fastapi'] },
+        { name: 'Есть декоратор post', type: 'regex', pattern: '@app\\.post|@router\\.post' },
+        { name: 'Есть валидация схемы', type: 'includesAny', tokens: ['BaseModel', 'pydantic'] },
+      ],
+      rubric: { tests: 60, quality: 20, style: 20 },
+      maxScore: 100,
+    },
+    {
+      moduleOrder: 6,
+      lessonOrder: 1,
+      title: 'CRUD для сущности Product',
+      assignmentType: 'code',
+      description:
+        'Добавьте CRUD-операции для Product с использованием SQLAlchemy и базовой обработкой ошибок.',
+      tests: [
+        { name: 'Есть SQLAlchemy модель', type: 'includesAny', tokens: ['declarative_base', 'Mapped', 'Column'] },
+        { name: 'Есть создание записи', type: 'includesAny', tokens: ['add(', 'session.add'] },
+        { name: 'Есть коммит', type: 'includesAny', tokens: ['commit(', 'session.commit'] },
+      ],
+      rubric: { tests: 60, quality: 20, style: 20 },
+      maxScore: 100,
+    },
+    {
+      moduleOrder: 8,
+      lessonOrder: 1,
+      title: 'Мини-проект API заметок',
+      assignmentType: 'code',
+      description:
+        'Сделайте API заметок с endpoint для создания и получения списка. Добавьте хотя бы одну проверку входных данных.',
+      tests: [
+        { name: 'Есть как минимум два endpoint', type: 'minCountRegex', pattern: '@app\\.(get|post)|@router\\.(get|post)', min: 2 },
+        { name: 'Есть список заметок', type: 'includesAny', tokens: ['notes', 'list_notes', 'get_notes'] },
+        { name: 'Есть создание заметки', type: 'includesAny', tokens: ['create_note', 'post_note', 'add_note'] },
+      ],
+      rubric: { tests: 65, quality: 20, style: 15 },
+      maxScore: 100,
+    },
+  ]
+
+  for (const assignment of assignments) {
+    const lessonId = lessonIdByKey.get(`${assignment.moduleOrder}:${assignment.lessonOrder}`)
+    if (!lessonId) {
+      continue
+    }
+
+    const existing = await pool.query(
+      `SELECT id FROM assignments WHERE lesson_id = $1 AND title = $2 LIMIT 1`,
+      [lessonId, assignment.title]
+    )
+
+    if (existing.rows.length > 0) {
+      await pool.query(
+        `UPDATE assignments
+         SET assignment_type = $1,
+             description = $2,
+             tests = $3::jsonb,
+             rubric = $4::jsonb,
+             max_score = $5,
+             updated_at = NOW()
+         WHERE id = $6`,
+        [
+          assignment.assignmentType,
+          assignment.description,
+          JSON.stringify(assignment.tests),
+          JSON.stringify(assignment.rubric),
+          assignment.maxScore,
+          existing.rows[0].id,
+        ]
+      )
+    } else {
+      await pool.query(
+        `INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7)`,
+        [
+          lessonId,
+          assignment.assignmentType,
+          assignment.title,
+          assignment.description,
+          JSON.stringify(assignment.tests),
+          JSON.stringify(assignment.rubric),
+          assignment.maxScore,
+        ]
+      )
+    }
+  }
+
+  const additionalCourses = [
+    {
+      title: "JavaScript Backend: Node.js API",
+      slug: "javascript-nodejs-api",
+      description: "Курс по JavaScript/Node.js: роутинг, валидация, middleware и тесты API.",
+      level: "Intermediate",
+      category: "Programming",
+      priceCents: 219000,
+      rating: 4.8,
+      studentsCount: 910,
+      durationHours: 44,
+      modules: [
+        { order: 1, title: "Node.js основы и async" },
+        { order: 2, title: "Express и архитектура API" },
+        { order: 3, title: "Тестирование endpoint-ов" },
+      ],
+      lessons: [
+        {
+          moduleOrder: 1,
+          lessonOrder: 1,
+          title: "Event loop, promises и async/await",
+          lessonType: "text",
+          contentText: "Разбираем неблокирующую модель Node.js и правильную работу с async/await в сервисах.",
+        },
+        {
+          moduleOrder: 2,
+          lessonOrder: 1,
+          title: "Express роуты и middleware",
+          lessonType: "interactive",
+          contentText: "Создаем API с middleware-цепочкой, обработкой ошибок и валидацией payload.",
+        },
+        {
+          moduleOrder: 3,
+          lessonOrder: 1,
+          title: "Тестирование API через supertest",
+          lessonType: "interactive",
+          contentText: "Пишем базовые тесты на статусы и формат ответа для REST endpoint-ов.",
+        },
+      ],
+      assignments: [
+        {
+          moduleOrder: 2,
+          lessonOrder: 1,
+          title: "POST /tasks с валидацией",
+          assignmentType: "code",
+          description: "Реализуйте endpoint POST /tasks, который валидирует title и возвращает 201 при успешном создании.",
+          tests: [
+            { name: "Есть express маршрут POST", type: "regex", pattern: "post\\s*\\(" },
+            { name: "Есть статус 201", type: "includesAny", tokens: ["201", "created"] },
+            { name: "Есть валидация title", type: "includesAny", tokens: ["title", "trim", "length"] },
+          ],
+          rubric: { tests: 65, quality: 20, style: 15 },
+          maxScore: 100,
+        },
+      ],
+    },
+    {
+      title: "Go Backend Fundamentals",
+      slug: "go-backend-fundamentals",
+      description: "Практика на Go: структура проекта, HTTP handlers и работа со структурами данных.",
+      level: "Intermediate",
+      category: "Programming",
+      priceCents: 229000,
+      rating: 4.7,
+      studentsCount: 620,
+      durationHours: 40,
+      modules: [
+        { order: 1, title: "Go синтаксис и структуры" },
+        { order: 2, title: "HTTP handlers" },
+        { order: 3, title: "Практика и тесты" },
+      ],
+      lessons: [
+        {
+          moduleOrder: 1,
+          lessonOrder: 1,
+          title: "Struct, methods и interfaces",
+          lessonType: "text",
+          contentText: "Изучаем модели данных в Go, методы и интерфейсы для сервисного слоя.",
+        },
+        {
+          moduleOrder: 2,
+          lessonOrder: 1,
+          title: "net/http и обработчики",
+          lessonType: "interactive",
+          contentText: "Пишем HTTP endpoint и обрабатываем JSON-запросы/ответы.",
+        },
+        {
+          moduleOrder: 3,
+          lessonOrder: 1,
+          title: "Проверка API и edge cases",
+          lessonType: "interactive",
+          contentText: "Добавляем проверки на пустой payload и корректные статусы ошибок.",
+        },
+      ],
+      assignments: [
+        {
+          moduleOrder: 2,
+          lessonOrder: 1,
+          title: "GET /health и JSON ответ",
+          assignmentType: "code",
+          description: "Сделайте endpoint /health, который возвращает JSON с полем status=ok и HTTP 200.",
+          tests: [
+            { name: "Есть handler /health", type: "includesAny", tokens: ["/health", "HandleFunc"] },
+            { name: "Есть JSON ответ", type: "includesAny", tokens: ["json", "Marshal", "NewEncoder"] },
+            { name: "Есть статус ok", type: "includesAny", tokens: ["ok", "StatusOK", "200"] },
+          ],
+          rubric: { tests: 65, quality: 20, style: 15 },
+          maxScore: 100,
+        },
+      ],
+    },
+  ]
+
+  for (const course of additionalCourses) {
+    const courseRow = await pool.query(
+      `INSERT INTO courses (title, slug, description, level, category, price_cents, teacher_id, status, rating, students_count, duration_hours)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', $8, $9, $10)
+       ON CONFLICT (slug)
+       DO UPDATE SET
+         title = EXCLUDED.title,
+         description = EXCLUDED.description,
+         level = EXCLUDED.level,
+         category = EXCLUDED.category,
+         status = 'published',
+         rating = EXCLUDED.rating,
+         students_count = GREATEST(courses.students_count, EXCLUDED.students_count),
+         duration_hours = GREATEST(courses.duration_hours, EXCLUDED.duration_hours),
+         updated_at = NOW()
+       RETURNING id`,
+      [
+        course.title,
+        course.slug,
+        course.description,
+        course.level,
+        course.category,
+        course.priceCents,
+        teacherId,
+        course.rating,
+        course.studentsCount,
+        course.durationHours,
+      ]
+    )
+
+    const courseId = courseRow.rows[0].id
+    const moduleIdByOrderMap = new Map()
+
+    for (const module of course.modules) {
+      const moduleRow = await pool.query(
+        `INSERT INTO course_modules (course_id, title, module_order)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (course_id, module_order)
+         DO UPDATE SET title = EXCLUDED.title
+         RETURNING id`,
+        [courseId, module.title, module.order]
+      )
+      moduleIdByOrderMap.set(module.order, moduleRow.rows[0].id)
+    }
+
+    const lessonIdByKeyMap = new Map()
+    for (const lesson of course.lessons) {
+      const moduleId = moduleIdByOrderMap.get(lesson.moduleOrder)
+      if (!moduleId) {
+        continue
+      }
+      const lessonRow = await pool.query(
+        `INSERT INTO lessons (module_id, title, lesson_type, content_text, lesson_order)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (module_id, lesson_order)
+         DO UPDATE SET
+           title = EXCLUDED.title,
+           lesson_type = EXCLUDED.lesson_type,
+           content_text = EXCLUDED.content_text
+         RETURNING id`,
+        [moduleId, lesson.title, lesson.lessonType, lesson.contentText, lesson.lessonOrder]
+      )
+
+      lessonIdByKeyMap.set(`${lesson.moduleOrder}:${lesson.lessonOrder}`, lessonRow.rows[0].id)
+    }
+
+    for (const assignment of course.assignments) {
+      const lessonId = lessonIdByKeyMap.get(`${assignment.moduleOrder}:${assignment.lessonOrder}`)
+      if (!lessonId) {
+        continue
+      }
+
+      const existing = await pool.query(
+        `SELECT id FROM assignments WHERE lesson_id = $1 AND title = $2 LIMIT 1`,
+        [lessonId, assignment.title]
+      )
+
+      if (existing.rows.length > 0) {
+        await pool.query(
+          `UPDATE assignments
+           SET assignment_type = $1,
+               description = $2,
+               tests = $3::jsonb,
+               rubric = $4::jsonb,
+               max_score = $5,
+               updated_at = NOW()
+           WHERE id = $6`,
+          [
+            assignment.assignmentType,
+            assignment.description,
+            JSON.stringify(assignment.tests),
+            JSON.stringify(assignment.rubric),
+            assignment.maxScore,
+            existing.rows[0].id,
+          ]
+        )
+      } else {
+        await pool.query(
+          `INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7)`,
+          [
+            lessonId,
+            assignment.assignmentType,
+            assignment.title,
+            assignment.description,
+            JSON.stringify(assignment.tests),
+            JSON.stringify(assignment.rubric),
+            assignment.maxScore,
+          ]
+        )
+      }
+    }
+  }
 }

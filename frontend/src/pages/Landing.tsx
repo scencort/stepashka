@@ -3,9 +3,10 @@ import { Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import Button from "../components/ui/Button"
 import Card from "../components/ui/Card"
-import { Search, Star, Users, Clock3, ArrowRight } from "lucide-react"
+import { Search, Star, Users, Clock3, ArrowRight, Sun, Moon, Sparkles } from "lucide-react"
 import { api } from "../lib/api"
 import BrandLogo from "../components/BrandLogo"
+import { useTheme } from "../context/theme"
 
 import {
   fadeInUp,
@@ -13,6 +14,7 @@ import {
 } from "../lib/animations"
 
 export default function Landing() {
+  const { theme, toggleTheme } = useTheme()
   const tracks = ["Python", "Web Development", "Data", "Testing", "DevOps", "Design"]
   const partners = ["Google", "IBM", "Microsoft", "Yandex", "VK", "MIPT"]
   const [courses, setCourses] = useState<Array<{
@@ -25,23 +27,56 @@ export default function Landing() {
     duration: string
     price: string
   }>>([])
+  const [landingStats, setLandingStats] = useState({
+    coursesTotal: 0,
+    studentsTotal: 0,
+    averageRating: 0,
+    communityMembers: 0,
+  })
   const [coursesLoading, setCoursesLoading] = useState(true)
+
+  const formatCompact = (value: number) =>
+    new Intl.NumberFormat("ru-RU", {
+      notation: "compact",
+      compactDisplay: "short",
+      maximumFractionDigits: 1,
+    }).format(Math.max(0, Math.round(value)))
 
   useEffect(() => {
     const load = async () => {
       setCoursesLoading(true)
       try {
-        const data = await api.get<Array<{
-          id: number
-          title: string
-          author: string
-          level: string
-          rating: string
-          students: string
-          duration: string
-          price: string
-        }>>("/courses")
-        setCourses(data.slice(0, 3))
+        const [coursesResult, statsResult] = await Promise.allSettled([
+          api.get<Array<{
+            id: number
+            title: string
+            author: string
+            level: string
+            rating: string
+            students: string
+            duration: string
+            price: string
+          }>>("/courses"),
+          api.get<{
+            coursesTotal: number
+            studentsTotal: number
+            averageRating: number
+            communityMembers: number
+          }>("/landing/stats"),
+        ])
+
+        if (coursesResult.status === "fulfilled") {
+          setCourses(coursesResult.value.slice(0, 3))
+        }
+        if (statsResult.status === "fulfilled") {
+          const s = statsResult.value
+          setLandingStats({
+            coursesTotal: Number(s.coursesTotal || 0),
+            studentsTotal: Number(s.studentsTotal || 0),
+            averageRating: Number(s.averageRating || 0),
+            communityMembers: Number(s.communityMembers || 0),
+          })
+        }
       } finally {
         setCoursesLoading(false)
       }
@@ -51,12 +86,11 @@ export default function Landing() {
   }, [])
 
   const averageRating = useMemo(() => {
-    if (courses.length === 0) {
+    if (landingStats.averageRating <= 0) {
       return "0.0"
     }
-    const total = courses.reduce((sum, item) => sum + Number(item.rating), 0)
-    return (total / courses.length).toFixed(1)
-  }, [courses])
+    return landingStats.averageRating.toFixed(1)
+  }, [landingStats.averageRating])
 
   return (
     <motion.div
@@ -72,7 +106,7 @@ export default function Landing() {
         className="mx-3 mt-3 px-4 md:px-8 py-4 rounded-2xl glass-panel flex flex-col md:flex-row gap-4 md:gap-0 justify-between items-center"
       >
         <BrandLogo
-          text="Stepashka"
+          text="Степашка"
           iconClassName="h-10 w-10"
           textClassName="text-2xl font-extrabold bg-gradient-to-r from-red-600 to-rose-800 bg-clip-text text-transparent"
         />
@@ -83,7 +117,20 @@ export default function Landing() {
           <a href="#about">О нас</a>
         </div>
 
-        <div className="flex gap-2 md:gap-3 w-full md:w-auto">
+        <div className="flex gap-2 md:gap-3 w-full md:w-auto items-center">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="group relative w-full md:w-auto overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-600/70 bg-gradient-to-r from-white to-slate-50 dark:from-slate-900 dark:to-slate-800 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-100 shadow-sm hover:shadow-lg transition-all"
+            aria-label="Переключить тему"
+          >
+            <span className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[linear-gradient(120deg,transparent,rgba(244,63,94,0.12),transparent)]" />
+            <span className="relative inline-flex items-center justify-center gap-2">
+              {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+              {theme === "dark" ? "Светлая" : "Тёмная"}
+            </span>
+          </button>
+
           <Link to="/login">
             <Button variant="outline" className="w-full md:w-auto">Войти</Button>
           </Link>
@@ -99,16 +146,26 @@ export default function Landing() {
 
         <div className="w-full max-w-5xl mx-auto">
 
-        <div className="absolute -right-14 -top-10 h-44 w-44 rounded-full bg-rose-400/20 blur-2xl" />
-        <div className="absolute -left-10 bottom-0 h-36 w-36 rounded-full bg-red-400/20 blur-2xl" />
+        <div className="absolute -right-14 -top-10 h-44 w-44 rounded-full bg-rose-400/20 dark:bg-blue-400/15 blur-2xl" />
+        <div className="absolute -left-10 bottom-0 h-36 w-36 rounded-full bg-red-400/20 dark:bg-slate-300/10 blur-2xl" />
+
+        <motion.div variants={fadeInUp} className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-rose-200/80 dark:border-slate-600/60 bg-white/70 dark:bg-slate-900/60 text-xs font-semibold text-slate-700 dark:text-slate-200 mx-auto mb-5">
+          <Sparkles size={14} className="text-rose-600 dark:text-slate-200" />
+          Код, тесты и понятный путь до результата
+        </motion.div>
 
         <motion.h2
           variants={fadeInUp}
           className="text-3xl md:text-6xl font-extrabold mb-5 max-w-4xl leading-tight mx-auto text-center"
         >
-          Учитесь быстрее.
+          Освойте профессию через
           <br />
-          Развивайте навыки по понятному маршруту.
+          <span
+            className="bg-gradient-to-r from-rose-700 via-red-700 to-orange-600 bg-clip-text text-transparent"
+            style={{ WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+          >
+            практику, тесты и реальные задачи
+          </span>
         </motion.h2>
 
         <motion.p
@@ -135,11 +192,11 @@ export default function Landing() {
 
         <motion.div variants={fadeInUp} className="mt-8 grid grid-cols-3 gap-3 md:gap-6 max-w-2xl w-full mx-auto">
           <Card className="text-center">
-            <p className="text-2xl font-bold">{courses.length}</p>
+            <p className="text-2xl font-bold">{landingStats.coursesTotal}</p>
             <p className="text-xs text-slate-500">курсов</p>
           </Card>
           <Card className="text-center">
-            <p className="text-2xl font-bold">48k</p>
+            <p className="text-2xl font-bold">{formatCompact(landingStats.studentsTotal)}</p>
             <p className="text-xs text-slate-500">студентов</p>
           </Card>
           <Card className="text-center">
@@ -160,7 +217,7 @@ export default function Landing() {
             {partners.map((item) => (
               <div
                 key={item}
-                className="rounded-xl py-3 text-center font-semibold bg-white/70 dark:bg-slate-900/50 border border-rose-200/70 dark:border-rose-900/50"
+                className="rounded-xl py-3 text-center font-semibold bg-white/70 dark:bg-slate-900/50 border border-rose-200/70 dark:border-slate-700/60"
               >
                 {item}
               </div>
@@ -194,41 +251,42 @@ export default function Landing() {
 
       {/* Catalog */}
       <section id="catalog" className="px-4 md:px-6 py-8 md:py-12 max-w-6xl mx-auto">
+        <Card className="p-5 md:p-6 border border-slate-200/80 dark:border-slate-700/80">
+          <div className="flex items-center justify-between mb-6">
+            <motion.h3 variants={fadeInUp} className="text-xl md:text-3xl font-bold">
+              Рекомендуемые курсы
+            </motion.h3>
+            <button className="hidden md:flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-slate-200">
+              Смотреть все <ArrowRight size={16} />
+            </button>
+          </div>
 
-        <div className="flex items-center justify-between mb-6">
-          <motion.h3 variants={fadeInUp} className="text-xl md:text-3xl font-bold">
-            Рекомендуемые курсы
-          </motion.h3>
-          <button className="hidden md:flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-rose-300">
-            Смотреть все <ArrowRight size={16} />
-          </button>
-        </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {coursesLoading && <Card><p className="text-sm">Загрузка курсов...</p></Card>}
+            {!coursesLoading && courses.map((course) => (
+              <Card key={course.title} className="p-0 overflow-hidden">
+                <div className="h-36 bg-gradient-to-br from-red-600/95 via-rose-700/95 to-red-900/95 dark:from-slate-700/95 dark:via-slate-800/95 dark:to-slate-950/95" />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {coursesLoading && <Card><p className="text-sm">Загрузка курсов...</p></Card>}
-          {!coursesLoading && courses.map((course) => (
-            <Card key={course.title} className="p-0 overflow-hidden">
-              <div className="h-36 bg-gradient-to-br from-red-600/95 via-rose-700/95 to-red-900/95" />
+                <div className="p-5">
+                  <p className="text-xs text-slate-500 mb-2">{course.level}</p>
+                  <h4 className="text-lg font-bold leading-snug">{course.title}</h4>
+                  <p className="text-sm text-slate-500 mt-2">{course.author}</p>
 
-              <div className="p-5">
-                <p className="text-xs text-slate-500 mb-2">{course.level}</p>
-                <h4 className="text-lg font-bold leading-snug">{course.title}</h4>
-                <p className="text-sm text-slate-500 mt-2">{course.author}</p>
+                  <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-300">
+                    <span className="inline-flex items-center gap-1"><Star size={13} /> {course.rating}</span>
+                    <span className="inline-flex items-center gap-1"><Users size={13} /> {course.students}</span>
+                    <span className="inline-flex items-center gap-1"><Clock3 size={13} /> {course.duration}</span>
+                  </div>
 
-                <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-300">
-                  <span className="inline-flex items-center gap-1"><Star size={13} /> {course.rating}</span>
-                  <span className="inline-flex items-center gap-1"><Users size={13} /> {course.students}</span>
-                  <span className="inline-flex items-center gap-1"><Clock3 size={13} /> {course.duration}</span>
+                  <div className="mt-5 flex items-center justify-between">
+                    <p className="text-lg font-bold">{course.price}</p>
+                    <Button variant="outline">Подробнее</Button>
+                  </div>
                 </div>
-
-                <div className="mt-5 flex items-center justify-between">
-                  <p className="text-lg font-bold">{course.price}</p>
-                  <Button variant="outline">Подробнее</Button>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            ))}
+          </div>
+        </Card>
 
       </section>
 
@@ -258,7 +316,7 @@ export default function Landing() {
             </Card>
             <Card>
               <p className="text-sm text-slate-500">Сообщество</p>
-              <p className="text-2xl font-bold mt-1">18k</p>
+              <p className="text-2xl font-bold mt-1">{formatCompact(landingStats.communityMembers)}</p>
             </Card>
           </div>
         </Card>
@@ -267,7 +325,7 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="text-center py-8 text-sm text-slate-500">
-        © 2026 Stepashka • Учебный проект
+        © 2026 Степашка • Учебный проект
       </footer>
 
     </motion.div>

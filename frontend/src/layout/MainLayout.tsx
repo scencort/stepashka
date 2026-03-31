@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "../context/theme"
 import { useEffect, useState } from "react"
-import { motion } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
 import type { ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 import { api } from "../lib/api"
@@ -18,7 +18,7 @@ import {
 import {
   LayoutDashboard,
   BookOpen,
-  ClipboardList,
+  Code,
   GraduationCap,
   Brain,
   Wrench,
@@ -64,6 +64,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [notificationsError, setNotificationsError] = useState("")
   const [courseFormError, setCourseFormError] = useState("")
   const [streakDays, setStreakDays] = useState<number>(0)
+  const [weeklyCompleted, setWeeklyCompleted] = useState(0)
+  const [weeklyGoal, setWeeklyGoal] = useState(10)
 
   const toggleNotifications = () => {
     setShowNotifications((prev) => !prev)
@@ -96,8 +98,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
         return
       }
       try {
-        const data = await api.get<{ stats?: { streakDays?: number } }>("/dashboard")
+        const data = await api.get<{ stats?: { streakDays?: number }; weeklyPlan?: { completedSteps?: number; goalSteps?: number } }>("/dashboard")
         setStreakDays(Number(data?.stats?.streakDays || 0))
+        setWeeklyCompleted(Number(data?.weeklyPlan?.completedSteps || 0))
+        setWeeklyGoal(Math.max(Number(data?.weeklyPlan?.goalSteps || 10), 1))
       } catch {
         setStreakDays(0)
       }
@@ -185,7 +189,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         to={path}
         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
           active
-            ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900 shadow-md"
+            ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900 shadow-md"
             : "text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-900/60"
         }`}
       >
@@ -205,7 +209,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         onClick={() => setMobileMenuOpen(false)}
         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
           active
-            ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900 shadow-md"
+            ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900 shadow-md"
             : "text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-900/60"
         }`}
       >
@@ -251,9 +255,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <p className="text-xs text-slate-500 dark:text-slate-300">
               Прогресс недели
             </p>
-            <p className="text-2xl font-bold mt-1">68%</p>
+            <p className="text-2xl font-bold mt-1">{Math.min(100, Math.round((weeklyCompleted / weeklyGoal) * 100))}%</p>
+            <p className="text-xs text-slate-400 mt-0.5">{weeklyCompleted}/{weeklyGoal} шагов</p>
             <div className="mt-3 h-2 rounded-full bg-slate-200/70 dark:bg-slate-700/70">
-              <div className="h-2 w-2/3 rounded-full bg-gradient-to-r from-red-500 to-rose-700" />
+              <div
+                className="h-2 rounded-full bg-gradient-to-r from-red-500 to-rose-700 transition-all duration-500"
+                style={{ width: `${Math.min(100, Math.round((weeklyCompleted / weeklyGoal) * 100))}%` }}
+              />
             </div>
           </div>
         )}
@@ -262,11 +270,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <nav className="flex flex-col gap-2">
           {navItem("/dashboard", "Панель", LayoutDashboard)}
           {navItem("/course", "Курсы", BookOpen)}
-          {navItem("/task", "Задания", ClipboardList)}
+          {navItem("/task", "AI Code Review", Code)}
           {isTeacherOrAdmin && navItem("/teacher", "Кабинет преподавателя", GraduationCap)}
           {isAdmin && navItem("/admin", "Панель администратора", ShieldCheck)}
           {navItem("/learning-paths", "Учебные траектории", GraduationCap)}
-          {navItem("/ai-review", "AI-проверка", Brain)}
+          {navItem("/ai-review", "AI-чат", Brain)}
           {isTeacherOrAdmin && navItem("/assignment-builder", "Конструктор заданий", Wrench)}
           {isTeacherOrAdmin && navItem("/analytics", "Аналитика", ChartColumn)}
           {isAdmin && navItem("/roles-access", "Роли и доступы", ShieldCheck)}
@@ -317,11 +325,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <nav className="flex flex-col gap-2">
               {navItemMobile("/dashboard", "Панель", LayoutDashboard)}
               {navItemMobile("/course", "Курсы", BookOpen)}
-              {navItemMobile("/task", "Задания", ClipboardList)}
+              {navItemMobile("/task", "AI Code Review", Code)}
               {isTeacherOrAdmin && navItemMobile("/teacher", "Кабинет преподавателя", GraduationCap)}
               {isAdmin && navItemMobile("/admin", "Панель администратора", ShieldCheck)}
               {navItemMobile("/learning-paths", "Учебные траектории", GraduationCap)}
-              {navItemMobile("/ai-review", "AI-проверка", Brain)}
+              {navItemMobile("/ai-review", "AI-чат", Brain)}
               {isTeacherOrAdmin && navItemMobile("/assignment-builder", "Конструктор заданий", Wrench)}
               {isTeacherOrAdmin && navItemMobile("/analytics", "Аналитика", ChartColumn)}
               {isAdmin && navItemMobile("/roles-access", "Роли и доступы", ShieldCheck)}
@@ -405,7 +413,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
             <button
               onClick={toggleProfile}
-              className="w-9 h-9 rounded-full bg-gradient-to-br from-rose-200 to-red-300 flex items-center justify-center text-xs font-bold text-red-900 overflow-hidden"
+              className="w-9 h-9 rounded-full bg-gradient-to-br from-rose-200 to-red-300 dark:from-slate-600 dark:to-slate-800 flex items-center justify-center text-xs font-bold text-red-900 dark:text-slate-100 overflow-hidden"
             >
               {user?.avatarUrl ? (
                 <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
@@ -419,15 +427,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
               Серия: {streakDays} дней
             </button>
 
+            <AnimatePresence>
             {showNotifications && (
-              <div className="absolute right-0 top-14 w-[calc(100vw-2.5rem)] max-w-[360px] rounded-2xl glass-panel p-4 z-[90]">
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="absolute right-0 top-14 w-[calc(100vw-2.5rem)] max-w-[360px] rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/95 dark:bg-slate-900/95 shadow-2xl shadow-slate-900/15 dark:shadow-black/45 p-4 z-[90]"
+              >
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold">Уведомления</h3>
                   <button
                     onClick={() => setShowNotifications(false)}
                     aria-label="Close notifications"
                     title="Close notifications"
-                    className="w-8 h-8 rounded-lg glass-panel flex items-center justify-center"
+                    className="w-8 h-8 rounded-lg border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                   >
                     <X size={14} />
                   </button>
@@ -439,7 +454,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   )}
 
                   {!notificationsLoading && notificationsError && (
-                    <p className="text-sm text-red-700 dark:text-rose-300">{notificationsError}</p>
+                    <p className="text-sm text-red-700 dark:text-red-300">{notificationsError}</p>
                   )}
 
                   {!notificationsLoading && !notificationsError && notifications.length === 0 && (
@@ -447,19 +462,27 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   )}
 
                   {!notificationsLoading && !notificationsError && notifications.map((item) => (
-                    <div key={item.id} className="glass-panel rounded-xl p-3">
+                    <div key={item.id} className="rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 p-3">
                       <p className="text-sm font-medium">{item.title}</p>
                       <p className="text-xs text-slate-500 mt-1">{item.time}</p>
                     </div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
 
+            <AnimatePresence>
             {showProfile && (
-              <div className="absolute right-0 top-14 w-[calc(100vw-2.5rem)] max-w-[290px] rounded-2xl glass-panel p-4 z-[90]">
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="absolute right-0 top-14 w-[calc(100vw-2.5rem)] max-w-[290px] rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/95 dark:bg-slate-900/95 shadow-2xl shadow-slate-900/15 dark:shadow-black/45 p-4 z-[90]"
+              >
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-rose-200 to-red-300 flex items-center justify-center text-sm font-bold text-red-900 overflow-hidden">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-rose-200 to-red-300 dark:from-slate-600 dark:to-slate-800 flex items-center justify-center text-sm font-bold text-red-900 dark:text-slate-100 overflow-hidden">
                     {user?.avatarUrl ? (
                       <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
                     ) : (
@@ -477,7 +500,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     setShowProfile(false)
                     navigate("/account?tab=profile")
                   }}
-                  className="w-full text-left rounded-xl glass-panel px-3 py-2 mb-2 inline-flex items-center gap-2"
+                  className="w-full text-left rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-2 mb-2 inline-flex items-center gap-2 transition"
                 >
                   <UserRound size={15} />
                   Профиль
@@ -487,15 +510,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     setShowProfile(false)
                     navigate("/account?tab=settings")
                   }}
-                  className="w-full text-left rounded-xl glass-panel px-3 py-2 mb-2"
+                  className="w-full text-left rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-2 mb-2 transition"
                 >
                   Настройки аккаунта
                 </button>
-                <button onClick={handleLogout} className="w-full text-left rounded-xl glass-panel px-3 py-2">
+                <button onClick={handleLogout} className="w-full text-left rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-2 transition">
                   Выйти
                 </button>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
 
           </div>
 
@@ -534,8 +558,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 pathname === "/task" ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900" : "text-slate-600 dark:text-slate-300"
               }`}
             >
-              <ClipboardList size={16} />
-              Задания
+              <Code size={16} />
+              Review
             </Link>
 
             <button
@@ -573,7 +597,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </label>
 
           {courseFormError && (
-            <p className="text-sm text-red-700 dark:text-rose-300 mb-4">{courseFormError}</p>
+            <p className="text-sm text-red-700 dark:text-red-300 mb-4">{courseFormError}</p>
           )}
 
           <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">

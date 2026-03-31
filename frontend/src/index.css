@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -11,21 +11,27 @@
   --muted: #72535a;
   --card: rgba(255, 255, 255, 0.84);
   --card-border: rgba(176, 129, 140, 0.3);
+  --glow-a: rgba(248, 113, 113, 0.22);
+  --glow-b: rgba(190, 24, 93, 0.16);
+  --grid-line: rgba(130, 82, 94, 0.12);
   --brand: #b91c1c;
   --brand-accent: #991b1b;
   --brand-warm: #7f1d1d;
 }
 
 .dark {
-  --bg: #15070a;
-  --bg-soft: #260b11;
-  --text: #ffeef2;
-  --muted: #cdaeb7;
-  --card: rgba(44, 15, 24, 0.72);
-  --card-border: rgba(137, 64, 84, 0.42);
+  --bg: #0a0d13;
+  --bg-soft: #111827;
+  --text: #e6edf7;
+  --muted: #9aa4b7;
+  --card: rgba(15, 23, 42, 0.72);
+  --card-border: rgba(148, 163, 184, 0.22);
+  --glow-a: rgba(30, 64, 175, 0.18);
+  --glow-b: rgba(148, 163, 184, 0.11);
+  --grid-line: rgba(148, 163, 184, 0.1);
   --brand: #ef4444;
   --brand-accent: #f87171;
-  --brand-warm: #fb7185;
+  --brand-warm: #dc2626;
 }
 
 * {
@@ -36,12 +42,12 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--text);
-  font-family: "Manrope", sans-serif;
-  font-size: 17px;
+  font-family: "Inter", sans-serif;
+  font-size: 18px;
   line-height: 1.6;
   background:
-    radial-gradient(800px 400px at 10% -10%, rgba(248, 113, 113, 0.22), transparent 60%),
-    radial-gradient(900px 500px at 100% 10%, rgba(190, 24, 93, 0.16), transparent 60%),
+    radial-gradient(800px 400px at 10% -10%, var(--glow-a), transparent 60%),
+    radial-gradient(900px 500px at 100% 10%, var(--glow-b), transparent 60%),
     linear-gradient(145deg, var(--bg), var(--bg-soft));
 }
 
@@ -75,6 +81,7 @@ a {
 }
 
 .glass-panel {
+  -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   background: var(--card);
   border: 1px solid var(--card-border);
@@ -87,8 +94,8 @@ a {
 
 .hero-grid {
   background-image:
-    linear-gradient(rgba(130, 82, 94, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(130, 82, 94, 0.12) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 30px 30px;
 }
 

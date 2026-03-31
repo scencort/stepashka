@@ -3,7 +3,7 @@ import { useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Router } from "./router"
 
-const BASE_TITLE = "Stepashka"
+const BASE_TITLE = "Степашка"
 
 function getPageTitle(pathname: string) {
   if (pathname.startsWith("/course/")) {
@@ -18,7 +18,7 @@ function getPageTitle(pathname: string) {
     "/reset-password": "Сброс пароля",
     "/dashboard": "Панель",
     "/course": "Курсы",
-    "/task": "Задания",
+    "/task": "AI Code Review",
     "/learning-paths": "Траектории обучения",
     "/ai-review": "AI-проверка",
     "/assignment-builder": "Конструктор заданий",

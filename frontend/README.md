@@ -35,10 +35,10 @@
 
 ## Запуск с PostgreSQL
 
-1. Поднимите PostgreSQL и backend в корне репозитория:
+1. В корне репозитория запустите backend и frontend одной командой:
 
-```bash
-docker compose up --build
+```powershell
+./start.ps1
 ```
 
 2. В папке frontend создайте .env на основе .env.example и проверьте URL API:
@@ -53,6 +53,8 @@ VITE_API_URL=http://localhost:4000/api
 npm install
 npm run dev
 ```
+
+Если backend не запускается, проверьте локальный PostgreSQL и значение DATABASE_URL в backend/.env.
 
 ## Локальная проверка фронтенда
 
@@ -74,33 +76,11 @@ npm run dev
 npm run build
 ```
 
-4. Проверка качества и готовности к деплою:
+4. Проверка качества:
 
 ```bash
 npm run check
 ```
-
-## Подготовка к деплою
-
-Проект подготовлен как SPA-приложение с fallback на index.html.
-
-Backend подготовлен для контейнерного деплоя с PostgreSQL:
-
-- docker-compose.yml в корне
-- backend/Dockerfile
-- backend/.env.example
-
-### Netlify
-
-В проекте есть файл netlify.toml с нужными параметрами:
-
-- команда сборки: npm run build
-- папка публикации: dist
-- fallback-редирект на /index.html
-
-### Vercel
-
-В проекте есть файл vercel.json с rewrite на /index.html для всех маршрутов.
 
 ## Структура маршрутов
 

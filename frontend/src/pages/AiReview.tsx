@@ -166,7 +166,7 @@ export default function AiReview() {
             )}
 
             {!isChecking && error && (
-              <p className="text-sm text-red-700 dark:text-rose-300">{error}</p>
+              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
             )}
           </Card>
 

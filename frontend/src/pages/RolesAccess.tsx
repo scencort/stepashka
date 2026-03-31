@@ -81,7 +81,7 @@ export default function RolesAccess() {
 
         <Card className="space-y-3">
           <p className="font-semibold">Пригласить участника</p>
-          {error && <p className="text-sm text-red-700 dark:text-rose-300">{error}</p>}
+          {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
           <div className="flex flex-col md:flex-row gap-2">
             <input
               value={invite}

@@ -212,7 +212,7 @@ export default function AssignmentBuilder() {
             ))}
           </div>
 
-          {error && <p className="text-sm text-red-700 dark:text-rose-300">{error}</p>}
+          {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
 
           <Button onClick={saveAssignment} className="w-full md:w-auto">Сохранить задание</Button>
         </Card>

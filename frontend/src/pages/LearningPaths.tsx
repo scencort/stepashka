@@ -70,7 +70,7 @@ export default function LearningPaths() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           {loading && <Card><p className="text-sm">Загрузка...</p></Card>}
-          {!loading && error && <Card><p className="text-sm text-red-700 dark:text-rose-300">{error}</p></Card>}
+          {!loading && error && <Card><p className="text-sm text-red-700 dark:text-red-300">{error}</p></Card>}
 
           {!loading && !error && tracks.map((track) => (
             <Card key={track.id} className="space-y-4">

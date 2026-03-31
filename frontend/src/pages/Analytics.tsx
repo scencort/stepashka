@@ -17,6 +17,8 @@ export default function Analytics() {
     completedCourses: 0,
   })
   const [error, setError] = useState("")
+  const [insights, setInsights] = useState<Array<{ label: string; text: string }>>([])
+  const [insightsLoading, setInsightsLoading] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -33,6 +35,25 @@ export default function Analytics() {
         }>(`/analytics?period=${period}`)
         setValues(data.values)
         setStats(data.stats)
+
+        // Fetch AI insights
+        setInsightsLoading(true)
+        try {
+          const insightsData = await api.post<{
+            insights: Array<{ label: string; text: string }>
+          }>("/ai/insights", {
+            period,
+            values: data.values,
+            averageScore: data.stats.averageScore,
+            solvedTasks: data.stats.solvedTasks,
+            completedCourses: data.stats.completedCourses,
+          })
+          setInsights(insightsData.insights || [])
+        } catch {
+          setInsights([])
+        } finally {
+          setInsightsLoading(false)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Не удалось загрузить аналитику")
       } finally {
@@ -100,7 +121,7 @@ export default function Analytics() {
 
         <Card>
           <h3 className="font-semibold mb-4">Динамика прогресса</h3>
-          {error && <p className="text-sm text-red-700 dark:text-rose-300 mb-3">{error}</p>}
+          {error && <p className="text-sm text-red-700 dark:text-red-300 mb-3">{error}</p>}
 
           {loading && (
             <div className="space-y-2">
@@ -139,20 +160,26 @@ export default function Analytics() {
         {!loading && values.length > 0 && (
           <Card className="space-y-3">
             <h3 className="font-semibold">AI insights</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="rounded-xl glass-panel p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Сильная зона</p>
-                <p className="font-medium mt-1">Практические шаги: стабильный рост {Math.max(0, delta)}%</p>
+            {insightsLoading && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
               </div>
-              <div className="rounded-xl glass-panel p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Зона риска</p>
-                <p className="font-medium mt-1">Рекомендуется увеличить регулярность и довести sprint до {goal}%</p>
+            )}
+            {!insightsLoading && insights.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {insights.map((item, idx) => (
+                  <div key={idx} className="rounded-xl glass-panel p-3">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">{item.label}</p>
+                    <p className="font-medium mt-1">{item.text}</p>
+                  </div>
+                ))}
               </div>
-              <div className="rounded-xl glass-panel p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Следующий шаг</p>
-                <p className="font-medium mt-1">Добавить 2 code-практики и пройти 1 quiz на этой неделе</p>
-              </div>
-            </div>
+            )}
+            {!insightsLoading && insights.length === 0 && (
+              <p className="text-sm text-slate-500">Не удалось загрузить AI-инсайты. Попробуйте позже.</p>
+            )}
           </Card>
         )}
       </motion.div>

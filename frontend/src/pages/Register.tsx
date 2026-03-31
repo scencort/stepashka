@@ -3,7 +3,9 @@ import { useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import Button from "../components/ui/Button"
 import Card from "../components/ui/Card"
-import { UserRoundPlus, User, Mail, Lock } from "lucide-react"
+import FieldSvgIcon from "../components/ui/FieldSvgIcon"
+import AuthScreenShell from "../components/auth/AuthScreenShell"
+import { UserRoundPlus, Eye, EyeOff } from "lucide-react"
 import { useAppStore } from "../store/AppStore"
 import { useToast } from "../hooks/useToast"
 
@@ -19,6 +21,7 @@ export default function Register() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [passwordVisible, setPasswordVisible] = useState(false)
 
   const validate = () => {
     if (name.trim().length < 2) {
@@ -59,7 +62,7 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <AuthScreenShell>
 
       <motion.div
         variants={fadeInUp}
@@ -79,36 +82,44 @@ export default function Register() {
           </h2>
 
           <div className="relative mb-4">
-            <User size={15} className="absolute left-3 top-3.5 text-slate-500" />
+            <FieldSvgIcon kind="user" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
             <input
               type="text"
               placeholder="Имя"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-11 pr-4 py-3 rounded-xl glass-panel outline-none"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
 
           <div className="relative mb-4">
-            <Mail size={15} className="absolute left-3 top-3.5 text-slate-500" />
+            <FieldSvgIcon kind="email" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
             <input
               type="email"
               placeholder="Email"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-11 pr-4 py-3 rounded-xl glass-panel outline-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           <div className="relative mb-6">
-            <Lock size={15} className="absolute left-3 top-3.5 text-slate-500" />
+            <FieldSvgIcon kind="password" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
             <input
-              type="password"
+              type={passwordVisible ? "text" : "password"}
               placeholder="Пароль"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-11 pr-11 py-3 rounded-xl glass-panel outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            <button
+              type="button"
+              onClick={() => setPasswordVisible((prev) => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 z-10"
+              aria-label={passwordVisible ? "Скрыть пароль" : "Показать пароль"}
+            >
+              {passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
 
           <p className="text-sm mb-6 text-slate-500 dark:text-slate-300">
@@ -116,7 +127,7 @@ export default function Register() {
           </p>
 
           {error && (
-            <p className="text-sm text-red-700 dark:text-rose-300 mb-4">{error}</p>
+            <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
           )}
 
           <Button className="w-full" onClick={handleRegister} disabled={loading}>
@@ -125,7 +136,7 @@ export default function Register() {
 
           <p className="text-sm text-center mt-4 text-slate-500">
             Уже есть аккаунт?{" "}
-            <Link to="/login" className="text-red-700 dark:text-rose-300 font-semibold">
+            <Link to="/login" className="text-red-700 dark:text-red-300 font-semibold">
               Войти
             </Link>
           </p>
@@ -134,6 +145,6 @@ export default function Register() {
 
       </motion.div>
 
-    </div>
+    </AuthScreenShell>
   )
 }

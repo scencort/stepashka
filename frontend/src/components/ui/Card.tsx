@@ -1,5 +1,5 @@
 import { motion } from "framer-motion"
-import { scaleHover, smooth } from "../../lib/animations"
+import { smooth } from "../../lib/animations"
 
 type Props = {
   children: React.ReactNode
@@ -9,7 +9,6 @@ type Props = {
 export default function Card({ children, className = "" }: Props) {
   return (
     <motion.div
-      {...scaleHover}
       {...smooth}
       className={`
         p-5

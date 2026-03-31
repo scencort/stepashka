@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { motion } from "framer-motion"
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
 import { useSearchParams } from "react-router-dom"
+import Cropper, { type Area, type Point } from "react-easy-crop"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
 import Button from "../components/ui/Button"
@@ -51,6 +52,12 @@ export default function AccountSettings() {
   const [sessions, setSessions] = useState<AccountSession[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [pendingAvatarSrc, setPendingAvatarSrc] = useState<string | null>(null)
+  const [pendingAvatarMime, setPendingAvatarMime] = useState("image/jpeg")
+  const [cropPosition, setCropPosition] = useState<Point>({ x: 0, y: 0 })
+  const [cropZoom, setCropZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [error, setError] = useState("")
   const [profileErrors, setProfileErrors] = useState<ProfileErrors>({})
@@ -61,6 +68,26 @@ export default function AccountSettings() {
   const [emailConfirmCode, setEmailConfirmCode] = useState("")
   const [twoFactorCode, setTwoFactorCode] = useState("")
   const [disable2faPassword, setDisable2faPassword] = useState("")
+  const avatarInputRef = useRef<HTMLInputElement | null>(null)
+  const actionRowClass = "flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end"
+  const actionButtonClass = "w-full sm:w-auto sm:min-w-[180px]"
+  const avatarActionButtonClass = "w-full sm:w-auto sm:min-w-0"
+
+  const onCropComplete = useCallback((_croppedArea: Area, croppedPixels: Area) => {
+    setCroppedAreaPixels(croppedPixels)
+  }, [])
+
+  const closeCropModal = useCallback(() => {
+    setPendingAvatarSrc(null)
+    setCroppedAreaPixels(null)
+    setCropPosition({ x: 0, y: 0 })
+    setCropZoom(1)
+  }, [])
+
+  const resetCrop = useCallback(() => {
+    setCropPosition({ x: 0, y: 0 })
+    setCropZoom(1)
+  }, [])
 
   const formatDateTime = (value: string, tz: string) => {
     try {
@@ -132,6 +159,39 @@ export default function AccountSettings() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (!pendingAvatarSrc) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeCropModal()
+      }
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault()
+        setCropZoom((prev) => Math.min(3.5, Number((prev + 0.1).toFixed(2))))
+      }
+      if (event.key === "-" || event.key === "_") {
+        event.preventDefault()
+        setCropZoom((prev) => Math.max(1, Number((prev - 0.1).toFixed(2))))
+      }
+      if (event.key.toLowerCase() === "r") {
+        event.preventDefault()
+        resetCrop()
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener("keydown", onKeyDown)
+    }
+  }, [pendingAvatarSrc, closeCropModal, resetCrop])
+
   const isDirty = useMemo(() => {
     if (!profile || !initialSnapshot) {
       return false
@@ -156,6 +216,95 @@ export default function AccountSettings() {
       setProfileErrors(validateProfile(next))
       return next
     })
+  }
+
+  const onAvatarFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !profile) {
+      return
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Выберите файл изображения")
+      event.target.value = ""
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Размер файла должен быть до 2 МБ")
+      event.target.value = ""
+      return
+    }
+
+    setAvatarUploading(true)
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ""))
+        reader.onerror = () => reject(new Error("Не удалось прочитать файл"))
+        reader.readAsDataURL(file)
+      })
+
+      setPendingAvatarSrc(dataUrl)
+      setPendingAvatarMime(file.type || "image/jpeg")
+      setCropPosition({ x: 0, y: 0 })
+      setCropZoom(1)
+      setCroppedAreaPixels(null)
+      toast.success("Фото выбрано. Обрежьте его и примените")
+    } catch {
+      toast.error("Не удалось загрузить фото")
+    } finally {
+      setAvatarUploading(false)
+      event.target.value = ""
+    }
+  }
+
+  const applyAvatarCrop = async () => {
+    if (!pendingAvatarSrc || !croppedAreaPixels) {
+      return
+    }
+
+    setAvatarUploading(true)
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image()
+        image.onload = () => resolve(image)
+        image.onerror = () => reject(new Error("Не удалось загрузить изображение"))
+        image.src = pendingAvatarSrc
+      })
+
+      const canvas = document.createElement("canvas")
+      canvas.width = 256
+      canvas.height = 256
+      const ctx = canvas.getContext("2d")
+      if (!ctx) {
+        throw new Error("Canvas недоступен")
+      }
+
+      ctx.drawImage(
+        img,
+        croppedAreaPixels.x,
+        croppedAreaPixels.y,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
+        0,
+        0,
+        256,
+        256,
+      )
+
+      const mimeType = pendingAvatarMime === "image/png" ? "image/png" : "image/jpeg"
+      const dataUrl = canvas.toDataURL(mimeType, 0.92)
+
+      updateProfileField("avatarUrl", dataUrl)
+      setPendingAvatarSrc(null)
+      setCroppedAreaPixels(null)
+      toast.success("Фото обрезано. Не забудьте сохранить профиль")
+    } catch {
+      toast.error("Не удалось обрезать фото")
+    } finally {
+      setAvatarUploading(false)
+    }
   }
 
   const saveProfile = async () => {
@@ -355,7 +504,7 @@ export default function AccountSettings() {
 
         {loading && <Card><p className="text-sm text-slate-500">Загрузка профиля...</p></Card>}
 
-        {!loading && error && <Card><p className="text-sm text-red-700 dark:text-rose-300">{error}</p></Card>}
+        {!loading && error && <Card><p className="text-sm text-red-700 dark:text-red-300">{error}</p></Card>}
 
         {!loading && profile && (
           <>
@@ -378,29 +527,74 @@ export default function AccountSettings() {
               </div>
             </Card>
 
+            <Card className="space-y-3">
+              <h3 className="font-semibold">Состояние аккаунта</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div className="rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-3 bg-slate-50/70 dark:bg-slate-800/45">
+                  <p className="text-xs text-slate-500">Email</p>
+                  <p className="text-sm font-semibold mt-1">{profile.pendingEmail ? "Ожидает подтверждения" : "Подтверждён"}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-3 bg-slate-50/70 dark:bg-slate-800/45">
+                  <p className="text-xs text-slate-500">2FA</p>
+                  <p className="text-sm font-semibold mt-1">{profile.twoFactorEnabled ? "Включена" : "Выключена"}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-3 bg-slate-50/70 dark:bg-slate-800/45">
+                  <p className="text-xs text-slate-500">Активные сессии</p>
+                  <p className="text-sm font-semibold mt-1">{sessions.length}</p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                <Button variant="outline" className={actionButtonClass} onClick={() => setTab("security")}>Открыть безопасность</Button>
+                <Button variant="outline" className={actionButtonClass} onClick={() => setTab("sessions")}>Управлять сессиями</Button>
+              </div>
+            </Card>
+
             <Card className="space-y-4">
               <h3 className="font-semibold">Профиль</h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-sm text-slate-500">Avatar URL</span>
-                  <input
-                    value={profile.avatarUrl || ""}
-                    onChange={(event) => updateProfileField("avatarUrl", event.target.value)}
-                    className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
-                    placeholder="https://..."
-                  />
-                </label>
-
-                <div className="rounded-xl glass-panel px-3 py-2 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-slate-200/70 overflow-hidden">
+              <div className="grid grid-cols-1 gap-3">
+                <div className="rounded-xl glass-panel p-3 sm:p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="w-16 h-16 rounded-full bg-slate-200/70 dark:bg-slate-700/60 overflow-hidden shrink-0">
                     {profile.avatarUrl ? (
                       <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-xs text-slate-500">no avatar</div>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500">Аватар используется в хедере и профиле</p>
+                  <div>
+                    <p className="text-sm font-medium">Фото профиля</p>
+                    <p className="text-xs text-slate-500">Аватар используется в хедере и профиле</p>
+                  </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={onAvatarFileSelected}
+                      className="hidden"
+                      aria-label="Загрузить фото профиля"
+                      title="Загрузить фото профиля"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={saving || avatarUploading}
+                      className={avatarActionButtonClass}
+                    >
+                      {avatarUploading ? "Загрузка..." : "Выбрать фото"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => updateProfileField("avatarUrl", "")}
+                      disabled={saving || avatarUploading || !profile.avatarUrl}
+                      className={avatarActionButtonClass}
+                    >
+                      Убрать фото
+                    </Button>
+                  </div>
+
                 </div>
               </div>
 
@@ -526,13 +720,13 @@ export default function AccountSettings() {
                       placeholder="6-значный код"
                       className="w-full md:max-w-[220px] rounded-xl glass-panel px-3 py-2 outline-none"
                     />
-                    <Button variant="outline" onClick={confirmEmailChange} disabled={saving}>Подтвердить email</Button>
+                    <Button variant="outline" onClick={confirmEmailChange} disabled={saving} className={actionButtonClass}>Подтвердить email</Button>
                   </div>
                 </div>
               )}
 
-              <div className="flex justify-end">
-                <Button onClick={saveProfile} disabled={saving || !isDirty || hasProfileErrors}>Сохранить профиль</Button>
+              <div className={actionRowClass}>
+                <Button onClick={saveProfile} disabled={saving || !isDirty || hasProfileErrors} className={actionButtonClass}>Сохранить профиль</Button>
               </div>
             </Card>
 
@@ -568,8 +762,8 @@ export default function AccountSettings() {
                   />
                 </label>
               </div>
-              <div className="flex justify-end">
-                <Button variant="outline" onClick={changePassword} disabled={saving}>Изменить пароль</Button>
+              <div className={actionRowClass}>
+                <Button variant="outline" onClick={changePassword} disabled={saving} className={actionButtonClass}>Изменить пароль</Button>
               </div>
 
               <div className="pt-2 border-t border-slate-200/70 dark:border-slate-700/70 space-y-3">
@@ -578,8 +772,8 @@ export default function AccountSettings() {
 
                 {!profile.twoFactorEnabled && (
                   <div className="space-y-2">
-                    <div className="flex gap-2 flex-wrap">
-                      <Button variant="outline" onClick={requestEnable2fa} disabled={saving}>Запросить код включения</Button>
+                    <div className={actionRowClass}>
+                      <Button variant="outline" onClick={requestEnable2fa} disabled={saving} className={actionButtonClass}>Запросить код включения</Button>
                     </div>
                     <div className="flex flex-col md:flex-row gap-2 md:items-center">
                       <input
@@ -588,7 +782,7 @@ export default function AccountSettings() {
                         placeholder="Код 2FA"
                         className="w-full md:max-w-[220px] rounded-xl glass-panel px-3 py-2 outline-none"
                       />
-                      <Button onClick={confirmEnable2fa} disabled={saving}>Подтвердить включение</Button>
+                      <Button onClick={confirmEnable2fa} disabled={saving} className={actionButtonClass}>Подтвердить включение</Button>
                     </div>
                   </div>
                 )}
@@ -602,7 +796,7 @@ export default function AccountSettings() {
                       placeholder="Введите пароль для отключения"
                       className="w-full md:max-w-[280px] rounded-xl glass-panel px-3 py-2 outline-none"
                     />
-                    <Button variant="outline" onClick={disable2fa} disabled={saving}>Отключить 2FA</Button>
+                    <Button variant="outline" onClick={disable2fa} disabled={saving} className={actionButtonClass}>Отключить 2FA</Button>
                   </div>
                 )}
               </div>
@@ -613,7 +807,7 @@ export default function AccountSettings() {
               <Card className="space-y-4">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                 <h3 className="font-semibold">Активные сессии</h3>
-                <Button variant="outline" onClick={logoutAll} disabled={saving}>Завершить все остальные</Button>
+                <Button variant="outline" onClick={logoutAll} disabled={saving} className={actionButtonClass}>Завершить все остальные</Button>
               </div>
 
               {sessionsLoading && <p className="text-sm text-slate-500">Загрузка сессий...</p>}
@@ -631,7 +825,7 @@ export default function AccountSettings() {
                     <p className="text-xs text-slate-500">Expires: {formatDateTime(session.expiresAt, profile.timezone)}</p>
                   </div>
 
-                  <Button variant="outline" onClick={() => revokeSession(session.id)} disabled={saving}>Завершить</Button>
+                  <Button variant="outline" onClick={() => revokeSession(session.id)} disabled={saving} className={actionButtonClass}>Завершить</Button>
                 </div>
               ))}
             </Card>
@@ -639,6 +833,107 @@ export default function AccountSettings() {
           </>
         )}
       </motion.div>
+
+      <AnimatePresence>
+        {pendingAvatarSrc && (
+          <motion.div
+            className="fixed inset-0 z-50 bg-black/55 backdrop-blur-md p-3 sm:p-6 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                closeCropModal()
+              }
+            }}
+          >
+            <motion.div
+              className="w-full max-w-3xl rounded-3xl overflow-hidden glass-panel border border-white/25 dark:border-slate-600/40 text-[var(--text)] shadow-2xl shadow-black/35"
+              initial={{ y: 24, scale: 0.98, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={{ y: 20, scale: 0.98, opacity: 0 }}
+              transition={{ duration: 0.22 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="px-5 pt-5 pb-3 sm:px-7 sm:pt-6 sm:pb-4 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xl sm:text-2xl font-semibold tracking-tight">Редактирование аватара</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Перетащите фото и подберите крупность кадра</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeCropModal}
+                  className="rounded-xl glass-panel px-3 py-1.5 text-xs font-semibold hover:bg-white/80 dark:hover:bg-slate-900/70"
+                >
+                  Закрыть
+                </button>
+              </div>
+
+              <div className="relative h-[320px] sm:h-[420px] bg-slate-200/45 dark:bg-slate-900/75">
+                <Cropper
+                  image={pendingAvatarSrc}
+                  crop={cropPosition}
+                  zoom={cropZoom}
+                  aspect={1}
+                  cropShape="round"
+                  showGrid={false}
+                  minZoom={1}
+                  maxZoom={3.5}
+                  onCropChange={setCropPosition}
+                  onZoomChange={setCropZoom}
+                  onCropComplete={onCropComplete}
+                />
+                {avatarUploading && (
+                  <div className="absolute inset-0 bg-black/35 backdrop-blur-[1px] flex items-center justify-center">
+                    <div className="rounded-xl glass-panel px-4 py-2 text-sm font-semibold">Сохраняем фото...</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-5 pb-5 pt-4 sm:px-7 sm:pb-6 space-y-4 border-t border-slate-300/50 dark:border-slate-600/50 bg-white/30 dark:bg-slate-900/35">
+                <label className="block">
+                  <div className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
+                    <span>Масштаб</span>
+                    <span>{cropZoom.toFixed(1)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={3.5}
+                    step={0.05}
+                    value={cropZoom}
+                    onChange={(event) => setCropZoom(Number(event.target.value))}
+                    className="mt-2 w-full accent-rose-500"
+                  />
+                </label>
+
+                <p className="text-xs text-slate-600 dark:text-slate-300">Совет: крутите колесо мыши для масштаба, перетаскивайте фото для позиционирования, клавиши <span className="font-semibold">+ / - / R</span> работают в модалке.</p>
+
+                <div className="flex flex-col sm:flex-row-reverse gap-2">
+                  <Button onClick={applyAvatarCrop} disabled={saving || avatarUploading || !croppedAreaPixels} className="w-full sm:w-auto sm:min-w-[210px]">Применить</Button>
+                  <Button
+                    variant="outline"
+                    onClick={resetCrop}
+                    disabled={saving || avatarUploading}
+                    className="w-full sm:w-auto sm:min-w-[170px]"
+                  >
+                    Сбросить кадр
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={closeCropModal}
+                    disabled={saving || avatarUploading}
+                    className="w-full sm:w-auto sm:min-w-[160px]"
+                  >
+                    Отмена
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </MainLayout>
   )
 }

@@ -10,7 +10,7 @@ type BrandLogoProps = {
 
 export default function BrandLogo({
   showText = true,
-  text = "Stepashka",
+  text = "Степашка",
   className = "",
   iconClassName = "h-9 w-9",
   textClassName = "text-xl font-extrabold bg-gradient-to-r from-red-600 to-rose-800 bg-clip-text text-transparent",

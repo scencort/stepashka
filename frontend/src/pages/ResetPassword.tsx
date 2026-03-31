@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 import { Lock, ShieldCheck, Mail, KeyRound } from "lucide-react"
 import Card from "../components/ui/Card"
 import Button from "../components/ui/Button"
+import AuthScreenShell from "../components/auth/AuthScreenShell"
 import { api } from "../services/api"
 import { useToast } from "../hooks/useToast"
 import { fadeInUp } from "../lib/animations"
@@ -76,7 +77,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <AuthScreenShell>
       <motion.div variants={fadeInUp} initial="initial" animate="animate" className="w-full max-w-md">
         <Card className="p-7 md:p-8">
           <div className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full glass-panel mb-4 text-slate-600 dark:text-slate-300">
@@ -136,19 +137,19 @@ export default function ResetPassword() {
             />
           </div>
 
-          {error && <p className="text-sm text-red-700 dark:text-rose-300 mb-4">{error}</p>}
+          {error && <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>}
 
           <Button className="w-full" onClick={handleSubmit} disabled={loading}>
             {loading ? "Обновляем..." : "Обновить пароль"}
           </Button>
 
           <p className="text-sm text-center mt-4 text-slate-500">
-            <Link to="/login" className="text-red-700 dark:text-rose-300 font-semibold">
+            <Link to="/login" className="text-red-700 dark:text-red-300 font-semibold">
               Назад ко входу
             </Link>
           </p>
         </Card>
       </motion.div>
-    </div>
+    </AuthScreenShell>
   )
 }

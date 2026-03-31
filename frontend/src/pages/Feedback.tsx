@@ -81,7 +81,7 @@ export default function Feedback() {
 
         <Card className="space-y-3">
           <p className="font-semibold">Новое предложение</p>
-          {error && <p className="text-sm text-red-700 dark:text-rose-300">{error}</p>}
+          {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}

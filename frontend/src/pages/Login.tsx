@@ -3,7 +3,9 @@ import { useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import Button from "../components/ui/Button"
 import Card from "../components/ui/Card"
-import { LogIn, Mail, Lock } from "lucide-react"
+import FieldSvgIcon from "../components/ui/FieldSvgIcon"
+import AuthScreenShell from "../components/auth/AuthScreenShell"
+import { LogIn, Eye, EyeOff } from "lucide-react"
 import { useAppStore } from "../store/AppStore"
 import { useToast } from "../hooks/useToast"
 
@@ -21,6 +23,7 @@ export default function Login() {
   const [twoFactorMode, setTwoFactorMode] = useState(false)
   const [twoFactorCode, setTwoFactorCode] = useState("")
   const [challengeId, setChallengeId] = useState("")
+  const [passwordVisible, setPasswordVisible] = useState(false)
 
   const validate = () => {
     const normalizedEmail = email.trim().toLowerCase()
@@ -93,7 +96,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <AuthScreenShell>
 
       <motion.div
         variants={fadeInUp}
@@ -105,7 +108,7 @@ export default function Login() {
         <Card className="p-7 md:p-8">
 
           <div className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full glass-panel mb-4 text-slate-600 dark:text-slate-300">
-            <LogIn size={13} /> Доступ к аккаунту
+            <LogIn size={13} /> Вход в личный кабинет
           </div>
 
           <h2 className="text-2xl font-bold mb-6 text-center">
@@ -113,11 +116,11 @@ export default function Login() {
           </h2>
 
           <div className="relative mb-4">
-            <Mail size={15} className="absolute left-3 top-3.5 text-slate-500" />
+            <FieldSvgIcon kind="email" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
             <input
               type="email"
               placeholder="Email"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-11 pr-4 py-3 rounded-xl glass-panel outline-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={twoFactorMode}
@@ -125,24 +128,33 @@ export default function Login() {
           </div>
 
           <div className="relative mb-6">
-            <Lock size={15} className="absolute left-3 top-3.5 text-slate-500" />
+            <FieldSvgIcon kind="password" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
             <input
-              type="password"
+              type={passwordVisible ? "text" : "password"}
               placeholder="Пароль"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+              className="w-full pl-11 pr-11 py-3 rounded-xl glass-panel outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={twoFactorMode}
             />
+            <button
+              type="button"
+              onClick={() => setPasswordVisible((prev) => !prev)}
+              disabled={twoFactorMode}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-50 z-10"
+              aria-label={passwordVisible ? "Скрыть пароль" : "Показать пароль"}
+            >
+              {passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
 
           {twoFactorMode && (
             <div className="relative mb-6">
-              <Lock size={15} className="absolute left-3 top-3.5 text-slate-500" />
+              <FieldSvgIcon kind="key" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
               <input
                 type="text"
                 placeholder="Код 2FA"
-                className="w-full pl-10 pr-4 py-3 rounded-xl glass-panel outline-none"
+                className="w-full pl-11 pr-4 py-3 rounded-xl glass-panel outline-none"
                 value={twoFactorCode}
                 onChange={(e) => setTwoFactorCode(e.target.value)}
               />
@@ -150,13 +162,13 @@ export default function Login() {
           )}
 
           <div className="mb-6 text-center">
-            <Link to="/forgot-password" className="text-sm text-red-700 dark:text-rose-300 font-semibold">
+            <Link to="/forgot-password" className="text-sm text-red-700 dark:text-red-300 font-semibold">
               Забыли пароль?
             </Link>
           </div>
 
           {error && (
-            <p className="text-sm text-red-700 dark:text-rose-300 mb-4">{error}</p>
+            <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
           )}
 
           <Button className="w-full" onClick={twoFactorMode ? handleVerify2fa : handleLogin} disabled={loading}>
@@ -178,7 +190,7 @@ export default function Login() {
 
           <p className="text-sm text-center mt-4 text-slate-500">
             Еще нет аккаунта?{" "}
-            <Link to="/register" className="text-red-700 dark:text-rose-300 font-semibold">
+            <Link to="/register" className="text-red-700 dark:text-red-300 font-semibold">
               Регистрация
             </Link>
           </p>
@@ -187,6 +199,6 @@ export default function Login() {
 
       </motion.div>
 
-    </div>
+    </AuthScreenShell>
   )
 }

@@ -130,7 +130,7 @@ const profilePatchSchema = z.object({
   language: z.enum(["ru", "en"]).optional(),
   emailNotifications: z.boolean().optional(),
   marketingNotifications: z.boolean().optional(),
-  avatarUrl: z.string().max(1000).optional(),
+  avatarUrl: z.string().max(2_000_000).optional(),
 })
 
 const accountChangePasswordSchema = z.object({
@@ -414,6 +414,114 @@ function estimateEssay(answerText, rubric = {}) {
   }
 }
 
+function evaluateTreePattern(codeText, levels = [1, 2]) {
+  const code = String(codeText || "")
+  const hasLoop = /\b(for|while)\b/.test(code)
+  const hasPrint = /print\s*\(/.test(code)
+  const hasStar = /\*/.test(code)
+  const hasStarMultiplication = /(["']\*["']\s*\*\s*\w+)|(\*\s*\w+\s*\))/i.test(code)
+
+  const requiredLiterals = Array.isArray(levels)
+    ? levels.filter((level) => Number.isInteger(level) && level > 0).map((level) => "*".repeat(level))
+    : ["*", "**"]
+
+  const hasLiteralLines = requiredLiterals.every(
+    (line) => code.includes(`"${line}"`) || code.includes(`'${line}'`)
+  )
+
+  return hasLoop && hasPrint && hasStar && (hasStarMultiplication || hasLiteralLines)
+}
+
+function evaluateCodeByTests(answerText, testsRaw) {
+  const answer = String(answerText || "")
+  const lowered = answer.toLowerCase()
+  const tests = Array.isArray(testsRaw) ? testsRaw : []
+
+  if (tests.length === 0) {
+    const passed = answer.trim().length >= 20
+    return {
+      passed,
+      scorePercent: passed ? 100 : 0,
+      passedCount: passed ? 1 : 0,
+      totalChecks: 1,
+      checkResults: [
+        {
+          name: "Базовая проверка: длина ответа",
+          passed,
+        },
+      ],
+      feedback: passed
+        ? "Решение принято: базовая проверка пройдена"
+        : "Добавьте более полное решение: минимум 20 символов",
+    }
+  }
+
+  const failedChecks = []
+  const checkResults = []
+  let passedCount = 0
+
+  for (const rawTest of tests) {
+    const test = rawTest || {}
+    const name = String(test.name || "Проверка")
+    const type = String(test.type || "")
+    let passed = false
+
+    if (type === "regex") {
+      try {
+        const pattern = new RegExp(String(test.pattern || ""), "i")
+        passed = pattern.test(answer)
+      } catch {
+        passed = false
+      }
+    } else if (type === "includesAny") {
+      const tokens = Array.isArray(test.tokens) ? test.tokens.map((token) => String(token).toLowerCase()) : []
+      passed = tokens.some((token) => token && lowered.includes(token))
+    } else if (type === "includesAll") {
+      const tokens = Array.isArray(test.tokens) ? test.tokens.map((token) => String(token).toLowerCase()) : []
+      passed = tokens.length > 0 && tokens.every((token) => token && lowered.includes(token))
+    } else if (type === "minCountRegex") {
+      try {
+        const pattern = new RegExp(String(test.pattern || ""), "gi")
+        const min = Math.max(1, Number(test.min || 1))
+        const matches = answer.match(pattern) || []
+        passed = matches.length >= min
+      } catch {
+        passed = false
+      }
+    } else if (type === "treePattern") {
+      passed = evaluateTreePattern(answer, test.levels)
+    } else {
+      passed = answer.trim().length >= 20
+    }
+
+    if (passed) {
+      passedCount += 1
+    } else {
+      failedChecks.push(name)
+    }
+
+    checkResults.push({
+      name,
+      passed,
+    })
+  }
+
+  const totalChecks = tests.length
+  const scorePercent = totalChecks ? Math.round((passedCount / totalChecks) * 100) : 0
+  const allPassed = passedCount === totalChecks
+
+  return {
+    passed: allPassed,
+    scorePercent,
+    passedCount,
+    totalChecks,
+    checkResults,
+    feedback: allPassed
+      ? `Решение принято: пройдено ${passedCount}/${totalChecks} проверок`
+      : `Не пройдено ${failedChecks.length} из ${totalChecks} проверок: ${failedChecks.join(", ")}`,
+  }
+}
+
 app.get("/api/health", async (_req, res) => {
   if (!dbReady) {
     return res.status(503).json({ status: "degraded", dbReady: false })
@@ -434,6 +542,31 @@ app.get("/api/catalog", async (_req, res) => {
      ORDER BY c.created_at DESC`
   )
   return res.json(rows.rows)
+})
+
+app.get("/api/public/stats", async (_req, res) => {
+  const [catalogStats, communityStats] = await Promise.all([
+    pool.query(
+      `SELECT
+        COUNT(*)::int AS "coursesTotal",
+        COALESCE(SUM(students_count), 0)::int AS "studentsTotal",
+        COALESCE(AVG(rating), 0)::numeric(5,2) AS "averageRating"
+       FROM courses
+       WHERE status IN ('published', 'pending_review')`
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS "membersTotal"
+       FROM users
+       WHERE status = 'active'`
+    ),
+  ])
+
+  return res.json({
+    coursesTotal: Number(catalogStats.rows[0]?.coursesTotal || 0),
+    studentsTotal: Number(catalogStats.rows[0]?.studentsTotal || 0),
+    averageRating: Number(catalogStats.rows[0]?.averageRating || 0),
+    communityMembers: Number(communityStats.rows[0]?.membersTotal || 0),
+  })
 })
 
 app.use("/api/auth", authLimiter)
@@ -803,7 +936,7 @@ app.patch("/api/account/profile", authRequired, async (req, res) => {
 
   if (typeof parsed.avatarUrl === "string") {
     updates.push(`avatar_url = $${idx++}`)
-    values.push(parsed.avatarUrl.trim().slice(0, 1000))
+    values.push(parsed.avatarUrl.trim().slice(0, 2_000_000))
   }
 
   if (updates.length > 0) {
@@ -1275,20 +1408,41 @@ app.get("/api/student/dashboard", authRequired, requireRoles("student", "teacher
   )
 
   const dailyActivity = await pool.query(
-    `SELECT DISTINCT DATE(created_at) AS day
-     FROM submissions
-     WHERE user_id = $1
+    `SELECT DISTINCT day
+     FROM (
+       SELECT DATE(created_at) AS day
+       FROM submissions
+       WHERE user_id = $1
+
+       UNION
+
+       SELECT DATE(completed_at) AS day
+       FROM step_progress
+       WHERE user_id = $1 AND status = 'completed' AND completed_at IS NOT NULL
+     ) activity
      ORDER BY day DESC
-     LIMIT 60`,
+     LIMIT 365`,
     [req.user.id]
   )
 
-  const daysSet = new Set(dailyActivity.rows.map((item) => String(item.day).slice(0, 10)))
+  const toDateKey = (value) => {
+    const date = new Date(value)
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, "0")
+    const d = String(date.getDate()).padStart(2, "0")
+    return `${y}-${m}-${d}`
+  }
+
+  const daysSet = new Set(dailyActivity.rows.map((item) => toDateKey(item.day)))
+  const today = new Date()
+  const todayKey = toDateKey(today)
+  const startOffset = daysSet.has(todayKey) ? 0 : 1
+
   let streakDays = 0
-  for (let i = 0; i < 365; i += 1) {
+  for (let i = startOffset; i < 365; i += 1) {
     const date = new Date()
     date.setDate(date.getDate() - i)
-    const key = date.toISOString().slice(0, 10)
+    const key = toDateKey(date)
     if (daysSet.has(key)) {
       streakDays += 1
     } else {
@@ -1299,6 +1453,75 @@ app.get("/api/student/dashboard", authRequired, requireRoles("student", "teacher
   const activeEnrollments = enrollments.rows.filter((item) => item.status === "active")
   const averageProgress = activeEnrollments.length
     ? Math.round(activeEnrollments.reduce((sum, item) => sum + Number(item.progressPercent || 0), 0) / activeEnrollments.length)
+    : 0
+
+  const activeCourseIds = activeEnrollments.map((item) => Number(item.courseId)).filter((value) => Number.isInteger(value) && value > 0)
+
+  let continueStep = null
+  let totalSteps = 0
+  let completedSteps = 0
+
+  if (activeCourseIds.length > 0) {
+    const stepsSummary = await pool.query(
+      `SELECT
+         COUNT(cs.id)::int AS total,
+         COUNT(cs.id) FILTER (WHERE sp.id IS NOT NULL)::int AS completed
+       FROM course_steps cs
+       LEFT JOIN step_progress sp
+         ON sp.step_id = cs.id
+        AND sp.user_id = $1
+        AND sp.status = 'completed'
+       WHERE cs.course_id = ANY($2::int[])`,
+      [req.user.id, activeCourseIds]
+    )
+
+    totalSteps = Number(stepsSummary.rows[0]?.total || 0)
+    completedSteps = Number(stepsSummary.rows[0]?.completed || 0)
+
+    const nextStepQuery = await pool.query(
+      `SELECT cs.course_id AS "courseId", c.title AS "courseTitle", cs.id AS "stepId", cs.title AS "stepTitle", cs.step_order AS "stepOrder"
+       FROM enrollments e
+       INNER JOIN courses c ON c.id = e.course_id
+       INNER JOIN course_steps cs ON cs.course_id = c.id
+       LEFT JOIN step_progress sp
+         ON sp.step_id = cs.id
+        AND sp.user_id = $1
+        AND sp.status = 'completed'
+       WHERE e.user_id = $1
+         AND e.status = 'active'
+         AND sp.id IS NULL
+       ORDER BY e.progress_percent DESC, cs.step_order ASC
+       LIMIT 1`,
+      [req.user.id]
+    )
+
+    if (nextStepQuery.rows[0]) {
+      continueStep = {
+        courseId: Number(nextStepQuery.rows[0].courseId),
+        courseTitle: nextStepQuery.rows[0].courseTitle,
+        stepId: Number(nextStepQuery.rows[0].stepId),
+        stepTitle: nextStepQuery.rows[0].stepTitle,
+        stepOrder: Number(nextStepQuery.rows[0].stepOrder),
+      }
+    }
+  }
+
+  const completedStepsWeekQuery = await pool.query(
+    `SELECT COUNT(*)::int AS count
+     FROM step_progress
+     WHERE user_id = $1
+       AND status = 'completed'
+       AND completed_at IS NOT NULL
+       AND completed_at >= NOW() - INTERVAL '7 days'`,
+    [req.user.id]
+  )
+
+  const completedStepsWeek = Number(completedStepsWeekQuery.rows[0]?.count || 0)
+  const weeklyGoalSteps = 10
+  const remainingCourseSteps = Math.max(totalSteps - completedSteps, 0)
+  const stepsPerDay = completedStepsWeek / 7
+  const forecastDays = remainingCourseSteps > 0
+    ? Math.ceil(remainingCourseSteps / Math.max(stepsPerDay, 0.5))
     : 0
 
   const recentAudits = await pool.query(
@@ -1348,6 +1571,13 @@ app.get("/api/student/dashboard", authRequired, requireRoles("student", "teacher
       streakDays,
       averageScore: `${averageProgress}%`,
       tasksWeek: Number(submissionsWeek.rows[0]?.count || 0),
+    },
+    continue: continueStep,
+    weeklyPlan: {
+      goalSteps: weeklyGoalSteps,
+      completedSteps: completedStepsWeek,
+      remainingSteps: Math.max(weeklyGoalSteps - completedStepsWeek, 0),
+      forecastDays,
     },
     courses: activeEnrollments.slice(0, 6).map((item) => ({
       id: item.courseId,
@@ -1416,7 +1646,7 @@ app.get("/api/student/courses/:courseId/steps", authRequired, requireRoles("stud
   const lessonIds = lessons.rows.map((item) => item.id)
   const assignments = lessonIds.length
     ? await pool.query(
-      `SELECT id, lesson_id AS "lessonId", title
+      `SELECT id, lesson_id AS "lessonId", title, description
        FROM assignments
        WHERE lesson_id = ANY($1::int[])
        ORDER BY id ASC`,
@@ -1431,6 +1661,7 @@ app.get("/api/student/courses/:courseId/steps", authRequired, requireRoles("stud
       id: lesson.id * 10 + 1,
       title: `${lesson.title}: теория`,
       kind: "theory",
+      taskTypeLabel: "Теория",
       theoryText: lesson.contentText || "Изучите материал урока и зафиксируйте ключевые идеи.",
       options: [],
       stepOrder: order++,
@@ -1441,7 +1672,8 @@ app.get("/api/student/courses/:courseId/steps", authRequired, requireRoles("stud
       id: lesson.id * 10 + 2,
       title: `${lesson.title}: мини-тест`,
       kind: "quiz",
-      theoryText: "",
+      taskTypeLabel: "Тестовое задание",
+      theoryText: "Выберите вариант ответа и проверьте знание теории.",
       options: ["Понял материал", "Нужно повторить", "Нужны примеры"],
       stepOrder: order++,
       xp: 12,
@@ -1449,11 +1681,19 @@ app.get("/api/student/courses/:courseId/steps", authRequired, requireRoles("stud
 
     const assignment = assignments.rows.find((item) => item.lessonId === lesson.id)
     if (assignment) {
+      const rawTests = Array.isArray(assignment.tests) ? assignment.tests : []
+      const testNames = rawTests
+        .slice(0, 3)
+        .map((test, idx) => String(test?.name || `Тест ${idx + 1}`))
+
       steps.push({
         id: lesson.id * 10 + 3,
         title: `${assignment.title}: практика`,
         kind: "code",
-        theoryText: "",
+        taskTypeLabel: "Кодовое задание",
+        theoryText: String(assignment.description || "Решите задание и отправьте код на проверку."),
+        checks: testNames,
+        checkCount: testNames.length,
         options: [],
         stepOrder: order++,
         xp: 20,
@@ -1523,6 +1763,7 @@ app.post("/api/student/steps/:stepId/check", authRequired, requireRoles("student
   let feedback = ""
   let score = 0
   let assignmentId = null
+  let checkResults = null
 
   if (slot === 1) {
     kind = "theory"
@@ -1537,13 +1778,15 @@ app.post("/api/student/steps/:stepId/check", authRequired, requireRoles("student
   } else if (slot === 3) {
     kind = "code"
     const assignment = await pool.query(
-      `SELECT id FROM assignments WHERE lesson_id = $1 ORDER BY id ASC LIMIT 1`,
+      `SELECT id, tests FROM assignments WHERE lesson_id = $1 ORDER BY id ASC LIMIT 1`,
       [lessonId]
     )
     assignmentId = assignment.rows[0]?.id || null
-    passed = answer.length >= 20
-    score = passed ? 20 : 0
-    feedback = passed ? "Кодовое решение принято" : "Добавьте более полное решение (минимум 20 символов)"
+    const codeEvaluation = evaluateCodeByTests(answer, assignment.rows[0]?.tests)
+    passed = codeEvaluation.passed
+    score = passed ? 20 : Math.max(0, Math.round((codeEvaluation.scorePercent / 100) * 20))
+    feedback = codeEvaluation.feedback
+    checkResults = codeEvaluation.checkResults
   } else {
     return res.status(400).json({ error: "Некорректный тип шага" })
   }
@@ -1629,6 +1872,7 @@ app.post("/api/student/steps/:stepId/check", authRequired, requireRoles("student
   return res.json({
     passed,
     feedback,
+    checkResults,
     progress: currentProgress.rows[0] || null,
     courseSummary: { total, completed, percent },
   })

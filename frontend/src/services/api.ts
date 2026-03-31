@@ -32,6 +32,10 @@ type Course = {
   level: string
   price: string
   published?: boolean
+  accessType?: string
+  coverUrl?: string
+  description?: string
+  category?: string
 }
 
 type CourseStep = {
@@ -110,9 +114,9 @@ type MockDb = {
   accountProfiles: AccountProfile[]
 }
 
-const STORAGE_KEY = "stepashka_mock_api_v1"
+const STORAGE_KEY = "stepashka_mock_api_v2"
 const USERS_RESET_MARKER_KEY = "stepashka_mock_users_reset_v1"
-const LEGACY_EN_NORMALIZE_MARKER_KEY = "stepashka_mock_en_normalized_v1"
+const LEGACY_EN_NORMALIZE_MARKER_KEY = "stepashka_mock_en_normalized_v2"
 const ACCESS_TOKEN_KEY = "stepashka_access_token"
 const REFRESH_TOKEN_KEY = "stepashka_refresh_token"
 const MOCK_RESET_CODE_KEY = "stepashka_mock_reset_code"
@@ -182,12 +186,15 @@ function toCourse(catalogItem: {
   id: number
   title: string
   category: string
+  description?: string
   studentsCount: number
   rating: string | number
   durationHours: number
   teacherName: string | null
   level: string
   priceCents: number
+  accessType?: string
+  coverUrl?: string
 }): Course {
   const duration = Math.max(0, Number(catalogItem.durationHours || 0))
   const lessons = Math.max(1, Math.round(duration / 2) || 1)
@@ -219,6 +226,10 @@ function toCourse(catalogItem: {
     level: normalizedLevel,
     price,
     published: true,
+    accessType: catalogItem.accessType || "open",
+    coverUrl: catalogItem.coverUrl || "",
+    description: catalogItem.description || "",
+    category: catalogItem.category || "",
   }
 }
 
@@ -248,14 +259,22 @@ async function backendRequest<T>(
     if (refreshed) {
       return backendRequest<T>(path, init, false)
     }
+    // Refresh failed — redirect to login so user can re-authenticate
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login"
+    }
   }
 
   if (!response.ok) {
     let message = "Ошибка запроса"
     try {
-      const data = (await response.json()) as { error?: string }
+      const data = (await response.json()) as { error?: string; detail?: string | unknown[] }
       if (data?.error) {
         message = data.error
+      } else if (typeof data?.detail === "string") {
+        message = data.detail
+      } else if (Array.isArray(data?.detail) && data.detail.length > 0) {
+        message = (data.detail[0] as { msg?: string }).msg || `Ошибка ${response.status}`
       }
     } catch {
       message = `Ошибка ${response.status}`
@@ -291,6 +310,10 @@ async function tryRefreshToken() {
     }
 
     const data = (await response.json()) as BackendAuthResponse
+    if (!data.accessToken || !data.refreshToken) {
+      clearTokens()
+      return false
+    }
     setTokens(data.accessToken, data.refreshToken)
     return true
   } catch {
@@ -343,7 +366,10 @@ function normalizeLegacyMockDb(db: MockDb) {
 
   db.courseSteps = db.courseSteps.map((step) => ({
     ...step,
-    title: normalizeLegacyText(step.title),
+    title:
+      step.kind === "code"
+        ? normalizeLegacyText(step.title).replace(/^Тест:\s*/i, "Код: ")
+        : normalizeLegacyText(step.title),
     theoryText: normalizeLegacyText(step.theoryText),
     options: step.options.map((option) => normalizeLegacyText(option)),
     correctOption: normalizeLegacyText(step.correctOption),
@@ -402,56 +428,60 @@ function createSeed(): MockDb {
       { id: 3, title: "Вы получили бейдж Fast Learner", time: "Вчера" },
     ],
     courses: [
-      { id: 1, title: "React Enterprise Bootcamp", lessons: 24, progress: 0, type: "Frontend", students: "12.4k", rating: "4.9", duration: "74ч", author: "Stepashka Academy", level: "Средний", price: "$49", published: true },
-      { id: 2, title: "TypeScript System Design", lessons: 20, progress: 0, type: "Frontend", students: "9.7k", rating: "4.8", duration: "58ч", author: "Platform Team", level: "Продвинутый", price: "$59", published: true },
-      { id: 3, title: "Backend API Engineering with Node", lessons: 22, progress: 0, type: "Backend", students: "10.2k", rating: "4.9", duration: "66ч", author: "Core Backend", level: "Средний", price: "$69", published: true },
-      { id: 4, title: "Python for Product Analytics", lessons: 18, progress: 0, type: "Backend", students: "8.1k", rating: "4.8", duration: "46ч", author: "Data Team", level: "Начальный", price: "Бесплатно", published: true },
-      { id: 5, title: "DevOps Delivery Pipeline", lessons: 21, progress: 0, type: "Backend", students: "6.3k", rating: "4.7", duration: "61ч", author: "Infra Guild", level: "Продвинутый", price: "$79", published: true },
-      { id: 6, title: "AI Integrations for Web Apps", lessons: 16, progress: 0, type: "Frontend", students: "4.4k", rating: "4.9", duration: "40ч", author: "AI Lab", level: "Средний", price: "$45", published: true },
-      { id: 7, title: "Data Platform Architecture", lessons: 19, progress: 0, type: "Backend", students: "3.1k", rating: "4.8", duration: "52ч", author: "Data Platform", level: "Продвинутый", price: "$89", published: false },
+      {
+        id: 1,
+        title: "Python: Большой практический курс",
+        lessons: 36,
+        progress: 0,
+        type: "Backend",
+        students: "980",
+        rating: "4.9",
+        duration: "52ч",
+        author: "Stepashka Academy",
+        level: "Начальный",
+        price: "Бесплатно",
+        published: true,
+      },
     ],
     courseSteps: [
-      { id: 1, courseId: 1, title: "Архитектура feature slices", kind: "theory", theoryText: "Разделяйте UI, доменные модели и API-слой по feature-границам.", options: [], correctOption: "", codeKeyword: "", stepOrder: 1, xp: 12 },
-      { id: 2, courseId: 1, title: "Что отвечает за orchestration?", kind: "quiz", theoryText: "", options: ["widgets/pages", "entities only", "styles only"], correctOption: "widgets/pages", codeKeyword: "", stepOrder: 2, xp: 14 },
-      { id: 3, courseId: 1, title: "Соберите карточку курса", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "progress", stepOrder: 3, xp: 20 },
-      { id: 4, courseId: 1, title: "State orchestration через store", kind: "theory", theoryText: "Держите source of truth в store и синхронизируйте API-ответы.", options: [], correctOption: "", codeKeyword: "", stepOrder: 4, xp: 12 },
-      { id: 5, courseId: 1, title: "Как избегать prop drilling?", kind: "quiz", theoryText: "", options: ["Context + composition", "window globals", "manual copy"], correctOption: "Context + composition", codeKeyword: "", stepOrder: 5, xp: 14 },
-      { id: 6, courseId: 1, title: "Реализуйте optimistic update", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "setCourses", stepOrder: 6, xp: 22 },
+      { id: 1, courseId: 1, title: "Python и область применения", kind: "theory", theoryText: "Python используют для веба, автоматизации, анализа данных и ML. Ключевая идея языка - читаемость кода.", options: [], correctOption: "", codeKeyword: "", stepOrder: 1, xp: 8 },
+      { id: 2, courseId: 1, title: "Типы данных: int, float, str, bool", kind: "theory", theoryText: "В Python переменные динамически типизированы. Один и тот же идентификатор может хранить значения разных типов.", options: [], correctOption: "", codeKeyword: "", stepOrder: 2, xp: 8 },
+      { id: 3, courseId: 1, title: "Условные конструкции if/elif/else", kind: "theory", theoryText: "Ветвление позволяет выполнить разный код в зависимости от условия. Отступы в Python обязательны.", options: [], correctOption: "", codeKeyword: "", stepOrder: 3, xp: 8 },
+      { id: 4, courseId: 1, title: "Циклы for и while", kind: "theory", theoryText: "for обычно используют с range() или коллекциями. while выполняется, пока условие истинно.", options: [], correctOption: "", codeKeyword: "", stepOrder: 4, xp: 8 },
+      { id: 5, courseId: 1, title: "Функции и return", kind: "theory", theoryText: "Функции объявляются через def. Оператор return возвращает значение вызывающему коду.", options: [], correctOption: "", codeKeyword: "", stepOrder: 5, xp: 8 },
+      { id: 6, courseId: 1, title: "Списки и словари", kind: "theory", theoryText: "list хранит упорядоченные элементы, dict хранит пары ключ-значение. Оба типа часто используются в реальных задачах.", options: [], correctOption: "", codeKeyword: "", stepOrder: 6, xp: 8 },
+      { id: 7, courseId: 1, title: "Срезы и индексация", kind: "theory", theoryText: "Срезы позволяют получать подстроки и подсписки: s[1:4], s[::-1]. Индексация начинается с нуля.", options: [], correctOption: "", codeKeyword: "", stepOrder: 7, xp: 8 },
+      { id: 8, courseId: 1, title: "Обработка исключений", kind: "theory", theoryText: "Конструкция try/except защищает код от аварийного завершения и позволяет корректно обработать ошибки.", options: [], correctOption: "", codeKeyword: "", stepOrder: 8, xp: 8 },
+      { id: 9, courseId: 1, title: "Файлы и контекстный менеджер", kind: "theory", theoryText: "with open(...) as f: автоматически закрывает файл. Это безопаснее, чем manual close().", options: [], correctOption: "", codeKeyword: "", stepOrder: 9, xp: 8 },
+      { id: 10, courseId: 1, title: "Генераторы и yield", kind: "theory", theoryText: "Генераторы экономят память и отдают значения по одному. Это полезно при больших наборах данных.", options: [], correctOption: "", codeKeyword: "", stepOrder: 10, xp: 8 },
+      { id: 11, courseId: 1, title: "ООП: класс, объект, метод", kind: "theory", theoryText: "Классы описывают структуру и поведение объектов. self ссылается на текущий экземпляр.", options: [], correctOption: "", codeKeyword: "", stepOrder: 11, xp: 8 },
+      { id: 12, courseId: 1, title: "Импорты и структура проекта", kind: "theory", theoryText: "Разбивайте код по модулям. Используйте явные импорты и понятные имена пакетов.", options: [], correctOption: "", codeKeyword: "", stepOrder: 12, xp: 8 },
 
-      { id: 7, courseId: 2, title: "Type narrowing и discriminated unions", kind: "theory", theoryText: "Union-модели помогают безопасно кодировать разные состояния UI.", options: [], correctOption: "", codeKeyword: "", stepOrder: 1, xp: 12 },
-      { id: 8, courseId: 2, title: "Как типизировать API errors?", kind: "quiz", theoryText: "", options: ["Result<T, E>", "any", "never"], correctOption: "Result<T, E>", codeKeyword: "", stepOrder: 2, xp: 14 },
-      { id: 9, courseId: 2, title: "Соберите typed api client", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "request", stepOrder: 3, xp: 20 },
-      { id: 10, courseId: 2, title: "Runtime validation + zod", kind: "theory", theoryText: "TypeScript не валидирует runtime-данные, поэтому нужен schema-layer.", options: [], correctOption: "", codeKeyword: "", stepOrder: 4, xp: 13 },
-      { id: 11, courseId: 2, title: "Где ставить schema checks?", kind: "quiz", theoryText: "", options: ["На boundary API", "в CSS", "только в UI"], correctOption: "На boundary API", codeKeyword: "", stepOrder: 5, xp: 15 },
-      { id: 12, courseId: 2, title: "Соберите typed reducer", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "action", stepOrder: 6, xp: 21 },
+      { id: 13, courseId: 1, title: "Какой тип хранит текст?", kind: "quiz", theoryText: "", options: ["str", "int", "float", "dict"], correctOption: "str", codeKeyword: "", stepOrder: 13, xp: 10 },
+      { id: 14, courseId: 1, title: "Что вернет bool(0)?", kind: "quiz", theoryText: "", options: ["False", "True", "0", "None"], correctOption: "False", codeKeyword: "", stepOrder: 14, xp: 10 },
+      { id: 15, courseId: 1, title: "Как объявить функцию в Python?", kind: "quiz", theoryText: "", options: ["def my_func():", "function my_func()", "func my_func()", "lambda my_func()"], correctOption: "def my_func():", codeKeyword: "", stepOrder: 15, xp: 10 },
+      { id: 16, courseId: 1, title: "Что выведет 2 + 2 * 2?", kind: "quiz", theoryText: "", options: ["6", "8", "4", "2"], correctOption: "6", codeKeyword: "", stepOrder: 16, xp: 10 },
+      { id: 17, courseId: 1, title: "Какой цикл подходит для range(10)?", kind: "quiz", theoryText: "", options: ["for", "while", "if", "try"], correctOption: "for", codeKeyword: "", stepOrder: 17, xp: 10 },
+      { id: 18, courseId: 1, title: "Какой оператор сравнения равенства?", kind: "quiz", theoryText: "", options: ["==", "=", "!=", ">="], correctOption: "==", codeKeyword: "", stepOrder: 18, xp: 10 },
+      { id: 19, courseId: 1, title: "Как создать пустой словарь?", kind: "quiz", theoryText: "", options: ["{}", "[]", "()", "set()"], correctOption: "{}", codeKeyword: "", stepOrder: 19, xp: 10 },
+      { id: 20, courseId: 1, title: "Какой метод добавляет элемент в список?", kind: "quiz", theoryText: "", options: ["append", "add", "push", "insert_last"], correctOption: "append", codeKeyword: "", stepOrder: 20, xp: 10 },
+      { id: 21, courseId: 1, title: "Что делает break в цикле?", kind: "quiz", theoryText: "", options: ["Прерывает цикл", "Пропускает итерацию", "Завершает программу", "Продолжает цикл"], correctOption: "Прерывает цикл", codeKeyword: "", stepOrder: 21, xp: 10 },
+      { id: 22, courseId: 1, title: "Какой блок ловит исключения?", kind: "quiz", theoryText: "", options: ["except", "catch", "error", "finally"], correctOption: "except", codeKeyword: "", stepOrder: 22, xp: 10 },
+      { id: 23, courseId: 1, title: "Как получить длину строки s?", kind: "quiz", theoryText: "", options: ["len(s)", "s.length", "size(s)", "count(s)"], correctOption: "len(s)", codeKeyword: "", stepOrder: 23, xp: 10 },
+      { id: 24, courseId: 1, title: "Что такое list comprehension?", kind: "quiz", theoryText: "", options: ["Краткий синтаксис для создания списка", "Наследование списков", "Сортировка списка", "Тип списка"], correctOption: "Краткий синтаксис для создания списка", codeKeyword: "", stepOrder: 24, xp: 10 },
 
-      { id: 13, courseId: 3, title: "REST contract и idempotency", kind: "theory", theoryText: "Проектируйте API так, чтобы повторный запрос не ломал данные.", options: [], correctOption: "", codeKeyword: "", stepOrder: 1, xp: 12 },
-      { id: 14, courseId: 3, title: "Какой код ответа при создании?", kind: "quiz", theoryText: "", options: ["201", "204", "302"], correctOption: "201", codeKeyword: "", stepOrder: 2, xp: 12 },
-      { id: 15, courseId: 3, title: "Реализуйте POST endpoint", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "created", stepOrder: 3, xp: 20 },
-      { id: 16, courseId: 3, title: "Rate limiting + auth", kind: "theory", theoryText: "Ограничивайте частоту запросов и всегда логируйте аномалии.", options: [], correctOption: "", codeKeyword: "", stepOrder: 4, xp: 12 },
-      { id: 17, courseId: 3, title: "Что хранить в refresh token store?", kind: "quiz", theoryText: "", options: ["hash + expiresAt", "сырой пароль", "cookie html"], correctOption: "hash + expiresAt", codeKeyword: "", stepOrder: 5, xp: 15 },
-      { id: 18, courseId: 3, title: "Добавьте audit log", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "writeAudit", stepOrder: 6, xp: 22 },
-
-      { id: 19, courseId: 4, title: "EDA для продуктовой аналитики", kind: "theory", theoryText: "Перед моделированием всегда проверьте распределения и пропуски.", options: [], correctOption: "", codeKeyword: "", stepOrder: 1, xp: 10 },
-      { id: 20, courseId: 4, title: "Как получить первые строки в pandas?", kind: "quiz", theoryText: "", options: ["head()", "rows()", "peek()"], correctOption: "head()", codeKeyword: "", stepOrder: 2, xp: 12 },
-      { id: 21, courseId: 4, title: "Сделайте фильтр по score", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "score", stepOrder: 3, xp: 18 },
-      { id: 22, courseId: 4, title: "Retention когорты", kind: "theory", theoryText: "Когортный анализ показывает удержание по периодам регистрации.", options: [], correctOption: "", codeKeyword: "", stepOrder: 4, xp: 11 },
-      { id: 23, courseId: 4, title: "Какая метрика для ежемесячного дохода?", kind: "quiz", theoryText: "", options: ["MRR", "CPU", "RAM"], correctOption: "MRR", codeKeyword: "", stepOrder: 5, xp: 13 },
-      { id: 24, courseId: 4, title: "Постройте weekly dashboard", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "groupby", stepOrder: 6, xp: 20 },
-
-      { id: 25, courseId: 5, title: "CI pipeline stages", kind: "theory", theoryText: "Build, test, security scan, deploy — базовый конвейер для релизов.", options: [], correctOption: "", codeKeyword: "", stepOrder: 1, xp: 12 },
-      { id: 26, courseId: 5, title: "Что запускается до deploy?", kind: "quiz", theoryText: "", options: ["tests", "marketing", "design review"], correctOption: "tests", codeKeyword: "", stepOrder: 2, xp: 12 },
-      { id: 27, courseId: 5, title: "Соберите docker-compose сервис", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "ports", stepOrder: 3, xp: 20 },
-      { id: 28, courseId: 5, title: "Observability basics", kind: "theory", theoryText: "Логи, метрики и трассировки нужны одновременно, не по отдельности.", options: [], correctOption: "", codeKeyword: "", stepOrder: 4, xp: 12 },
-      { id: 29, courseId: 5, title: "Что показывает error budget?", kind: "quiz", theoryText: "", options: ["допустимый уровень отказов", "количество кода", "цену продукта"], correctOption: "допустимый уровень отказов", codeKeyword: "", stepOrder: 5, xp: 14 },
-      { id: 30, courseId: 5, title: "Настройте health endpoint", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "status", stepOrder: 6, xp: 21 },
-
-      { id: 31, courseId: 6, title: "LLM integration patterns", kind: "theory", theoryText: "Client-server прокси обязателен для защиты API-ключей.", options: [], correctOption: "", codeKeyword: "", stepOrder: 1, xp: 13 },
-      { id: 32, courseId: 6, title: "Где хранить OpenAI ключ?", kind: "quiz", theoryText: "", options: ["backend env", "frontend js", "localStorage"], correctOption: "backend env", codeKeyword: "", stepOrder: 2, xp: 15 },
-      { id: 33, courseId: 6, title: "Соберите endpoint /ai/chat", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "reply", stepOrder: 3, xp: 22 },
-      { id: 34, courseId: 6, title: "Prompt engineering в продукте", kind: "theory", theoryText: "Системный prompt и контекст диалога влияют на стабильность ответов.", options: [], correctOption: "", codeKeyword: "", stepOrder: 4, xp: 13 },
-      { id: 35, courseId: 6, title: "Что важно для безопасного AI?", kind: "quiz", theoryText: "", options: ["rate-limit + audit", "без логов", "только UI"], correctOption: "rate-limit + audit", codeKeyword: "", stepOrder: 5, xp: 15 },
-      { id: 36, courseId: 6, title: "Добавьте contextual memory", kind: "code", theoryText: "", options: [], correctOption: "", codeKeyword: "context", stepOrder: 6, xp: 23 },
+      { id: 25, courseId: 1, title: "Код: сумма двух чисел", kind: "code", theoryText: "Напишите функцию sum_two(a, b), возвращающую сумму двух чисел.", options: [], correctOption: "", codeKeyword: "sum_two", stepOrder: 25, xp: 20 },
+      { id: 26, courseId: 1, title: "Код: чётное число", kind: "code", theoryText: "Напишите функцию is_even(n), которая возвращает True для четных чисел.", options: [], correctOption: "", codeKeyword: "is_even", stepOrder: 26, xp: 20 },
+      { id: 27, courseId: 1, title: "Код: максимум в списке", kind: "code", theoryText: "Напишите функцию max_in_list(lst), которая возвращает максимум списка.", options: [], correctOption: "", codeKeyword: "max_in_list", stepOrder: 27, xp: 20 },
+      { id: 28, courseId: 1, title: "Код: факториал", kind: "code", theoryText: "Напишите функцию factorial(n). 0! должно быть равно 1.", options: [], correctOption: "", codeKeyword: "factorial", stepOrder: 28, xp: 22 },
+      { id: 29, courseId: 1, title: "Код: палиндром", kind: "code", theoryText: "Напишите функцию is_palindrome(s), которая проверяет строку на палиндром.", options: [], correctOption: "", codeKeyword: "is_palindrome", stepOrder: 29, xp: 22 },
+      { id: 30, courseId: 1, title: "Код: количество гласных", kind: "code", theoryText: "Напишите функцию count_vowels(s), которая считает гласные в строке.", options: [], correctOption: "", codeKeyword: "count_vowels", stepOrder: 30, xp: 22 },
+      { id: 31, courseId: 1, title: "Код: реверс строки", kind: "code", theoryText: "Напишите функцию reverse_string(s), которая переворачивает строку.", options: [], correctOption: "", codeKeyword: "reverse_string", stepOrder: 31, xp: 22 },
+      { id: 32, courseId: 1, title: "Код: сумма списка", kind: "code", theoryText: "Напишите функцию sum_list(lst), возвращающую сумму элементов списка.", options: [], correctOption: "", codeKeyword: "sum_list", stepOrder: 32, xp: 22 },
+      { id: 33, courseId: 1, title: "Код: проверка простого числа", kind: "code", theoryText: "Напишите функцию is_prime(n), проверяющую простое число.", options: [], correctOption: "", codeKeyword: "is_prime", stepOrder: 33, xp: 24 },
+      { id: 34, courseId: 1, title: "Код: число Фибоначчи", kind: "code", theoryText: "Напишите функцию fibonacci(n), возвращающую n-е число Фибоначчи.", options: [], correctOption: "", codeKeyword: "fibonacci", stepOrder: 34, xp: 24 },
+      { id: 35, courseId: 1, title: "Код: уникальные элементы", kind: "code", theoryText: "Напишите функцию unique_items(lst), которая убирает дубликаты.", options: [], correctOption: "", codeKeyword: "unique_items", stepOrder: 35, xp: 24 },
+      { id: 36, courseId: 1, title: "Код: сортировка словаря по значению", kind: "code", theoryText: "Напишите функцию sort_dict_by_value(d), сортирующую пары словаря по значению.", options: [], correctOption: "", codeKeyword: "sort_dict_by_value", stepOrder: 36, xp: 26 },
     ],
     progress: [],
     aiReviews: [],
@@ -638,6 +668,31 @@ function canAccessCourse(user: PublicUser | null, course: Course) {
 async function handleGet<T>(path: string): Promise<T> {
   const db = getDb()
 
+  if (path === "/landing/stats") {
+    const courses = withCourseProgress(db)
+    const studentsTotal = courses.reduce((sum, course) => {
+      const raw = String(course.students || "0").trim().toLowerCase().replace(/,/g, ".")
+      const numeric = Number(raw.replace(/[^\d.]/g, ""))
+      if (!Number.isFinite(numeric)) {
+        return sum
+      }
+      const multiplier = raw.includes("m") ? 1_000_000 : raw.includes("k") ? 1_000 : 1
+      return sum + Math.round(numeric * multiplier)
+    }, 0)
+
+    const averageRating =
+      courses.length > 0
+        ? courses.reduce((sum, course) => sum + Number(course.rating || 0), 0) / courses.length
+        : 0
+
+    return {
+      coursesTotal: courses.length,
+      studentsTotal,
+      averageRating,
+      communityMembers: db.users.length,
+    } as T
+  }
+
   if (path === "/auth/me") {
     return getCurrentUser(db) as T
   }
@@ -741,8 +796,41 @@ async function handleGet<T>(path: string): Promise<T> {
       ? Math.round(courses.reduce((sum, item) => sum + item.progress, 0) / courses.length)
       : 0
 
-    const completedToday = db.progress.filter((item) => item.status === "completed" && item.completedAt && item.completedAt.slice(0, 10) === nowIso().slice(0, 10)).length
-    const streakDays = Math.max(0, Math.min(30, completedToday > 0 ? 1 + Math.round(db.aiReviews.length / 4) : Math.round(db.aiReviews.length / 6)))
+    const toDateKey = (value: string | Date) => {
+      const date = value instanceof Date ? value : new Date(value)
+      const y = date.getFullYear()
+      const m = String(date.getMonth() + 1).padStart(2, "0")
+      const d = String(date.getDate()).padStart(2, "0")
+      return `${y}-${m}-${d}`
+    }
+
+    const activeDays = new Set(
+      db.progress
+        .filter((item) => item.status === "completed" && item.completedAt)
+        .map((item) => toDateKey(String(item.completedAt)))
+    )
+
+    const today = new Date()
+    const todayKey = toDateKey(today)
+    const startOffset = activeDays.has(todayKey) ? 0 : 1
+
+    let streakDays = 0
+    for (let i = startOffset; i < 365; i += 1) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      if (activeDays.has(toDateKey(date))) {
+        streakDays += 1
+      } else {
+        break
+      }
+    }
+
+    const weekAgo = new Date()
+    weekAgo.setDate(weekAgo.getDate() - 7)
+
+    const tasksWeek = db.progress.filter(
+      (item) => item.status === "completed" && item.completedAt && new Date(item.completedAt) >= weekAgo
+    ).length
 
     const unfinishedStep = db.courseSteps
       .slice()
@@ -753,12 +841,39 @@ async function handleGet<T>(path: string): Promise<T> {
         return enrolledCourse && !completed
       })
 
+    const weeklyGoalSteps = 10
+    const remainingCourseSteps = db.courseSteps.filter((step) => {
+      const enrolledCourse = courses.some((course) => course.id === step.courseId)
+      const completed = db.progress.some((item) => item.courseId === step.courseId && item.stepId === step.id && item.status === "completed")
+      return enrolledCourse && !completed
+    }).length
+
+    const stepsPerDay = tasksWeek / 7
+    const forecastDays = remainingCourseSteps > 0 ? Math.ceil(remainingCourseSteps / Math.max(stepsPerDay, 0.5)) : 0
+
+    const continueCourse = unfinishedStep ? courses.find((course) => course.id === unfinishedStep.courseId) : null
+
     return {
       stats: {
         activeCourses: activeCourses.length,
         streakDays,
         averageScore: `${average}%`,
-        tasksWeek: db.progress.filter((item) => item.status === "completed").length,
+        tasksWeek,
+      },
+      continue: unfinishedStep
+        ? {
+          courseId: unfinishedStep.courseId,
+          courseTitle: continueCourse?.title || `Курс #${unfinishedStep.courseId}`,
+          stepId: unfinishedStep.id,
+          stepTitle: unfinishedStep.title,
+          stepOrder: unfinishedStep.stepOrder,
+        }
+        : null,
+      weeklyPlan: {
+        goalSteps: weeklyGoalSteps,
+        completedSteps: tasksWeek,
+        remainingSteps: Math.max(weeklyGoalSteps - tasksWeek, 0),
+        forecastDays,
       },
       courses: activeCourses.map((item) => ({ id: item.id, title: item.title, progress: item.progress })),
       activities: db.notifications.slice(0, 5).map((item, index) => ({ id: index + 1, text: item.title })),
@@ -1317,12 +1432,27 @@ async function handlePost<T>(path: string, body: unknown): Promise<T> {
     }
 
     let passed = false
+    let checkResults: Array<{ name: string; passed: boolean }> | null = null
     if (step.kind === "theory") {
       passed = true
     } else if (step.kind === "quiz") {
       passed = answer.toLowerCase() === step.correctOption.toLowerCase()
     } else {
-      passed = step.codeKeyword ? answer.toLowerCase().includes(step.codeKeyword.toLowerCase()) : answer.length > 10
+      const keywordPassed = step.codeKeyword ? answer.toLowerCase().includes(step.codeKeyword.toLowerCase()) : answer.length > 10
+      const nonEmptyPassed = answer.trim().length > 0
+      checkResults = [
+        {
+          name: step.codeKeyword
+            ? `Содержит ключевую конструкцию: ${step.codeKeyword}`
+            : "Базовая проверка условия",
+          passed: keywordPassed,
+        },
+        {
+          name: "Ответ не пустой",
+          passed: nonEmptyPassed,
+        },
+      ]
+      passed = keywordPassed && nonEmptyPassed
     }
 
     const existing = db.progress.find((item) => item.courseId === step.courseId && item.stepId === step.id)
@@ -1365,6 +1495,7 @@ async function handlePost<T>(path: string, body: unknown): Promise<T> {
     return {
       passed,
       feedback: passed ? "Решение принято" : "Пока не принято. Попробуйте еще раз.",
+      checkResults,
       progress: saved,
       courseSummary: { total, completed, percent },
     } as T
@@ -1547,7 +1678,7 @@ async function handlePatch<T>(path: string, body: unknown): Promise<T> {
     }
 
     if (typeof payload.avatarUrl === "string") {
-      user.avatarUrl = payload.avatarUrl.trim().slice(0, 1000)
+      user.avatarUrl = payload.avatarUrl.trim().slice(0, 2_000_000)
     }
 
     if (typeof payload.phone === "string") {
@@ -1878,10 +2009,31 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
             averageScore: string
             tasksWeek: number
           }
+          continue: {
+            courseId: number
+            courseTitle: string
+            stepId: number
+            stepTitle: string
+            stepOrder: number
+          } | null
+          weeklyPlan: {
+            goalSteps: number
+            completedSteps: number
+            remainingSteps: number
+            forecastDays: number
+          }
           courses: Array<{ id: number; title: string; progress: number }>
           activities: Array<{ id: number; text: string }>
           deadline: { title: string; text: string }
         }>("/student/dashboard", { method: "GET" })
+        return data as T
+      }
+
+      if (path === "/student/weekly-goal" && method === "PATCH") {
+        const data = await backendRequest<{ goal: number }>("/student/weekly-goal", {
+          method: "PATCH",
+          body: JSON.stringify(rawBody),
+        })
         return data as T
       }
 
@@ -2030,9 +2182,24 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
           teacherName: string | null
           level: string
           priceCents: number
+          accessType?: string
         }>>("/catalog", { method: "GET" })
 
         return data.map(toCourse) as T
+      }
+
+      if (path === "/my-progress" && method === "GET") {
+        return await backendRequest<T>("/student/my-progress", { method: "GET" })
+      }
+
+      if (path === "/landing/stats" && method === "GET") {
+        const data = await backendRequest<{
+          coursesTotal: number
+          studentsTotal: number
+          averageRating: number
+          communityMembers: number
+        }>("/public/stats", { method: "GET" })
+        return data as T
       }
 
       if (/^\/courses\/\d+\/enroll$/.test(path) && method === "POST") {
@@ -2060,7 +2227,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
             id: number
             title: string
             kind: "theory" | "quiz" | "code"
+            taskTypeLabel?: string
             theoryText: string
+            checks?: string[]
+            checkCount?: number
             options: string[]
             stepOrder: number
             xp: number
@@ -2089,6 +2259,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         const data = await backendRequest<{
           passed: boolean
           feedback: string
+          checkResults?: Array<{
+            name: string
+            passed: boolean
+          }> | null
           progress: {
             stepId: number
             status: "started" | "completed"
@@ -2108,8 +2282,154 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         })
         return data as T
       }
+
+      if (/^\/courses\/\d+\/detail$/.test(path) && method === "GET") {
+        const courseId = path.split("/")[2]
+        const data = await backendRequest<{
+          id: number
+          title: string
+          slug: string
+          description: string
+          level: string
+          category: string
+          status: string
+          rating: number
+          studentsCount: number
+          durationHours: number
+          priceCents: number
+          currency: string
+          accessType: string
+          coverUrl: string
+          teacherName: string
+          teacherId: number
+          modules: Array<{ id: number; title: string; moduleOrder: number }>
+          lessonsCount: number
+          stepsCount: number
+        }>(`/courses/${courseId}`, { method: "GET" })
+        return data as T
+      }
+
+      if (/^\/courses\/\d+\/enrollment-status$/.test(path) && method === "GET") {
+        const courseId = path.split("/")[2]
+        const data = await backendRequest<{
+          enrolled: boolean
+          status?: string
+          progress?: number
+          requestStatus?: string | null
+          teacherComment?: string | null
+        }>(`/student/courses/${courseId}/enrollment-status`, { method: "GET" })
+        return data as T
+      }
+
+      if (/^\/courses\/\d+\/request-enrollment$/.test(path) && method === "POST") {
+        const courseId = path.split("/")[2]
+        const payload = rawBody as { message?: string }
+        const data = await backendRequest<{
+          success: boolean
+          message: string
+          error?: string
+        }>(`/student/courses/${courseId}/request-enrollment`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+        return data as T
+      }
+
+      if (/^\/teacher\/courses\/\d+\/enrollment-requests$/.test(path) && method === "GET") {
+        const courseId = path.split("/")[3]
+        const data = await backendRequest<Array<{
+          id: number
+          userId: number
+          userName: string
+          userEmail: string
+          status: string
+          message: string
+          teacherComment: string | null
+          createdAt: string
+          updatedAt: string
+        }>>(`/teacher/courses/${courseId}/enrollment-requests`, { method: "GET" })
+        return data as T
+      }
+
+      if (/^\/teacher\/enrollment-requests\/\d+$/.test(path) && method === "PATCH") {
+        const requestId = path.split("/")[3]
+        const payload = rawBody as { status: string; teacherComment?: string }
+        const data = await backendRequest<{
+          success: boolean
+          status: string
+        }>(`/teacher/enrollment-requests/${requestId}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        })
+        return data as T
+      }
+
+      if (/^\/teacher\/courses\/\d+\/structure$/.test(path) && method === "GET") {
+        const courseId = path.split("/")[3]
+        const data = await backendRequest<{
+          course: { id: number; title: string }
+          modules: Array<{ id: number; title: string; moduleOrder: number }>
+          lessons: Array<{ id: number; moduleId: number; title: string; lessonOrder: number; lessonType: string; contentText: string }>
+          steps: Array<{ id: number; lessonId: number; title: string; stepOrder: number; stepType: string; content: unknown; xp: number }>
+        }>(`/teacher/courses/${courseId}/structure`, { method: "GET" })
+        return data as T
+      }
+
+      if (path === "/ai-review/check" && method === "POST") {
+        const payload = rawBody as { sourceCode: string; language?: string }
+        const data = await backendRequest<{
+          id: number
+          quality: number
+          correctness: number
+          style: number
+          summary: string
+          issues: string[]
+          improvements: string[]
+          goodParts: string[]
+          language: string
+        }>("/ai/review/check", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+        return data as T
+      }
+
+      if (path === "/ai-review/history" && method === "GET") {
+        const data = await backendRequest<Array<{
+          id: number
+          quality: number
+          correctness: number
+          style: number
+          summary: string
+          createdAt: string
+        }>>("/ai/review/history", { method: "GET" })
+        return data as T
+      }
+
+      if (path === "/ai/insights" && method === "POST") {
+        const data = await backendRequest<{
+          insights: Array<{ label: string; text: string }>
+        }>("/ai/insights", { method: "POST", body: JSON.stringify(rawBody) })
+        return data as T
+      }
+
+      if (path === "/ai/daily-plan" && method === "POST") {
+        const data = await backendRequest<{
+          today: string[]
+          tomorrow: string[]
+        }>("/ai/daily-plan", { method: "POST", body: JSON.stringify(rawBody) })
+        return data as T
+      }
+
+      if (path === "/ai/faq" && method === "POST") {
+        const data = await backendRequest<{ answer: string }>("/ai/faq", {
+          method: "POST",
+          body: JSON.stringify(rawBody),
+        })
+        return data as T
+      }
     } catch (error) {
-      if (path.startsWith("/auth") || path === "/courses" || /^\/courses\/\d+\/(enroll|steps)$/.test(path) || /^\/steps\/\d+\/check$/.test(path) || path.startsWith("/account") || path === "/dashboard" || path === "/ai/chat") {
+      if (path.startsWith("/auth") || path === "/courses" || /^\/courses\/\d+\/(enroll|steps|detail|enrollment-status|request-enrollment)$/.test(path) || /^\/steps\/\d+\/check$/.test(path) || path.startsWith("/account") || path === "/dashboard" || path === "/ai/chat" || path.startsWith("/teacher/") || path.startsWith("/ai-review/") || path.startsWith("/ai/") || path.startsWith("/student/")) {
         throw error
       }
     }
