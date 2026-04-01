@@ -58,7 +58,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [showAddCourse, setShowAddCourse] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [courseName, setCourseName] = useState("")
-  const [courseLevel, setCourseLevel] = useState("РќР°С‡Р°Р»СЊРЅС‹Р№")
+  const [courseLevel, setCourseLevel] = useState("Начальный")
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [notificationsError, setNotificationsError] = useState("")
@@ -81,7 +81,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       const data = await api.get<NotificationItem[]>("/notifications")
       setNotifications(data)
     } catch (error) {
-      setNotificationsError(error instanceof Error ? error.message : "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СѓРІРµРґРѕРјР»РµРЅРёСЏ")
+      setNotificationsError(error instanceof Error ? error.message : "Не удалось загрузить уведомления")
     } finally {
       setNotificationsLoading(false)
     }
@@ -126,13 +126,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const closeAddCourse = () => {
     setShowAddCourse(false)
     setCourseName("")
-    setCourseLevel("РќР°С‡Р°Р»СЊРЅС‹Р№")
+    setCourseLevel("Начальный")
     setCourseFormError("")
   }
 
   const createCourse = async () => {
     if (!courseName.trim()) {
-      setCourseFormError("Р’РІРµРґРёС‚Рµ РЅР°Р·РІР°РЅРёРµ РєСѓСЂСЃР°")
+      setCourseFormError("Введите название курса")
       return
     }
 
@@ -146,17 +146,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
       await loadNotifications()
       setShowNotifications(true)
     } catch (error) {
-      setCourseFormError(error instanceof Error ? error.message : "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РєСѓСЂСЃ")
+      setCourseFormError(error instanceof Error ? error.message : "Не удалось создать курс")
     }
   }
 
   const handleLogout = async () => {
     try {
       await logout()
-      toast.success("Р’С‹ РІС‹С€Р»Рё РёР· Р°РєРєР°СѓРЅС‚Р°")
+      toast.success("Вы вышли из аккаунта")
       navigate("/login")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "РћС€РёР±РєР° РІС‹С…РѕРґР°")
+      toast.error(error instanceof Error ? error.message : "Ошибка выхода")
     }
   }
 
@@ -171,7 +171,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const isAdmin = user?.role === "admin"
   const isTeacherOrAdmin = user?.role === "teacher" || user?.role === "admin"
-  const roleLabel = user?.role === "admin" ? "РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ" : user?.role === "teacher" ? "РџСЂРµРїРѕРґР°РІР°С‚РµР»СЊ" : "РЎС‚СѓРґРµРЅС‚"
+  const roleLabel = user?.role === "admin" ? "Администратор" : user?.role === "teacher" ? "Преподаватель" : "Студент"
 
   const isPathActive = (path: string) => {
     if (path === "/course") {
@@ -236,7 +236,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           <BrandLogo
             showText={!collapsed}
-            text="РЎС‚РµРїР°С€РєР°"
+            text="Степашка"
             iconClassName="h-9 w-9"
             textClassName="text-xl font-extrabold text-primary dark:text-red-500"
           />
@@ -245,7 +245,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             onClick={() => setCollapsed(!collapsed)}
             className="w-9 h-9 rounded-lg glass-panel hover:bg-white/80 dark:hover:bg-slate-900/70"
           >
-            в°
+            ≡
           </button>
 
         </div>
@@ -253,10 +253,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
         {!collapsed && (
           <div className="glass-panel rounded-xl p-4 mb-6">
             <p className="text-xs text-slate-500 dark:text-slate-300">
-              РџСЂРѕРіСЂРµСЃСЃ РЅРµРґРµР»Рё
+              Прогресс недели
             </p>
             <p className="text-2xl font-bold mt-1">{Math.min(100, Math.round((weeklyCompleted / weeklyGoal) * 100))}%</p>
-            <p className="text-xs text-slate-400 mt-0.5">{weeklyCompleted}/{weeklyGoal} С€Р°РіРѕРІ</p>
+            <p className="text-xs text-slate-400 mt-0.5">{weeklyCompleted}/{weeklyGoal} шагов</p>
             <div className="mt-3 h-2 rounded-full bg-slate-200/70 dark:bg-slate-700/70">
               <div
                 className="h-2 rounded-full bg-primary transition-all duration-500"
@@ -268,18 +268,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
         {/* Nav */}
         <nav className="flex flex-col gap-2">
-          {navItem("/dashboard", "РџР°РЅРµР»СЊ", LayoutDashboard)}
-          {navItem("/course", "РљСѓСЂСЃС‹", BookOpen)}
+          {navItem("/dashboard", "Панель", LayoutDashboard)}
+          {navItem("/course", "Курсы", BookOpen)}
           {navItem("/task", "AI Code Review", Code)}
-          {isTeacherOrAdmin && navItem("/teacher", "РљР°Р±РёРЅРµС‚ РїСЂРµРїРѕРґР°РІР°С‚РµР»СЏ", GraduationCap)}
-          {isAdmin && navItem("/admin", "РџР°РЅРµР»СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°", ShieldCheck)}
-          {navItem("/learning-paths", "РЈС‡РµР±РЅС‹Рµ С‚СЂР°РµРєС‚РѕСЂРёРё", GraduationCap)}
-          {navItem("/ai-review", "AI-С‡Р°С‚", Brain)}
-          {isTeacherOrAdmin && navItem("/assignment-builder", "РљРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ Р·Р°РґР°РЅРёР№", Wrench)}
-          {isTeacherOrAdmin && navItem("/analytics", "РђРЅР°Р»РёС‚РёРєР°", ChartColumn)}
-          {isAdmin && navItem("/roles-access", "Р РѕР»Рё Рё РґРѕСЃС‚СѓРїС‹", ShieldCheck)}
-          {navItem("/feedback", "РћР±СЂР°С‚РЅР°СЏ СЃРІСЏР·СЊ", MessageSquare)}
-          {navItem("/help-center", "РЎРїСЂР°РІРєР°", LifeBuoy)}
+          {isTeacherOrAdmin && navItem("/teacher", "Кабинет преподавателя", GraduationCap)}
+          {isAdmin && navItem("/admin", "Панель администратора", ShieldCheck)}
+          {navItem("/learning-paths", "Учебные траектории", GraduationCap)}
+          {navItem("/ai-review", "AI-чат", Brain)}
+          {isTeacherOrAdmin && navItem("/assignment-builder", "Конструктор заданий", Wrench)}
+          {isTeacherOrAdmin && navItem("/analytics", "Аналитика", ChartColumn)}
+          {isAdmin && navItem("/roles-access", "Роли и доступы", ShieldCheck)}
+          {navItem("/feedback", "Обратная связь", MessageSquare)}
+          {navItem("/help-center", "Справка", LifeBuoy)}
         </nav>
 
         {/* Bottom */}
@@ -290,11 +290,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl glass-panel hover:scale-[1.02] active:scale-[0.98] transition"
           >
             {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-            {!collapsed && (theme === "light" ? "РўС‘РјРЅР°СЏ" : "РЎРІРµС‚Р»Р°СЏ")}
+            {!collapsed && (theme === "light" ? "Тёмная" : "Светлая")}
           </button>
 
           <button className="w-full px-4 py-2 rounded-xl text-white bg-primary hover:bg-red-700 hover:scale-[1.02] active:scale-[0.98] transition">
-            РџСЂРµРјРёСѓРј РґРѕСЃС‚СѓРї
+            Премиум доступ
           </button>
 
         </div>
@@ -311,7 +311,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">РњРµРЅСЋ</h2>
+              <h2 className="text-lg font-bold">Меню</h2>
               <button
                 onClick={() => setMobileMenuOpen(false)}
                 aria-label="Close menu"
@@ -323,18 +323,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
 
             <nav className="flex flex-col gap-2">
-              {navItemMobile("/dashboard", "РџР°РЅРµР»СЊ", LayoutDashboard)}
-              {navItemMobile("/course", "РљСѓСЂСЃС‹", BookOpen)}
+              {navItemMobile("/dashboard", "Панель", LayoutDashboard)}
+              {navItemMobile("/course", "Курсы", BookOpen)}
               {navItemMobile("/task", "AI Code Review", Code)}
-              {isTeacherOrAdmin && navItemMobile("/teacher", "РљР°Р±РёРЅРµС‚ РїСЂРµРїРѕРґР°РІР°С‚РµР»СЏ", GraduationCap)}
-              {isAdmin && navItemMobile("/admin", "РџР°РЅРµР»СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°", ShieldCheck)}
-              {navItemMobile("/learning-paths", "РЈС‡РµР±РЅС‹Рµ С‚СЂР°РµРєС‚РѕСЂРёРё", GraduationCap)}
-              {navItemMobile("/ai-review", "AI-С‡Р°С‚", Brain)}
-              {isTeacherOrAdmin && navItemMobile("/assignment-builder", "РљРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ Р·Р°РґР°РЅРёР№", Wrench)}
-              {isTeacherOrAdmin && navItemMobile("/analytics", "РђРЅР°Р»РёС‚РёРєР°", ChartColumn)}
-              {isAdmin && navItemMobile("/roles-access", "Р РѕР»Рё Рё РґРѕСЃС‚СѓРїС‹", ShieldCheck)}
-              {navItemMobile("/feedback", "РћР±СЂР°С‚РЅР°СЏ СЃРІСЏР·СЊ", MessageSquare)}
-              {navItemMobile("/help-center", "РЎРїСЂР°РІРєР°", LifeBuoy)}
+              {isTeacherOrAdmin && navItemMobile("/teacher", "Кабинет преподавателя", GraduationCap)}
+              {isAdmin && navItemMobile("/admin", "Панель администратора", ShieldCheck)}
+              {navItemMobile("/learning-paths", "Учебные траектории", GraduationCap)}
+              {navItemMobile("/ai-review", "AI-чат", Brain)}
+              {isTeacherOrAdmin && navItemMobile("/assignment-builder", "Конструктор заданий", Wrench)}
+              {isTeacherOrAdmin && navItemMobile("/analytics", "Аналитика", ChartColumn)}
+              {isAdmin && navItemMobile("/roles-access", "Роли и доступы", ShieldCheck)}
+              {navItemMobile("/feedback", "Обратная связь", MessageSquare)}
+              {navItemMobile("/help-center", "Справка", LifeBuoy)}
             </nav>
 
             <div className="mt-5 space-y-2">
@@ -343,13 +343,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl glass-panel"
               >
                 {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-                {theme === "light" ? "РўС‘РјРЅР°СЏ" : "РЎРІРµС‚Р»Р°СЏ"}
+                {theme === "light" ? "Тёмная" : "Светлая"}
               </button>
               <button
                 onClick={openAddCourse}
                 className="w-full px-4 py-2 rounded-xl text-white bg-primary hover:bg-red-700"
               >
-                РќРѕРІС‹Р№ РєСѓСЂСЃ
+                Новый курс
               </button>
             </div>
           </div>
@@ -375,10 +375,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
               title="Open menu"
               className="w-9 h-9 rounded-xl glass-panel"
             >
-              в°
+              ≡
             </button>
             <BrandLogo
-              text="РЎС‚РµРїР°С€РєР°"
+              text="Степашка"
               iconClassName="h-7 w-7"
               textClassName="text-base font-bold text-primary dark:text-red-500"
             />
@@ -387,7 +387,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <div className="hidden md:flex items-center gap-3 w-full max-w-md rounded-xl px-3 py-2 glass-panel">
             <Search size={16} className="text-slate-500" />
             <input
-              placeholder="РџРѕРёСЃРє РєСѓСЂСЃРѕРІ, С‚РµРј, Р·Р°РґР°РЅРёР№..."
+              placeholder="Поиск курсов, тем, заданий..."
               className="bg-transparent outline-none w-full text-sm"
             />
           </div>
@@ -408,7 +408,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               className="hidden sm:flex items-center gap-2 px-4 py-2 text-white rounded-xl bg-primary hover:bg-red-700 hover:scale-105 active:scale-95 transition"
             >
               <Plus size={16} />
-              РќРѕРІС‹Р№ РєСѓСЂСЃ
+              Новый курс
             </button>
 
             <button
@@ -424,7 +424,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
             <button className="hidden md:flex items-center gap-2 text-sm px-3 py-2 rounded-xl glass-panel">
               <Sparkles size={15} />
-              РЎРµСЂРёСЏ: {streakDays} РґРЅРµР№
+              Серия: {streakDays} дней
             </button>
 
             <AnimatePresence>
@@ -437,7 +437,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 className="absolute right-0 top-14 w-[calc(100vw-2.5rem)] max-w-[360px] rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/95 dark:bg-slate-900/95 shadow-2xl shadow-slate-900/15 dark:shadow-black/45 p-4 z-[90]"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold">РЈРІРµРґРѕРјР»РµРЅРёСЏ</h3>
+                  <h3 className="font-bold">Уведомления</h3>
                   <button
                     onClick={() => setShowNotifications(false)}
                     aria-label="Close notifications"
@@ -450,7 +450,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
                 <div className="space-y-3 max-h-72 overflow-auto pr-1">
                   {notificationsLoading && (
-                    <p className="text-sm text-slate-600 dark:text-slate-300">Р—Р°РіСЂСѓР·РєР°...</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">Загрузка...</p>
                   )}
 
                   {!notificationsLoading && notificationsError && (
@@ -458,7 +458,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   )}
 
                   {!notificationsLoading && !notificationsError && notifications.length === 0 && (
-                    <p className="text-sm text-slate-600 dark:text-slate-300">РџРѕРєР° РЅРµС‚ СѓРІРµРґРѕРјР»РµРЅРёР№</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">Пока нет уведомлений</p>
                   )}
 
                   {!notificationsLoading && !notificationsError && notifications.map((item) => (
@@ -490,7 +490,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     )}
                   </div>
                   <div>
-                    <p className="font-semibold">{user?.name || "Р“РѕСЃС‚СЊ"}</p>
+                    <p className="font-semibold">{user?.name || "Гость"}</p>
                     <p className="text-xs text-slate-500">{roleLabel}</p>
                   </div>
                 </div>
@@ -503,7 +503,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   className="w-full text-left rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-2 mb-2 inline-flex items-center gap-2 transition"
                 >
                   <UserRound size={15} />
-                  РџСЂРѕС„РёР»СЊ
+                  Профиль
                 </button>
                 <button
                   onClick={() => {
@@ -512,10 +512,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   }}
                   className="w-full text-left rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-2 mb-2 transition"
                 >
-                  РќР°СЃС‚СЂРѕР№РєРё Р°РєРєР°СѓРЅС‚Р°
+                  Настройки аккаунта
                 </button>
                 <button onClick={handleLogout} className="w-full text-left rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-2 transition">
-                  Р’С‹Р№С‚Рё
+                  Выйти
                 </button>
               </motion.div>
             )}
@@ -539,7 +539,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               }`}
             >
               <LayoutDashboard size={16} />
-              РџР°РЅРµР»СЊ
+              Панель
             </Link>
 
             <Link
@@ -549,7 +549,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               }`}
             >
               <BookOpen size={16} />
-              РљСѓСЂСЃС‹
+              Курсы
             </Link>
 
             <Link
@@ -567,32 +567,32 @@ export default function MainLayout({ children }: MainLayoutProps) {
               className="flex flex-col items-center justify-center py-2 rounded-xl text-xs text-white bg-primary hover:bg-red-700"
             >
               <Plus size={16} />
-              Р”РѕР±Р°РІРёС‚СЊ
+              Добавить
             </button>
           </div>
         </div>
 
-        <Modal open={showAddCourse} onClose={closeAddCourse} title="Р”РѕР±Р°РІР»РµРЅРёРµ РєСѓСЂСЃР°">
+        <Modal open={showAddCourse} onClose={closeAddCourse} title="Добавление курса">
           <label className="block mb-3">
-            <span className="text-sm text-slate-600 dark:text-slate-300">РќР°Р·РІР°РЅРёРµ РєСѓСЂСЃР°</span>
+            <span className="text-sm text-slate-600 dark:text-slate-300">Название курса</span>
             <input
               value={courseName}
               onChange={(e) => setCourseName(e.target.value)}
-              placeholder="Р’РІРµРґРёС‚Рµ РЅР°Р·РІР°РЅРёРµ"
+              placeholder="Введите название"
               className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
             />
           </label>
 
           <label className="block mb-5">
-            <span className="text-sm text-slate-600 dark:text-slate-300">РЈСЂРѕРІРµРЅСЊ</span>
+            <span className="text-sm text-slate-600 dark:text-slate-300">Уровень</span>
             <select
               value={courseLevel}
               onChange={(e) => setCourseLevel(e.target.value)}
               className="mt-1 w-full rounded-xl glass-panel px-3 py-2 outline-none"
             >
-              <option>РќР°С‡Р°Р»СЊРЅС‹Р№</option>
-              <option>РЎСЂРµРґРЅРёР№</option>
-              <option>РџСЂРѕРґРІРёРЅСѓС‚С‹Р№</option>
+              <option>Начальный</option>
+              <option>Средний</option>
+              <option>Продвинутый</option>
             </select>
           </label>
 
@@ -605,13 +605,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
               onClick={closeAddCourse}
               className="px-4 py-2 rounded-xl glass-panel"
             >
-              РћС‚РјРµРЅР°
+              Отмена
             </button>
             <button
               onClick={createCourse}
               className="px-4 py-2 rounded-xl text-white bg-primary hover:bg-red-700"
             >
-              Р”РѕР±Р°РІРёС‚СЊ
+              Добавить
             </button>
           </div>
         </Modal>
@@ -620,4 +620,3 @@ export default function MainLayout({ children }: MainLayoutProps) {
     </div>
   )
 }
-
