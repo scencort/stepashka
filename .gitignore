@@ -18,7 +18,15 @@ pnpm-debug.log*
 .env.*
 !.env.example
 backend/.env
+backend-python/.env
 frontend/.env
+
+# Python (backend-python)
+backend-python/.venv/
+backend-python/venv/
+backend-python/**/__pycache__/
+backend-python/**/*.pyc
+backend-python/*.log
 
 # OS/editor
 .DS_Store

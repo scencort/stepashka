@@ -1,0 +1,52 @@
+services:
+  backend-python:
+    build:
+      context: ./backend-python
+    container_name: stepashka-backend-python
+    env_file:
+      - ./backend-python/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/stepashka
+      REDIS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: stepashka-postgres
+    environment:
+      POSTGRES_DB: stepashka
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - stepashka_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stepashka"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: stepashka-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - stepashka_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  stepashka_pg_data:
+  stepashka_redis_data:
