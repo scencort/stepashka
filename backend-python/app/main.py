@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
-app = FastAPI(title="Stepashka API", version="2.0.0", docs_url="/api/docs", redoc_url=None)
+app = FastAPI(title="Gradus API", version="2.0.0", docs_url="/api/docs", redoc_url=None)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

@@ -3,7 +3,7 @@ import urllib.error
 import urllib.request
 
 BASE = "http://127.0.0.1:4000/api"
-EMAIL = "student@stepashka.dev"
+EMAIL = "student@gradus.dev"
 PASSWORD = "Student@12345"
 
 

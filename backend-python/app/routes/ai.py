@@ -1,21 +1,41 @@
 from __future__ import annotations
 
+import asyncio
 import json
+
 import httpx
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-import asyncio
-
 
 from app import db
-from app.deps import CurrentUser, require_roles
-from app.schemas import AiChatBody, AiCodeReviewBody, AiInsightsBody, AiDailyPlanBody, AiFaqBody
-from app.services import write_audit
 from app.config import settings
+from app.deps import CurrentUser, require_roles
+from app.schemas import (
+    AiChatBody,
+    AiCodeReviewBody,
+    AiDailyPlanBody,
+    AiFaqBody,
+    AiInsightsBody,
+)
+from app.services import write_audit
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 AllRoles = Depends(require_roles("student", "teacher", "admin"))
+
+
+@router.get("/debug/provider", dependencies=[AllRoles])
+async def ai_debug_provider(user: CurrentUser):
+    provider = (settings.ai_provider or "").strip().lower()
+    return {
+        "provider": provider,
+        "model": _current_model(),
+        "openaiBaseUrl": settings.openai_base_url,
+        "hasOpenaiKey": bool(settings.openai_api_key),
+        "hasGeminiKey": bool(settings.gemini_api_key),
+        "hasGroqKey": bool(settings.groq_api_key),
+    }
+
 
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
@@ -50,57 +70,92 @@ def _chat_fallback(message: str) -> str:
         )
     if any(w in msg for w in ["помощь", "помоги", "как", "что такое", "объясни"]):
         return (
-            "Я AI-ассистент платформы Stepashka. Сейчас основная модель Gemini временно "
+            "Я AI-ассистент платформы Gradus. Сейчас основная модель Gemini временно "
             "недоступна (квота исчерпана), поэтому мои ответы ограничены. "
             "Попробуйте позже или задайте вопрос по конкретной теме: Python, JavaScript, "
             "веб-разработка, базы данных, алгоритмы."
         )
     return (
-        "Сейчас AI-сервис работает в ограниченном режиме (квота Gemini исчерпана). "
+        "Сейчас AI-сервис работает в ограниченном режиме (провайдер временно недоступен). "
         "Попробуйте задать вопрос позже или сформулируйте его конкретнее. "
         "Я могу помочь с Python, JavaScript, веб-разработкой и другими IT-темами."
     )
 
 
-GROQ_BASE = "https://api.groq.com/openai/v1/chat/completions"
+OPENAI_CHAT_PATH = "/chat/completions"
 
 
 def _gemini_url(model: str) -> str:
     return f"{GEMINI_BASE}/{model}:generateContent?key={settings.gemini_api_key}"
 
 
-async def _groq_generate(prompt: str, system: str = "") -> str:
-    """Call Groq API (OpenAI-compatible) and return text response."""
-    if not settings.groq_api_key:
-        raise ValueError("AI-сервис не настроен. Укажите GROQ_API_KEY в .env")
+async def _openai_compatible_generate(
+    *,
+    base_url: str,
+    api_key: str,
+    model: str,
+    provider_name: str,
+    prompt: str,
+    system: str = "",
+) -> str:
+    if not api_key:
+        raise ValueError(
+            f"AI-сервис не настроен. Укажите API key для {provider_name} в .env"
+        )
 
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
+    url = f"{base_url.rstrip('/')}{OPENAI_CHAT_PATH}"
+
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
-            GROQ_BASE,
+            url,
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {settings.groq_api_key}",
+                "Authorization": f"Bearer {api_key}",
             },
             json={
-                "model": settings.groq_model,
+                "model": model,
                 "messages": messages,
                 "temperature": 0.3,
                 "max_tokens": 4096,
             },
         )
         if resp.status_code != 200:
-            raise ValueError(f"Groq API error ({resp.status_code}): {resp.text[:400]}")
+            raise ValueError(
+                f"{provider_name} API error ({resp.status_code}): {resp.text[:400]}"
+            )
 
         data = resp.json()
         choices = data.get("choices", [])
         if not choices:
-            raise ValueError("Groq не вернул ответ")
+            raise ValueError(f"{provider_name} не вернул ответ")
         return choices[0].get("message", {}).get("content", "").strip()
+
+
+async def _groq_generate(prompt: str, system: str = "") -> str:
+    return await _openai_compatible_generate(
+        base_url="https://api.groq.com/openai/v1",
+        api_key=settings.groq_api_key,
+        model=settings.groq_model,
+        provider_name="Groq",
+        prompt=prompt,
+        system=system,
+    )
+
+
+async def _openai_generate(prompt: str, system: str = "") -> str:
+    return await _openai_compatible_generate(
+        base_url=settings.openai_base_url,
+        api_key=settings.openai_api_key,
+        model=settings.openai_model,
+        provider_name="OpenAI-compatible",
+        prompt=prompt,
+        system=system,
+    )
 
 
 async def _gemini_generate(prompt: str, system: str = "") -> str:
@@ -110,8 +165,15 @@ async def _gemini_generate(prompt: str, system: str = "") -> str:
 
     contents = []
     if system:
-        contents.append({"role": "user", "parts": [{"text": f"[System instruction]: {system}"}]})
-        contents.append({"role": "model", "parts": [{"text": "Understood. I will follow these instructions."}]})
+        contents.append(
+            {"role": "user", "parts": [{"text": f"[System instruction]: {system}"}]}
+        )
+        contents.append(
+            {
+                "role": "model",
+                "parts": [{"text": "Understood. I will follow these instructions."}],
+            }
+        )
     contents.append({"role": "user", "parts": [{"text": prompt}]})
 
     async with httpx.AsyncClient(timeout=60) as client:
@@ -124,7 +186,9 @@ async def _gemini_generate(prompt: str, system: str = "") -> str:
             },
         )
         if resp.status_code != 200:
-            raise ValueError(f"Gemini API error ({resp.status_code}): {resp.text[:400]}")
+            raise ValueError(
+                f"Gemini API error ({resp.status_code}): {resp.text[:400]}"
+            )
 
         data = resp.json()
         candidates = data.get("candidates", [])
@@ -136,14 +200,20 @@ async def _gemini_generate(prompt: str, system: str = "") -> str:
 
 async def _ai_generate(prompt: str, system: str = "") -> str:
     """Route to the configured AI provider."""
-    if settings.ai_provider == "groq":
+    provider = (settings.ai_provider or "").strip().lower()
+    if provider == "groq":
         return await _groq_generate(prompt, system)
+    if provider == "openai":
+        return await _openai_generate(prompt, system)
     return await _gemini_generate(prompt, system)
 
 
 def _current_model() -> str:
-    if settings.ai_provider == "groq":
+    provider = (settings.ai_provider or "").strip().lower()
+    if provider == "groq":
         return settings.groq_model
+    if provider == "openai":
+        return settings.openai_model
     return settings.gemini_model
 
 
@@ -157,18 +227,33 @@ async def ai_chat(body: AiChatBody, user: CurrentUser):
                 context_text += f"{m.role}: {m.content}\n"
 
         prompt = f"{context_text}user: {body.message}" if context_text else body.message
-        system = "Ты учебный AI-ассистент платформы Stepashka. Отвечай на русском, структурно и практично."
+        system = "Ты учебный AI-ассистент платформы Gradus. Отвечай на русском, структурно и практично."
 
         answer = await _ai_generate(prompt, system)
     except ValueError as exc:
         import logging
+
         logging.getLogger(__name__).warning("AI chat fallback: %s", exc)
-        answer = _chat_fallback(body.message)
+        if _current_model().startswith("accounts/fireworks"):
+            answer = (
+                "AI-провайдер Fireworks недоступен для текущего ключа: "
+                f"{str(exc)[:220]}. "
+                "Проверьте billing/лимиты Fireworks или переключитесь на другой провайдер."
+            )
+        else:
+            answer = _chat_fallback(body.message)
         model_used = "fallback"
 
-    await write_audit(user["id"], "ai.chat.request", "user", user["id"], {
-        "promptSize": len(body.message), "model": model_used,
-    })
+    await write_audit(
+        user["id"],
+        "ai.chat.request",
+        "user",
+        user["id"],
+        {
+            "promptSize": len(body.message),
+            "model": model_used,
+        },
+    )
 
     return {"reply": answer, "model": model_used}
 
@@ -182,20 +267,27 @@ async def ai_chat_stream(body: AiChatBody, user: CurrentUser):
                 context_text += f"{m.role}: {m.content}\n"
 
         prompt = f"{context_text}user: {body.message}" if context_text else body.message
-        system = "Ты учебный AI-ассистент платформы Stepashka. Отвечай на русском, структурно и практично."
+        system = "Ты учебный AI-ассистент платформы Gradus. Отвечай на русском, структурно и практично."
 
         answer = await _ai_generate(prompt, system)
     except ValueError:
         answer = _chat_fallback(body.message)
 
-    await write_audit(user["id"], "ai.chat.stream.request", "user", user["id"], {
-        "promptSize": len(body.message), "model": _current_model(),
-    })
+    await write_audit(
+        user["id"],
+        "ai.chat.stream.request",
+        "user",
+        user["id"],
+        {
+            "promptSize": len(body.message),
+            "model": _current_model(),
+        },
+    )
 
     async def generate():
         chunk_size = 28
         for i in range(0, len(answer), chunk_size):
-            yield answer[i:i + chunk_size]
+            yield answer[i : i + chunk_size]
             await asyncio.sleep(0.018)
 
     return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
@@ -206,11 +298,11 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
     lang = body.language if body.language != "auto" else "не указан"
     try:
         system = (
-            "Ты опытный старший разработчик и строгий code-reviewer на платформе Stepashka. "
+            "Ты опытный старший разработчик и строгий code-reviewer на платформе Gradus. "
             f"Язык программирования: {lang}. "
             "Проанализируй предоставленный код МАКСИМАЛЬНО подробно. "
             "Ответь СТРОГО в JSON формате без markdown, без ```json, только чистый JSON:\n"
-            '{\n'
+            "{\n"
             '  "quality": <число 0-100>,\n'
             '  "correctness": <число 0-100>,\n'
             '  "style": <число 0-100>,\n'
@@ -218,13 +310,16 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
             '  "issues": ["<проблема 1>", "<проблема 2>", ...],\n'
             '  "improvements": ["<рекомендация 1>", "<рекомендация 2>", ...],\n'
             '  "goodParts": ["<что хорошо 1>", "<что хорошо 2>", ...]\n'
-            '}\n'
+            "}\n"
             "В issues укажи конкретные баги, уязвимости, проблемы. "
             "В improvements — конкретные предложения с примерами кода, как улучшить. "
             "В goodParts — что сделано хорошо. Всё на русском языке. "
             "Учитывай идиоматику и best-practices конкретного языка."
         )
-        raw = await _ai_generate(f"Проверь этот код ({lang}):\n\n```{body.language}\n{body.sourceCode}\n```", system)
+        raw = await _ai_generate(
+            f"Проверь этот код ({lang}):\n\n```{body.language}\n{body.sourceCode}\n```",
+            system,
+        )
 
         # Strip markdown fences if present
         cleaned = raw.strip()
@@ -244,13 +339,21 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
         issues = [str(i) for i in result.get("issues", [])][:10]
         improvements = [str(i) for i in result.get("improvements", [])][:10]
         good_parts = [str(i) for i in result.get("goodParts", [])][:10]
-    except (ValueError, json.JSONDecodeError, KeyError):
+    except (ValueError, json.JSONDecodeError, KeyError) as exc:
         # Fallback: heuristic analysis
         lines = body.sourceCode.strip().split("\n")
         quality = min(95, max(20, len(lines) * 3 + 30))
         correctness = min(90, max(25, quality - 5))
         style = min(85, max(20, quality - 10))
         summary = "Не удалось получить AI-анализ. Базовая эвристика: код принят."
+        if isinstance(exc, ValueError) and _current_model().startswith(
+            "accounts/fireworks"
+        ):
+            summary = (
+                "Fireworks временно недоступен для текущего аккаунта/ключа. "
+                "Проверьте billing/лимиты в Fireworks. "
+                f"Техническая причина: {str(exc)[:200]}"
+            )
         issues = []
         improvements = ["Проверьте форматирование и naming conventions"]
         good_parts = []
@@ -260,14 +363,25 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
         review_id = await db.fetchval(
             """INSERT INTO ai_reviews (user_id, quality, correctness, style, summary)
                VALUES ($1, $2, $3, $4, $5) RETURNING id""",
-            user["id"], quality, correctness, style, summary,
+            user["id"],
+            quality,
+            correctness,
+            style,
+            summary,
         )
     except Exception:
         review_id = 0
 
-    await write_audit(user["id"], "ai.review.check", "user", user["id"], {
-        "codeSize": len(body.sourceCode), "quality": quality,
-    })
+    await write_audit(
+        user["id"],
+        "ai.review.check",
+        "user",
+        user["id"],
+        {
+            "codeSize": len(body.sourceCode),
+            "quality": quality,
+        },
+    )
 
     return {
         "id": review_id,
@@ -297,7 +411,7 @@ async def ai_insights(body: AiInsightsBody, user: CurrentUser):
     """Generate AI-powered analytics insights based on user's progress data."""
     try:
         system = (
-            "Ты аналитик обучения на платформе Stepashka. "
+            "Ты аналитик обучения на платформе Gradus. "
             "Ответь СТРОГО в JSON массиве из 3 объектов без markdown, только чистый JSON: "
             '[{"label": "<категория>", "text": "<рекомендация на русском>"}]. '
             "Первый объект — сильная зона ученика, второй — зона риска, третий — конкретный следующий шаг. "
@@ -334,9 +448,18 @@ async def ai_insights(body: AiInsightsBody, user: CurrentUser):
             raise ValueError("Invalid insights format")
 
         result = [
-            {"label": str(insights[0].get("label", "Сильная зона")), "text": str(insights[0].get("text", ""))},
-            {"label": str(insights[1].get("label", "Зона риска")), "text": str(insights[1].get("text", ""))},
-            {"label": str(insights[2].get("label", "Следующий шаг")), "text": str(insights[2].get("text", ""))},
+            {
+                "label": str(insights[0].get("label", "Сильная зона")),
+                "text": str(insights[0].get("text", "")),
+            },
+            {
+                "label": str(insights[1].get("label", "Зона риска")),
+                "text": str(insights[1].get("text", "")),
+            },
+            {
+                "label": str(insights[2].get("label", "Следующий шаг")),
+                "text": str(insights[2].get("text", "")),
+            },
         ]
     except (ValueError, json.JSONDecodeError, KeyError, IndexError):
         last_value = body.values[-1] if body.values else 0
@@ -344,9 +467,18 @@ async def ai_insights(body: AiInsightsBody, user: CurrentUser):
         delta = last_value - first_value
         goal = 80
         result = [
-            {"label": "Сильная зона", "text": f"Практические шаги: стабильный рост {max(0, delta)}%"},
-            {"label": "Зона риска", "text": f"Рекомендуется увеличить регулярность и довести sprint до {goal}%"},
-            {"label": "Следующий шаг", "text": "Добавить 2 code-практики и пройти 1 quiz на этой неделе"},
+            {
+                "label": "Сильная зона",
+                "text": f"Практические шаги: стабильный рост {max(0, delta)}%",
+            },
+            {
+                "label": "Зона риска",
+                "text": f"Рекомендуется увеличить регулярность и довести sprint до {goal}%",
+            },
+            {
+                "label": "Следующий шаг",
+                "text": "Добавить 2 code-практики и пройти 1 quiz на этой неделе",
+            },
         ]
 
     return {"insights": result}
@@ -357,7 +489,7 @@ async def ai_daily_plan(body: AiDailyPlanBody, user: CurrentUser):
     """Generate AI-powered personalized daily learning plan."""
     try:
         system = (
-            "Ты персональный учебный планировщик платформы Stepashka. "
+            "Ты персональный учебный планировщик платформы Gradus. "
             "Ответь СТРОГО в JSON без markdown, только чистый JSON: "
             '{"today": ["<пункт 1>", "<пункт 2>"], "tomorrow": ["<пункт 1>", "<пункт 2>"]}. '
             "Каждый план содержит 2-3 конкретных и коротких пункта на русском языке. "
@@ -401,11 +533,23 @@ async def ai_daily_plan(body: AiDailyPlanBody, user: CurrentUser):
         if body.continueStep:
             step_title = body.continueStep.get("stepTitle", "текущий шаг")
             step_order = body.continueStep.get("stepOrder", "?")
-            today = [f"Шаг {step_order}: {step_title}", "Повторить 1 прошлую ошибку по коду"]
-            tomorrow = ["Закрыть ещё 1 шаг после текущего", "Проверить обсуждение и задать вопрос"]
+            today = [
+                f"Шаг {step_order}: {step_title}",
+                "Повторить 1 прошлую ошибку по коду",
+            ]
+            tomorrow = [
+                "Закрыть ещё 1 шаг после текущего",
+                "Проверить обсуждение и задать вопрос",
+            ]
         else:
-            today = ["Выберите новый курс из каталога", "Сделайте 1 шаг для поддержания серии"]
-            tomorrow = ["Соберите персональный трек из 1-2 курсов", "Поставьте реальную недельную цель"]
+            today = [
+                "Выберите новый курс из каталога",
+                "Сделайте 1 шаг для поддержания серии",
+            ]
+            tomorrow = [
+                "Соберите персональный трек из 1-2 курсов",
+                "Поставьте реальную недельную цель",
+            ]
 
     return {"today": today, "tomorrow": tomorrow}
 
@@ -415,7 +559,7 @@ async def ai_faq(body: AiFaqBody, user: CurrentUser):
     """Answer FAQ questions using Gemini AI."""
     try:
         system = (
-            "Ты бот справочного центра платформы Stepashka — онлайн-платформы для обучения IT. "
+            "Ты бот справочного центра платформы Gradus — онлайн-платформы для обучения IT. "
             "Отвечай на русском языке. Давай точные, полезные и краткие ответы. "
             "Если вопрос не связан с платформой, вежливо перенаправь к теме обучения."
         )

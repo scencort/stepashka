@@ -1,11 +1,15 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="g" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+    <linearGradient id="g" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
       <stop stop-color="#BE123C"/>
       <stop offset="1" stop-color="#7F1D1D"/>
     </linearGradient>
   </defs>
-  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#g)"/>
-  <circle cx="32" cy="32" r="18" fill="#FFF7ED"/>
-  <path d="M22 23V41M32 23V41M42 23V41M22 32H42" stroke="#991B1B" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="64" height="64" rx="14" fill="url(#g)"/>
+  <!-- Three ascending bars -->
+  <rect x="10" y="38" width="12" height="16" rx="3" fill="white" opacity="0.6"/>
+  <rect x="26" y="28" width="12" height="26" rx="3" fill="white" opacity="0.8"/>
+  <rect x="42" y="16" width="12" height="38" rx="3" fill="white"/>
+  <!-- Arrow tip -->
+  <path d="M48 10 L42 16 L54 16 Z" fill="white" opacity="0.5"/>
 </svg>

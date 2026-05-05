@@ -1,13 +1,13 @@
-import { BrowserRouter, useLocation } from "react-router-dom"
-import { useEffect } from "react"
-import { AnimatePresence, motion } from "framer-motion"
-import { Router } from "./router"
+import { BrowserRouter, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Router } from "./router";
 
-const BASE_TITLE = "Степашка"
+const BASE_TITLE = "Gradus";
 
 function getPageTitle(pathname: string) {
   if (pathname.startsWith("/course/")) {
-    return "Прохождение курса"
+    return "Прохождение курса";
   }
 
   const titles: Record<string, string> = {
@@ -30,18 +30,18 @@ function getPageTitle(pathname: string) {
     "/account": "Профиль и настройки",
     "/teacher": "Кабинет преподавателя",
     "/admin": "Админ-панель",
-  }
+  };
 
-  return titles[pathname] || "Платформа обучения"
+  return titles[pathname] || "Платформа обучения";
 }
 
 function AnimatedRoutes() {
-  const location = useLocation()
+  const location = useLocation();
 
   useEffect(() => {
-    const pageTitle = getPageTitle(location.pathname)
-    document.title = `${pageTitle} | ${BASE_TITLE}`
-  }, [location.pathname])
+    const pageTitle = getPageTitle(location.pathname);
+    document.title = `${pageTitle} | ${BASE_TITLE}`;
+  }, [location.pathname]);
 
   return (
     <AnimatePresence mode="wait">
@@ -55,7 +55,7 @@ function AnimatedRoutes() {
         <Router />
       </motion.div>
     </AnimatePresence>
-  )
+  );
 }
 
 export default function App() {
@@ -63,5 +63,5 @@ export default function App() {
     <BrowserRouter>
       <AnimatedRoutes />
     </BrowserRouter>
-  )
+  );
 }

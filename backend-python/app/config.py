@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     smtp_secure: bool = False
     smtp_user: str = ""
     smtp_pass: str = ""
-    smtp_from: str = "Stepashka <no-reply@stepashka.dev>"
+    smtp_from: str = "Gradus <no-reply@gradus.dev>"
     show_dev_reset_code: bool = True
 
     openai_api_key: str = ""

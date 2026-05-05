@@ -5,7 +5,6 @@ import json
 from app import db
 from app.services import hash_password
 
-
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
@@ -282,21 +281,28 @@ async def init_db() -> None:
 
 
 async def _seed_users() -> None:
-    count = await db.fetchval("SELECT COUNT(*)::int FROM users")
-    if count > 0:
-        return
+    demo_users = [
+        ("admin@gradus.dev", "Admin@12345", "Системный администратор", "admin"),
+        ("teacher@gradus.dev", "Teacher@12345", "Ирина Преподаватель", "teacher"),
+        ("student@gradus.dev", "Student@12345", "Алексей Студент", "student"),
+    ]
 
-    admin_hash = hash_password("Admin@12345")
-    teacher_hash = hash_password("Teacher@12345")
-    student_hash = hash_password("Student@12345")
-
-    await db.execute(
-        """INSERT INTO users (email, password_hash, full_name, role) VALUES
-           ('admin@stepashka.dev', $1, 'Системный администратор', 'admin'),
-           ('teacher@stepashka.dev', $2, 'Ирина Преподаватель', 'teacher'),
-           ('student@stepashka.dev', $3, 'Алексей Студент', 'student')""",
-        admin_hash, teacher_hash, student_hash,
-    )
+    for email, password, full_name, role in demo_users:
+        password_hash = hash_password(password)
+        await db.execute(
+            """INSERT INTO users (email, password_hash, full_name, role, status)
+               VALUES ($1, $2, $3, $4, 'active')
+               ON CONFLICT (email) DO UPDATE
+               SET password_hash=EXCLUDED.password_hash,
+                   full_name=EXCLUDED.full_name,
+                   role=EXCLUDED.role,
+                   status='active',
+                   updated_at=NOW()""",
+            email,
+            password_hash,
+            full_name,
+            role,
+        )
 
 
 async def _seed_profiles() -> None:
@@ -312,34 +318,116 @@ async def _seed_courses() -> None:
     if count > 0:
         return
 
-    teacher = await db.fetchrow("SELECT id FROM users WHERE email = 'teacher@stepashka.dev' LIMIT 1")
+    teacher = await db.fetchrow(
+        "SELECT id FROM users WHERE email = 'teacher@gradus.dev' LIMIT 1"
+    )
     tid = teacher["id"] if teacher else None
 
     courses_data = [
-        ("Python: Большой практический курс", "python-backend-fastapi",
-         "Расширенный курс по Python: много теории, практические кейсы и проверка кода по тестам.",
-         "Intermediate", "Programming", 0, tid, "published", 4.9, 980, 52),
-        ("React + TypeScript для продукта", "react-typescript-product",
-         "Создание production фронтенда с архитектурой и тестами.",
-         "Intermediate", "Programming", 199000, tid, "published", 4.8, 1180, 36),
-        ("DevOps: Docker, CI/CD, Monitoring", "devops-docker-cicd-monitoring",
-         "Контейнеризация, деплой и наблюдаемость в реальных проектах.",
-         "Advanced", "DevOps", 329000, tid, "published", 4.7, 760, 48),
-        ("UI/UX Design Практика", "ui-ux-practice",
-         "UX-исследования, дизайн-система и передача макетов в разработку.",
-         "Beginner", "Design", 179000, tid, "pending_review", 4.6, 390, 28),
-        ("Data Science: прикладной ML", "data-science-applied-ml",
-         "Полный цикл ML-проекта: от EDA до продакшн-метрик.",
-         "Advanced", "Data Science", 359000, tid, "published", 4.9, 540, 52),
-        ("QA Engineer Pro", "qa-engineer-pro",
-         "Тест-дизайн, API/UI автотесты и интеграция в CI.",
-         "Intermediate", "QA", 189000, tid, "published", 4.8, 880, 34),
-        ("JavaScript Backend: Node.js API", "javascript-nodejs-api",
-         "Курс по JavaScript/Node.js: роутинг, валидация, middleware и тесты API.",
-         "Intermediate", "Programming", 219000, tid, "published", 4.8, 910, 44),
-        ("Go Backend Fundamentals", "go-backend-fundamentals",
-         "Практика на Go: структура проекта, HTTP handlers и работа со структурами данных.",
-         "Intermediate", "Programming", 229000, tid, "published", 4.7, 620, 40),
+        (
+            "Python: Большой практический курс",
+            "python-backend-fastapi",
+            "Расширенный курс по Python: много теории, практические кейсы и проверка кода по тестам.",
+            "Intermediate",
+            "Programming",
+            0,
+            tid,
+            "published",
+            4.9,
+            980,
+            52,
+        ),
+        (
+            "React + TypeScript для продукта",
+            "react-typescript-product",
+            "Создание production фронтенда с архитектурой и тестами.",
+            "Intermediate",
+            "Programming",
+            199000,
+            tid,
+            "published",
+            4.8,
+            1180,
+            36,
+        ),
+        (
+            "DevOps: Docker, CI/CD, Monitoring",
+            "devops-docker-cicd-monitoring",
+            "Контейнеризация, деплой и наблюдаемость в реальных проектах.",
+            "Advanced",
+            "DevOps",
+            329000,
+            tid,
+            "published",
+            4.7,
+            760,
+            48,
+        ),
+        (
+            "UI/UX Design Практика",
+            "ui-ux-practice",
+            "UX-исследования, дизайн-система и передача макетов в разработку.",
+            "Beginner",
+            "Design",
+            179000,
+            tid,
+            "pending_review",
+            4.6,
+            390,
+            28,
+        ),
+        (
+            "Data Science: прикладной ML",
+            "data-science-applied-ml",
+            "Полный цикл ML-проекта: от EDA до продакшн-метрик.",
+            "Advanced",
+            "Data Science",
+            359000,
+            tid,
+            "published",
+            4.9,
+            540,
+            52,
+        ),
+        (
+            "QA Engineer Pro",
+            "qa-engineer-pro",
+            "Тест-дизайн, API/UI автотесты и интеграция в CI.",
+            "Intermediate",
+            "QA",
+            189000,
+            tid,
+            "published",
+            4.8,
+            880,
+            34,
+        ),
+        (
+            "JavaScript Backend: Node.js API",
+            "javascript-nodejs-api",
+            "Курс по JavaScript/Node.js: роутинг, валидация, middleware и тесты API.",
+            "Intermediate",
+            "Programming",
+            219000,
+            tid,
+            "published",
+            4.8,
+            910,
+            44,
+        ),
+        (
+            "Go Backend Fundamentals",
+            "go-backend-fundamentals",
+            "Практика на Go: структура проекта, HTTP handlers и работа со структурами данных.",
+            "Intermediate",
+            "Programming",
+            229000,
+            tid,
+            "published",
+            4.7,
+            620,
+            40,
+        ),
     ]
 
     for c in courses_data:
@@ -351,7 +439,9 @@ async def _seed_courses() -> None:
         )
 
     # --- Python course modules, lessons, assignments ---
-    python_id = await db.fetchval("SELECT id FROM courses WHERE slug='python-backend-fastapi'")
+    python_id = await db.fetchval(
+        "SELECT id FROM courses WHERE slug='python-backend-fastapi'"
+    )
     if not python_id:
         return
 
@@ -373,39 +463,111 @@ async def _seed_courses() -> None:
                VALUES ($1, $2, $3)
                ON CONFLICT (course_id, module_order) DO UPDATE SET title=EXCLUDED.title
                RETURNING id""",
-            python_id, title, order,
+            python_id,
+            title,
+            order,
         )
         mod_ids[order] = mid
 
     lessons_data = [
-        (1, 1, "Переменные, типы и приведение", "text",
-         "Python динамически типизирован, но это не отменяет аккуратную работу с типами. Разбираем int, float, str, bool, приведение типов и типичные ошибки при смешивании строк и чисел."),
-        (1, 2, "Индексация, срезы и строки", "text",
-         "Подробно изучаем индексацию с нуля, отрицательные индексы, срезы и операции над строками."),
-        (2, 1, "Условия и логические выражения", "text",
-         "Разбираем if/elif/else, приоритет операторов, составные условия и читаемость кода."),
-        (2, 2, "Циклы for/while и шаблон елочки", "interactive",
-         "Учимся писать циклы и формировать текстовый вывод построчно."),
-        (2, 3, "Функции, аргументы и return", "text",
-         "Пишем функции с позиционными и именованными аргументами, разбираем return, области видимости."),
-        (3, 1, "Списки, словари, множества", "text",
-         "Сравниваем коллекции Python, выбираем структуры данных под задачу."),
-        (3, 2, "Исключения и защищенный код", "text",
-         "Разбираем try/except/finally, типы исключений и стратегию обработки ошибок в API."),
-        (4, 1, "ООП: классы и методы", "text",
-         "Практика с классами, self, инкапсуляцией и простым наследованием."),
-        (4, 2, "Модули и структура проекта", "text",
-         "Структурируем проект: package layout, импорты, __init__.py и разделение ответственности."),
-        (5, 1, "FastAPI роуты и схемы Pydantic", "interactive",
-         "Создаем endpoint, описываем модели запросов и ответов, делаем базовую валидацию payload через Pydantic."),
-        (5, 2, "HTTP-ошибки и статус-коды", "text",
-         "Учимся правильно возвращать 200/201/400/404/422/500."),
-        (6, 1, "SQLAlchemy модели и CRUD", "interactive",
-         "Базовое моделирование сущностей, создание записей, чтение и обновление."),
-        (7, 1, "Тесты на pytest: основы", "text",
-         "Пишем unit- и интеграционные тесты, проверяем сценарии успеха и ошибок."),
-        (8, 1, "Мини-проект: API заметок", "interactive",
-         "Собираем небольшой API-сервис заметок с валидацией и тестами."),
+        (
+            1,
+            1,
+            "Переменные, типы и приведение",
+            "text",
+            "Python динамически типизирован, но это не отменяет аккуратную работу с типами. Разбираем int, float, str, bool, приведение типов и типичные ошибки при смешивании строк и чисел.",
+        ),
+        (
+            1,
+            2,
+            "Индексация, срезы и строки",
+            "text",
+            "Подробно изучаем индексацию с нуля, отрицательные индексы, срезы и операции над строками.",
+        ),
+        (
+            2,
+            1,
+            "Условия и логические выражения",
+            "text",
+            "Разбираем if/elif/else, приоритет операторов, составные условия и читаемость кода.",
+        ),
+        (
+            2,
+            2,
+            "Циклы for/while и шаблон елочки",
+            "interactive",
+            "Учимся писать циклы и формировать текстовый вывод построчно.",
+        ),
+        (
+            2,
+            3,
+            "Функции, аргументы и return",
+            "text",
+            "Пишем функции с позиционными и именованными аргументами, разбираем return, области видимости.",
+        ),
+        (
+            3,
+            1,
+            "Списки, словари, множества",
+            "text",
+            "Сравниваем коллекции Python, выбираем структуры данных под задачу.",
+        ),
+        (
+            3,
+            2,
+            "Исключения и защищенный код",
+            "text",
+            "Разбираем try/except/finally, типы исключений и стратегию обработки ошибок в API.",
+        ),
+        (
+            4,
+            1,
+            "ООП: классы и методы",
+            "text",
+            "Практика с классами, self, инкапсуляцией и простым наследованием.",
+        ),
+        (
+            4,
+            2,
+            "Модули и структура проекта",
+            "text",
+            "Структурируем проект: package layout, импорты, __init__.py и разделение ответственности.",
+        ),
+        (
+            5,
+            1,
+            "FastAPI роуты и схемы Pydantic",
+            "interactive",
+            "Создаем endpoint, описываем модели запросов и ответов, делаем базовую валидацию payload через Pydantic.",
+        ),
+        (
+            5,
+            2,
+            "HTTP-ошибки и статус-коды",
+            "text",
+            "Учимся правильно возвращать 200/201/400/404/422/500.",
+        ),
+        (
+            6,
+            1,
+            "SQLAlchemy модели и CRUD",
+            "interactive",
+            "Базовое моделирование сущностей, создание записей, чтение и обновление.",
+        ),
+        (
+            7,
+            1,
+            "Тесты на pytest: основы",
+            "text",
+            "Пишем unit- и интеграционные тесты, проверяем сценарии успеха и ошибок.",
+        ),
+        (
+            8,
+            1,
+            "Мини-проект: API заметок",
+            "interactive",
+            "Собираем небольшой API-сервис заметок с валидацией и тестами.",
+        ),
     ]
 
     lesson_ids: dict[str, int] = {}
@@ -418,35 +580,108 @@ async def _seed_courses() -> None:
                VALUES ($1,$2,$3,$4,$5)
                ON CONFLICT (module_id, lesson_order) DO UPDATE SET title=EXCLUDED.title, content_text=EXCLUDED.content_text
                RETURNING id""",
-            mid, title, ltype, text, lesson_order,
+            mid,
+            title,
+            ltype,
+            text,
+            lesson_order,
         )
         lesson_ids[f"{mod_order}:{lesson_order}"] = lid
 
     assignments_data = [
-        ("2:2", "Елочка через цикл", "code",
-         "Напишите цикл, который печатает елочку минимум из двух строк.",
-         [{"name": "Есть цикл и print", "type": "includesAll", "tokens": ["for", "print"]},
-          {"name": "Есть символ *", "type": "regex", "pattern": "\\*"},
-          {"name": "Елочка 1..2", "type": "treePattern", "levels": [1, 2]}],
-         {"tests": 70, "quality": 15, "style": 15}, 100),
-        ("5:1", "FastAPI endpoint c валидацией", "code",
-         "Реализуйте endpoint POST /orders с валидацией входных данных.",
-         [{"name": "Используется FastAPI", "type": "includesAny", "tokens": ["FastAPI", "fastapi"]},
-          {"name": "Есть декоратор post", "type": "regex", "pattern": "@app\\.post|@router\\.post"},
-          {"name": "Есть валидация схемы", "type": "includesAny", "tokens": ["BaseModel", "pydantic"]}],
-         {"tests": 60, "quality": 20, "style": 20}, 100),
-        ("6:1", "CRUD для сущности Product", "code",
-         "Добавьте CRUD-операции для Product с использованием SQLAlchemy.",
-         [{"name": "Есть SQLAlchemy модель", "type": "includesAny", "tokens": ["declarative_base", "Mapped", "Column"]},
-          {"name": "Есть создание записи", "type": "includesAny", "tokens": ["add(", "session.add"]},
-          {"name": "Есть коммит", "type": "includesAny", "tokens": ["commit(", "session.commit"]}],
-         {"tests": 60, "quality": 20, "style": 20}, 100),
-        ("8:1", "Мини-проект API заметок", "code",
-         "Сделайте API заметок с endpoint для создания и получения списка.",
-         [{"name": "Есть минимум два endpoint", "type": "minCountRegex", "pattern": "@app\\.(get|post)|@router\\.(get|post)", "min": 2},
-          {"name": "Есть список заметок", "type": "includesAny", "tokens": ["notes", "list_notes", "get_notes"]},
-          {"name": "Есть создание заметки", "type": "includesAny", "tokens": ["create_note", "post_note", "add_note"]}],
-         {"tests": 65, "quality": 20, "style": 15}, 100),
+        (
+            "2:2",
+            "Елочка через цикл",
+            "code",
+            "Напишите цикл, который печатает елочку минимум из двух строк.",
+            [
+                {
+                    "name": "Есть цикл и print",
+                    "type": "includesAll",
+                    "tokens": ["for", "print"],
+                },
+                {"name": "Есть символ *", "type": "regex", "pattern": "\\*"},
+                {"name": "Елочка 1..2", "type": "treePattern", "levels": [1, 2]},
+            ],
+            {"tests": 70, "quality": 15, "style": 15},
+            100,
+        ),
+        (
+            "5:1",
+            "FastAPI endpoint c валидацией",
+            "code",
+            "Реализуйте endpoint POST /orders с валидацией входных данных.",
+            [
+                {
+                    "name": "Используется FastAPI",
+                    "type": "includesAny",
+                    "tokens": ["FastAPI", "fastapi"],
+                },
+                {
+                    "name": "Есть декоратор post",
+                    "type": "regex",
+                    "pattern": "@app\\.post|@router\\.post",
+                },
+                {
+                    "name": "Есть валидация схемы",
+                    "type": "includesAny",
+                    "tokens": ["BaseModel", "pydantic"],
+                },
+            ],
+            {"tests": 60, "quality": 20, "style": 20},
+            100,
+        ),
+        (
+            "6:1",
+            "CRUD для сущности Product",
+            "code",
+            "Добавьте CRUD-операции для Product с использованием SQLAlchemy.",
+            [
+                {
+                    "name": "Есть SQLAlchemy модель",
+                    "type": "includesAny",
+                    "tokens": ["declarative_base", "Mapped", "Column"],
+                },
+                {
+                    "name": "Есть создание записи",
+                    "type": "includesAny",
+                    "tokens": ["add(", "session.add"],
+                },
+                {
+                    "name": "Есть коммит",
+                    "type": "includesAny",
+                    "tokens": ["commit(", "session.commit"],
+                },
+            ],
+            {"tests": 60, "quality": 20, "style": 20},
+            100,
+        ),
+        (
+            "8:1",
+            "Мини-проект API заметок",
+            "code",
+            "Сделайте API заметок с endpoint для создания и получения списка.",
+            [
+                {
+                    "name": "Есть минимум два endpoint",
+                    "type": "minCountRegex",
+                    "pattern": "@app\\.(get|post)|@router\\.(get|post)",
+                    "min": 2,
+                },
+                {
+                    "name": "Есть список заметок",
+                    "type": "includesAny",
+                    "tokens": ["notes", "list_notes", "get_notes"],
+                },
+                {
+                    "name": "Есть создание заметки",
+                    "type": "includesAny",
+                    "tokens": ["create_note", "post_note", "add_note"],
+                },
+            ],
+            {"tests": 65, "quality": 20, "style": 15},
+            100,
+        ),
     ]
 
     for key, title, atype, desc, tests, rubric, max_score in assignments_data:
@@ -455,7 +690,8 @@ async def _seed_courses() -> None:
             continue
         exists = await db.fetchval(
             "SELECT id FROM assignments WHERE lesson_id=$1 AND title=$2 LIMIT 1",
-            lid, title,
+            lid,
+            title,
         )
         tests_json = json.dumps(tests)
         rubric_json = json.dumps(rubric)
@@ -463,13 +699,24 @@ async def _seed_courses() -> None:
             await db.execute(
                 """UPDATE assignments SET assignment_type=$1, description=$2, tests=$3::jsonb,
                    rubric=$4::jsonb, max_score=$5, updated_at=NOW() WHERE id=$6""",
-                atype, desc, tests_json, rubric_json, max_score, exists,
+                atype,
+                desc,
+                tests_json,
+                rubric_json,
+                max_score,
+                exists,
             )
         else:
             await db.execute(
                 """INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
                    VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)""",
-                lid, atype, title, desc, tests_json, rubric_json, max_score,
+                lid,
+                atype,
+                title,
+                desc,
+                tests_json,
+                rubric_json,
+                max_score,
             )
 
 

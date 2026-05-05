@@ -431,7 +431,7 @@ async def get_steps(course_id: int, user: CurrentUser):
             "progress": percent,
             "type": course_row["category"] or "General",
             "level": course_row["level"] or "Beginner",
-            "author": course_row["author"] or "Stepashka Team",
+            "author": course_row["author"] or "Gradus Team",
         },
         "steps": steps,
         "progress": [dict(r) for r in progress_rows],
