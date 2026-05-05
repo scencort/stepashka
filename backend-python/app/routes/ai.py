@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import re
 import httpx
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 import asyncio
 
 
-from app import db
+from app import db, cache
 from app.deps import CurrentUser, require_roles
 from app.schemas import AiChatBody, AiCodeReviewBody, AiInsightsBody, AiDailyPlanBody, AiFaqBody
 from app.services import write_audit
@@ -147,6 +148,41 @@ def _current_model() -> str:
     return settings.gemini_model
 
 
+_INVALID_CTRL_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+
+
+def _normalize_text(text: str) -> str:
+    cleaned = _INVALID_CTRL_RE.sub("", text or "")
+    cleaned = cleaned.replace("\r\n", "\n").replace("\r", "\n")
+    cleaned = "\n".join(line.rstrip() for line in cleaned.split("\n"))
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def _normalize_code_for_review(source_code: str) -> str:
+    return _normalize_text(source_code)
+
+
+def _review_cache_key(language: str, source_code: str) -> tuple[str, str]:
+    normalized_lang = (language or "auto").strip().lower()
+    normalized_code = _normalize_code_for_review(source_code)
+    payload = json.dumps(
+        {
+            "v": 1,
+            "type": "review",
+            "provider": settings.ai_provider,
+            "model": _current_model(),
+            "language": normalized_lang,
+            "code": normalized_code,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    digest = cache.sha256_text(payload)
+    key = f"{settings.ai_cache_namespace}:review:{digest}"
+    return key, normalized_code
+
+
 @router.post("/chat", dependencies=[AllRoles])
 async def ai_chat(body: AiChatBody, user: CurrentUser):
     model_used = _current_model()
@@ -157,7 +193,7 @@ async def ai_chat(body: AiChatBody, user: CurrentUser):
                 context_text += f"{m.role}: {m.content}\n"
 
         prompt = f"{context_text}user: {body.message}" if context_text else body.message
-        system = "Ты учебный AI-ассистент платформы Stepashka. Отвечай на русском, структурно и практично."
+        system = "Ты учебный AI-ассистент платформы Gradus. Отвечай на русском, структурно и практично."
 
         answer = await _ai_generate(prompt, system)
     except ValueError as exc:
@@ -182,7 +218,7 @@ async def ai_chat_stream(body: AiChatBody, user: CurrentUser):
                 context_text += f"{m.role}: {m.content}\n"
 
         prompt = f"{context_text}user: {body.message}" if context_text else body.message
-        system = "Ты учебный AI-ассистент платформы Stepashka. Отвечай на русском, структурно и практично."
+        system = "Ты учебный AI-ассистент платформы Gradus. Отвечай на русском, структурно и практично."
 
         answer = await _ai_generate(prompt, system)
     except ValueError:
@@ -204,6 +240,28 @@ async def ai_chat_stream(body: AiChatBody, user: CurrentUser):
 @router.post("/review/check", dependencies=[AllRoles])
 async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
     lang = body.language if body.language != "auto" else "не указан"
+    cache_key, normalized_code = _review_cache_key(body.language, body.sourceCode)
+
+    cached = await cache.get_json(cache_key)
+    if cached:
+        await write_audit(user["id"], "ai.review.check", "user", user["id"], {
+            "codeSize": len(body.sourceCode),
+            "quality": int(cached.get("quality", 0)),
+            "cacheHit": True,
+        })
+        return {
+            "id": 0,
+            "quality": int(cached.get("quality", 0)),
+            "correctness": int(cached.get("correctness", 0)),
+            "style": int(cached.get("style", 0)),
+            "summary": str(cached.get("summary", "")),
+            "issues": [str(i) for i in cached.get("issues", [])][:10],
+            "improvements": [str(i) for i in cached.get("improvements", [])][:10],
+            "goodParts": [str(i) for i in cached.get("goodParts", [])][:10],
+            "language": body.language,
+            "cache": {"hit": True},
+        }
+
     try:
         system = (
             "Ты опытный старший разработчик и строгий code-reviewer на платформе Stepashka. "
@@ -224,9 +282,9 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
             "В goodParts — что сделано хорошо. Всё на русском языке. "
             "Учитывай идиоматику и best-practices конкретного языка."
         )
-        raw = await _ai_generate(f"Проверь этот код ({lang}):\n\n```{body.language}\n{body.sourceCode}\n```", system)
+        raw = await _ai_generate(f"Проверь этот код ({lang}):\n\n```{body.language}\n{normalized_code}\n```", system)
 
-        # Strip markdown fences if present
+        # Иногда модель оборачивает JSON в markdown-блоки — аккуратно снимаем эту обёртку.
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
@@ -245,8 +303,8 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
         improvements = [str(i) for i in result.get("improvements", [])][:10]
         good_parts = [str(i) for i in result.get("goodParts", [])][:10]
     except (ValueError, json.JSONDecodeError, KeyError):
-        # Fallback: heuristic analysis
-        lines = body.sourceCode.strip().split("\n")
+        # Резервный сценарий: если ответ модели не удалось разобрать, выдаём базовую оценку по простым эвристикам.
+        lines = normalized_code.strip().split("\n")
         quality = min(95, max(20, len(lines) * 3 + 30))
         correctness = min(90, max(25, quality - 5))
         style = min(85, max(20, quality - 10))
@@ -255,7 +313,18 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
         improvements = ["Проверьте форматирование и naming conventions"]
         good_parts = []
 
-    # Save to DB
+    cached_payload = {
+        "quality": quality,
+        "correctness": correctness,
+        "style": style,
+        "summary": summary,
+        "issues": issues,
+        "improvements": improvements,
+        "goodParts": good_parts,
+    }
+    await cache.set_json(cache_key, cached_payload)
+
+    # Сохраняем результат в БД, чтобы он попал в историю проверок пользователя.
     try:
         review_id = await db.fetchval(
             """INSERT INTO ai_reviews (user_id, quality, correctness, style, summary)
@@ -266,7 +335,9 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
         review_id = 0
 
     await write_audit(user["id"], "ai.review.check", "user", user["id"], {
-        "codeSize": len(body.sourceCode), "quality": quality,
+        "codeSize": len(body.sourceCode),
+        "quality": quality,
+        "cacheHit": False,
     })
 
     return {
@@ -279,6 +350,7 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
         "improvements": improvements,
         "goodParts": good_parts,
         "language": body.language,
+        "cache": {"hit": False},
     }
 
 

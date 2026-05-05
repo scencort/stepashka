@@ -37,6 +37,11 @@ class Settings(BaseSettings):
 
     ai_provider: str = "groq"  # groq | gemini
 
+    redis_enabled: bool = False
+    redis_url: str = "redis://localhost:6379/0"
+    ai_review_cache_ttl_seconds: int = 60 * 60 * 24 * 7
+    ai_cache_namespace: str = "stepashka:ai"
+
     model_config = {"env_file": str(_ENV_FILE), "env_file_encoding": "utf-8"}
 
 

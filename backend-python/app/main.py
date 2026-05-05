@@ -11,6 +11,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app import db as database
+from app import cache
 from app.init_db import init_db
 
 from app.routes.auth import router as auth_router
@@ -48,19 +49,51 @@ async def startup():
     except Exception as e:
         logger.error(f"PostgreSQL unavailable: {e}")
 
+    if settings.redis_enabled:
+        ok = await cache.ping()
+        if ok:
+            logger.info("Redis connected")
+        else:
+            logger.warning("Redis enabled but unavailable")
+
 
 @app.on_event("shutdown")
 async def shutdown():
+    await cache.close()
     await database.close_pool()
 
 
 @app.get("/api/health")
 async def health():
+    db_ready = False
+    db_time = None
     try:
         row = await database.fetchrow("SELECT NOW() AS now")
-        return {"status": "ok", "dbReady": True, "dbTime": str(row["now"])}
+        db_ready = True
+        db_time = str(row["now"])
     except Exception:
-        return JSONResponse(status_code=503, content={"status": "degraded", "dbReady": False})
+        db_ready = False
+
+    redis_ready = await cache.ping() if settings.redis_enabled else None
+
+    if db_ready:
+        return {
+            "status": "ok",
+            "dbReady": True,
+            "dbTime": db_time,
+            "redisEnabled": settings.redis_enabled,
+            "redisReady": redis_ready,
+        }
+
+    return JSONResponse(
+        status_code=503,
+        content={
+            "status": "degraded",
+            "dbReady": False,
+            "redisEnabled": settings.redis_enabled,
+            "redisReady": redis_ready,
+        },
+    )
 
 
 @app.get("/api/catalog")
