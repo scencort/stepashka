@@ -9,7 +9,6 @@ const Login = lazy(() => import("../pages/Login"))
 const Register = lazy(() => import("../pages/Register"))
 const ForgotPassword = lazy(() => import("../pages/ForgotPassword"))
 const ResetPassword = lazy(() => import("../pages/ResetPassword"))
-const LearningPaths = lazy(() => import("../pages/LearningPaths"))
 const AiReview = lazy(() => import("../pages/AiReview"))
 const AssignmentBuilder = lazy(() => import("../pages/AssignmentBuilder"))
 const Analytics = lazy(() => import("../pages/Analytics"))
@@ -41,7 +40,6 @@ export const Router = () => {
       <Route path="/dashboard" element={withSuspense(<ProtectedRoute><Dashboard /></ProtectedRoute>)} />
       <Route path="/course" element={withSuspense(<ProtectedRoute><Course /></ProtectedRoute>)} />
       <Route path="/task" element={withSuspense(<ProtectedRoute><Task /></ProtectedRoute>)} />
-      <Route path="/learning-paths" element={withSuspense(<ProtectedRoute><LearningPaths /></ProtectedRoute>)} />
       <Route path="/ai-review" element={withSuspense(<ProtectedRoute><AiReview /></ProtectedRoute>)} />
       <Route path="/assignment-builder" element={withSuspense(<ProtectedRoute allowedRoles={["teacher", "admin"]}><AssignmentBuilder /></ProtectedRoute>)} />
       <Route path="/teacher/assignments" element={withSuspense(<ProtectedRoute allowedRoles={["teacher", "admin"]}><AssignmentBuilder /></ProtectedRoute>)} />

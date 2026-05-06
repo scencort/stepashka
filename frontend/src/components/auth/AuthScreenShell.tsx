@@ -106,7 +106,7 @@ function useMatrixRain(canvasRef: React.RefObject<HTMLCanvasElement | null>, isD
       const { cols, texts } = stateRef.current
 
       // moderate fade → visible but not overwhelming
-      ctx.fillStyle = isDark ? "rgba(2,6,23,0.08)" : "rgba(241,245,249,0.09)"
+      ctx.fillStyle = isDark ? "rgba(10,5,5,0.10)" : "rgba(250,245,245,0.09)"
       ctx.fillRect(0, 0, w, h)
 
       ctx.font = `${FONT}px ${MONO}`
@@ -118,13 +118,13 @@ function useMatrixRain(canvasRef: React.RefObject<HTMLCanvasElement | null>, isD
         const ci = cols[i] % line.length
 
         // ─── head ───
-        ctx.fillStyle = isDark ? "rgba(251,113,133,0.6)" : "rgba(190,18,60,0.45)"
+        ctx.fillStyle = isDark ? "rgba(239,68,68,0.6)" : "rgba(220,38,38,0.45)"
         ctx.fillText(line.charAt(ci), x, y)
 
         // ─── trail: 3 chars with fade ───
         for (let t = 1; t <= 3; t++) {
-          const a = isDark ? Math.max(0.35 - t * 0.1, 0.04) : Math.max(0.25 - t * 0.07, 0.03)
-          ctx.fillStyle = isDark ? `rgba(148,163,184,${a})` : `rgba(51,65,85,${a})`
+          const a = isDark ? Math.max(0.30 - t * 0.08, 0.04) : Math.max(0.25 - t * 0.07, 0.03)
+          ctx.fillStyle = isDark ? `rgba(120,80,80,${a})` : `rgba(51,65,85,${a})`
           ctx.fillText(line.charAt((ci - t + line.length) % line.length), x, y - t * ROW_H)
         }
 
@@ -207,7 +207,7 @@ function TypewriterCell({ text, left, top, vis, rotate, delay }: Snippet & { del
   return (
     <pre
       ref={ref}
-      className={`absolute font-mono select-none whitespace-pre leading-[1.55] text-[8px] sm:text-[9px] md:text-[10px] text-slate-700/70 dark:text-slate-300/40 ${visCls}`}
+      className={`absolute font-mono select-none whitespace-pre leading-[1.55] text-[8px] sm:text-[9px] md:text-[10px] text-red-950/60 dark:text-red-300/35 ${visCls}`}
       style={{ left, top, maxWidth: "18%", transform: rotate ? `rotate(${rotate}deg)` : undefined }}
     />
   )
@@ -222,15 +222,18 @@ export default function AuthScreenShell({ children }: Props) {
 
   const tint = useMemo(() => {
     const tints = [
-      { a: "rgba(244,63,94,0.18)", b: "rgba(59,130,246,0.14)", da: "rgba(244,63,94,0.24)", db: "rgba(59,130,246,0.20)", stroke: ["text-rose-500/20","text-sky-500/20"] },
-      { a: "rgba(16,185,129,0.15)", b: "rgba(244,114,182,0.13)", da: "rgba(16,185,129,0.22)", db: "rgba(244,114,182,0.20)", stroke: ["text-emerald-500/20","text-pink-500/20"] },
-      { a: "rgba(14,165,233,0.16)", b: "rgba(251,146,60,0.13)", da: "rgba(14,165,233,0.22)", db: "rgba(251,146,60,0.20)", stroke: ["text-sky-500/20","text-orange-500/20"] },
+      // Red + Burgundy
+      { a: "rgba(239,68,68,0.18)", b: "rgba(185,28,28,0.14)", da: "rgba(239,68,68,0.22)", db: "rgba(185,28,28,0.18)", stroke: ["text-red-500/20","text-red-800/20"] },
+      // Red + Dark red
+      { a: "rgba(220,38,38,0.16)", b: "rgba(127,29,29,0.13)", da: "rgba(220,38,38,0.24)", db: "rgba(127,29,29,0.18)", stroke: ["text-red-400/20","text-red-900/20"] },
+      // Rose red + Orange red
+      { a: "rgba(248,113,113,0.16)", b: "rgba(197,48,48,0.13)", da: "rgba(248,113,113,0.22)", db: "rgba(197,48,48,0.18)", stroke: ["text-rose-500/20","text-red-700/20"] },
     ]
     return tints[Math.floor(Math.random() * tints.length)]
   }, [])
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center px-4 overflow-hidden bg-slate-100/70 dark:bg-slate-950">
+    <div className="relative min-h-screen flex items-center justify-center px-4 overflow-hidden bg-[var(--bg-soft)] dark:bg-[#0A0505]">
       {/* ---------- background layer ---------- */}
       <div className="pointer-events-none absolute inset-0">
 
@@ -240,12 +243,16 @@ export default function AuthScreenShell({ children }: Props) {
         {/* radial colour overlay */}
         <div
           className="absolute inset-0"
-          style={{ background: `radial-gradient(circle at 12% 20%,${tint.a},transparent 34%),radial-gradient(circle at 83% 78%,${tint.b},transparent 36%)` }}
+          style={{ background: `radial-gradient(circle at 10% 15%,${tint.a},transparent 40%),radial-gradient(circle at 90% 85%,${tint.b},transparent 40%)` }}
         />
         <div
           className="absolute inset-0 hidden dark:block"
-          style={{ background: `radial-gradient(circle at 12% 20%,${tint.da},transparent 36%),radial-gradient(circle at 83% 78%,${tint.db},transparent 36%),linear-gradient(120deg,rgba(2,6,23,0.35),rgba(15,23,42,0.3))` }}
+          style={{ background: `radial-gradient(circle at 10% 15%,rgba(220,38,38,0.12),transparent 42%),radial-gradient(circle at 90% 85%,rgba(127,29,29,0.10),transparent 42%),linear-gradient(160deg,rgba(15,5,5,0.5),transparent 50%,rgba(10,5,5,0.4))` }}
         />
+
+        {/* Red glow orbs */}
+        <div className="absolute top-1/4 left-1/4 w-80 h-80 rounded-full bg-red-500/5 blur-3xl dark:block hidden" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-red-900/5 blur-3xl dark:block hidden" />
 
         {/* chaotic typewriter snippets */}
         {SNIPPETS.map((s, i) => (
@@ -253,12 +260,12 @@ export default function AuthScreenShell({ children }: Props) {
         ))}
 
         {/* dot grid */}
-        <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.035]" style={{ backgroundImage: "radial-gradient(circle,currentColor 1px,transparent 1px)", backgroundSize: "24px 24px" }} />
+        <div className="absolute inset-0 opacity-[0.015] dark:opacity-[0.025] dark:bg-red-500/30" style={{ backgroundImage: "radial-gradient(circle,currentColor 1px,transparent 1px)", backgroundSize: "24px 24px" }} />
 
         {/* SVG curves */}
-        <svg className="absolute inset-0 h-full w-full opacity-15 dark:opacity-10" viewBox="0 0 1200 800" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0 165 C180 120,290 285,470 238 C680 185,790 88,1200 205" fill="none" stroke="currentColor" className={tint.stroke[0]} strokeWidth="1.2" />
-          <path d="M0 540 C180 620,360 450,560 525 C760 598,930 445,1200 548" fill="none" stroke="currentColor" className={tint.stroke[1]} strokeWidth="1.2" />
+        <svg className="absolute inset-0 h-full w-full opacity-5 dark:opacity-[0.07]" viewBox="0 0 1200 800" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 165 C180 120,290 285,470 238 C680 185,790 88,1200 205" fill="none" stroke="rgba(185,28,28,0.5)" strokeWidth="1.2" />
+          <path d="M0 540 C180 620,360 450,560 525 C760 598,930 445,1200 548" fill="none" stroke="rgba(185,28,28,0.4)" strokeWidth="1.2" />
         </svg>
       </div>
 

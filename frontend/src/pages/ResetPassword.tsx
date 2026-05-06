@@ -1,18 +1,14 @@
-﻿import { useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { motion } from "framer-motion"
-import { Lock, ShieldCheck, Mail, KeyRound } from "lucide-react"
-import Card from "../components/ui/Card"
-import Button from "../components/ui/Button"
+import { Lock, Mail, KeyRound, ArrowLeft, ArrowRight } from "lucide-react"
 import AuthScreenShell from "../components/auth/AuthScreenShell"
 import { api } from "../services/api"
 import { useToast } from "../hooks/useToast"
-import { fadeInUp } from "../lib/animations"
+import BrandLogo from "../components/BrandLogo"
 
-type ResetPasswordResponse = {
-  success: boolean
-  message: string
-}
+type ResetPasswordResponse = { success: boolean; message: string }
+
 
 export default function ResetPassword() {
   const toast = useToast()
@@ -29,36 +25,17 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false)
 
   const validate = () => {
-    const normalizedEmail = email.trim().toLowerCase()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      return "Введите корректный email"
-    }
-
-    if (!/^\d{6}$/.test(code.trim())) {
-      return "Введите 6-значный код"
-    }
-
-    if (password.trim().length < 8) {
-      return "Пароль должен содержать минимум 8 символов"
-    }
-
-    if (password !== confirmPassword) {
-      return "Пароли не совпадают"
-    }
-
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) return "Введите корректный email"
+    if (!/^\d{6}$/.test(code.trim())) return "Введите 6-значный код"
+    if (password.trim().length < 8) return "Пароль — минимум 8 символов"
+    if (password !== confirmPassword) return "Пароли не совпадают"
     return ""
   }
 
   const handleSubmit = async () => {
-    const formError = validate()
-    if (formError) {
-      setError(formError)
-      return
-    }
-
-    setLoading(true)
-    setError("")
-
+    const err = validate()
+    if (err) { setError(err); return }
+    setLoading(true); setError("")
     try {
       const response = await api.post<ResetPasswordResponse>("/auth/reset-password", {
         email: email.trim().toLowerCase(),
@@ -67,88 +44,105 @@ export default function ResetPassword() {
       })
       toast.success(response.message)
       navigate("/login")
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Не удалось обновить пароль"
-      setError(message)
-      toast.error(message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Не удалось обновить пароль"
+      setError(msg); toast.error(msg)
+    } finally { setLoading(false) }
   }
 
   return (
     <AuthScreenShell>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="w-full max-w-md">
-        <Card className="p-7 md:p-8">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full glass-panel mb-4 text-slate-600 dark:text-slate-300">
-            <ShieldCheck size={13} /> Новый пароль
-          </div>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="w-full max-w-[420px] relative z-10">
+        <div className="bg-white/95 dark:bg-[#140808]/95 border border-[var(--border)] rounded-3xl shadow-card-lg backdrop-blur-xl overflow-hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-primary via-primary-700 to-burgundy" />
 
-          <h2 className="text-2xl font-bold mb-6 text-center">Сброс пароля</h2>
+          <div className="p-8">
+            <div className="flex flex-col items-center mb-8">
+              <BrandLogo showText text="Gradus" iconClassName="h-9 w-9" textClassName="text-2xl font-bold font-display text-[var(--text)]" />
+              <h1 className="font-display font-bold text-2xl mt-4 mb-1 text-[var(--text)]">Новый пароль</h1>
+              <p className="text-sm text-[var(--muted)]">Введите код из письма и придумайте новый пароль</p>
+            </div>
 
-          {!!devCodeFromQuery && (
-            <p className="text-xs text-emerald-700 dark:text-emerald-300 mb-4 text-center">
-              DEV режим: код автоматически подставлен в поле.
+            {devCodeFromQuery && (
+              <div className="mb-4 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40 text-xs text-green-600 dark:text-green-400">
+                DEV режим: код подставлен автоматически
+              </div>
+            )}
+
+            <div className="space-y-3" onKeyDown={(e) => e.key === "Enter" && void handleSubmit()}>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="input-field pl-10 pr-4 py-3 text-sm"
+                />
+              </div>
+
+              <div className="relative">
+                <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Код из письма (6 цифр)"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  maxLength={6}
+                  className="input-field pl-10 pr-4 py-3 text-sm tracking-[0.15em]"
+                />
+              </div>
+
+              <div className="relative">
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  type="password"
+                  placeholder="Новый пароль"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input-field pl-10 pr-4 py-3 text-sm"
+                />
+              </div>
+
+              <div className="relative">
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  type="password"
+                  placeholder="Подтвердите пароль"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="input-field pl-10 pr-4 py-3 text-sm"
+                />
+              </div>
+
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                  className="text-xs font-medium text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 px-3 py-2 rounded-lg"
+                >
+                  {error}
+                </motion.p>
+              )}
+
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="btn-primary w-full py-3 text-sm gap-2"
+              >
+                {loading
+                  ? <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <><span>Обновить пароль</span><ArrowRight size={16} /></>
+                }
+              </button>
+            </div>
+
+            <p className="text-sm text-center mt-6 text-[var(--muted)]">
+              <Link to="/login" className="inline-flex items-center gap-1 font-semibold text-primary hover:text-primary-700 transition-colors">
+                <ArrowLeft size={14} /> Назад ко входу
+              </Link>
             </p>
-          )}
-
-          <div className="relative mb-4">
-            <Mail size={15} className="absolute left-3 top-3.5 text-slate-500" />
-            <input
-              type="email"
-              placeholder="Email"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
           </div>
-
-          <div className="relative mb-4">
-            <KeyRound size={15} className="absolute left-3 top-3.5 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Код из email"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-input"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              maxLength={6}
-            />
-          </div>
-
-          <div className="relative mb-4">
-            <Lock size={15} className="absolute left-3 top-3.5 text-slate-500" />
-            <input
-              type="password"
-              placeholder="Новый пароль"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          <div className="relative mb-6">
-            <Lock size={15} className="absolute left-3 top-3.5 text-slate-500" />
-            <input
-              type="password"
-              placeholder="Подтвердите пароль"
-              className="w-full pl-10 pr-4 py-3 rounded-xl glass-input"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>}
-
-          <Button className="w-full" onClick={handleSubmit} disabled={loading}>
-            {loading ? "Обновляем..." : "Обновить пароль"}
-          </Button>
-
-          <p className="text-sm text-center mt-4 text-slate-500">
-            <Link to="/login" className="text-red-700 dark:text-red-300 font-semibold">
-              Назад ко входу
-            </Link>
-          </p>
-        </Card>
+        </div>
       </motion.div>
     </AuthScreenShell>
   )

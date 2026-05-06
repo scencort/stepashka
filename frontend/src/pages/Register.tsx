@@ -1,15 +1,12 @@
-﻿import { useState } from "react"
-import { useNavigate, Link } from "react-router-dom"
+import { useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
-import Button from "../components/ui/Button"
-import Card from "../components/ui/Card"
-import FieldSvgIcon from "../components/ui/FieldSvgIcon"
 import AuthScreenShell from "../components/auth/AuthScreenShell"
-import { UserRoundPlus, Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, ArrowLeft } from "lucide-react"
 import { useAppStore } from "../store/AppStore"
 import { useToast } from "../hooks/useToast"
+import BrandLogo from "../components/BrandLogo"
 
-import { fadeInUp } from "../lib/animations"
 
 export default function Register() {
   const navigate = useNavigate()
@@ -24,127 +21,150 @@ export default function Register() {
   const [passwordVisible, setPasswordVisible] = useState(false)
 
   const validate = () => {
-    if (name.trim().length < 2) {
-      return "Введите имя минимум из 2 символов"
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) {
-      return "Введите корректный email"
-    }
-
-    if (password.trim().length < 8) {
-      return "Пароль должен содержать минимум 8 символов"
-    }
-
+    if (name.trim().length < 2) return "Имя — минимум 2 символа"
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) return "Введите корректный email"
+    if (password.trim().length < 8) return "Пароль — минимум 8 символов"
     return ""
   }
 
   const handleRegister = async () => {
-    const formError = validate()
-    if (formError) {
-      setError(formError)
-      return
-    }
-
-    setLoading(true)
-    setError("")
+    const err = validate()
+    if (err) { setError(err); return }
+    setLoading(true); setError("")
     try {
       await register(name, email, password)
-      toast.success("Аккаунт создан")
+      toast.success("Аккаунт создан!")
       navigate("/dashboard")
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Ошибка регистрации"
-      setError(message)
-      toast.error(message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Ошибка регистрации"
+      setError(msg); toast.error(msg)
+    } finally { setLoading(false) }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") void handleRegister()
   }
 
   return (
     <AuthScreenShell>
-
       <motion.div
-        variants={fadeInUp}
-        initial="initial"
-        animate="animate"
-        className="w-full max-w-md"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="w-full max-w-[420px] relative z-10"
       >
+        <div className="bg-white/95 dark:bg-[#140808]/95 border border-[var(--border)] rounded-3xl shadow-card-lg backdrop-blur-xl overflow-hidden relative">
+          {/* Accent bar */}
+          <div className="h-1 w-full bg-gradient-to-r from-primary via-primary-700 to-burgundy" />
 
-        <Card className="p-7 md:p-8">
+          {/* Back button - absolute positioned in top-left corner */}
+          <Link
+            to="/"
+            className="btn-ghost absolute top-4 left-4 px-3 py-1.5 text-xs inline-flex items-center gap-1 z-10"
+          >
+            <ArrowLeft size={13} />
+            На главную
+          </Link>
 
-          <div className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full glass-panel mb-4 text-slate-600 dark:text-slate-300">
-            <UserRoundPlus size={13} /> Новый аккаунт
+          <div className="p-8">
+            {/* Logo + heading */}
+            <div className="flex flex-col items-center mb-8 mt-12">
+              <BrandLogo
+                showText
+                text="Gradus"
+                iconClassName="h-9 w-9"
+                textClassName="text-2xl font-bold font-display text-[var(--text)]"
+              />
+              <h1 className="font-display font-bold text-2xl mt-4 mb-1 text-[var(--text)]">
+                Создать аккаунт
+              </h1>
+              <p className="text-sm text-[var(--muted)]">Начните обучение бесплатно</p>
+            </div>
+
+            {/* Form */}
+            <div className="space-y-3" onKeyDown={handleKeyDown}>
+              {/* Name */}
+              <div className="relative">
+                <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Имя"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="input-field pl-10 pr-4 py-3 text-sm"
+                  autoFocus
+                />
+              </div>
+
+              {/* Email */}
+              <div className="relative">
+                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="input-field pl-10 pr-4 py-3 text-sm"
+                />
+              </div>
+
+              {/* Password */}
+              <div className="relative">
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  type={passwordVisible ? "text" : "password"}
+                  placeholder="Пароль (мин. 8 символов)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input-field pl-10 pr-11 py-3 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPasswordVisible((p) => !p)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+                >
+                  {passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              {/* Role notice */}
+              <p className="text-xs text-[var(--muted)] px-1">
+                Аккаунт создаётся с ролью студента. Роль преподавателя — через администратора.
+              </p>
+
+              {/* Error */}
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                  className="text-xs font-medium text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 px-3 py-2 rounded-lg"
+                >
+                  {error}
+                </motion.p>
+              )}
+
+              {/* Submit */}
+              <button
+                onClick={handleRegister}
+                disabled={loading}
+                className="btn-primary w-full py-3 text-sm mt-1 gap-2"
+              >
+                {loading
+                  ? <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <><span>Зарегистрироваться</span><ArrowRight size={16} /></>
+                }
+              </button>
+            </div>
+
+            {/* Footer */}
+            <p className="text-sm text-center mt-6 text-[var(--muted)]">
+              Уже есть аккаунт?{" "}
+              <Link to="/login" className="font-semibold text-primary hover:text-primary-700 transition-colors">
+                Войти
+              </Link>
+            </p>
           </div>
-
-          <h2 className="text-2xl font-bold mb-6 text-center">
-            Регистрация
-          </h2>
-
-          <div className="relative mb-4">
-            <FieldSvgIcon kind="user" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
-            <input
-              type="text"
-              placeholder="Имя"
-              className="w-full pl-11 pr-4 py-3 rounded-xl glass-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-
-          <div className="relative mb-4">
-            <FieldSvgIcon kind="email" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
-            <input
-              type="email"
-              placeholder="Email"
-              className="w-full pl-11 pr-4 py-3 rounded-xl glass-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div className="relative mb-6">
-            <FieldSvgIcon kind="password" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
-            <input
-              type={passwordVisible ? "text" : "password"}
-              placeholder="Пароль"
-              className="w-full pl-11 pr-11 py-3 rounded-xl glass-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <button
-              type="button"
-              onClick={() => setPasswordVisible((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 z-10"
-              aria-label={passwordVisible ? "Скрыть пароль" : "Показать пароль"}
-            >
-              {passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-
-          <p className="text-sm mb-6 text-slate-500 dark:text-slate-300">
-            Аккаунты создаются с ролью студента. Повышение до преподавателя или администратора доступно только через админ-панель.
-          </p>
-
-          {error && (
-            <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
-          )}
-
-          <Button className="w-full" onClick={handleRegister} disabled={loading}>
-            {loading ? "Создаем аккаунт..." : "Зарегистрироваться"}
-          </Button>
-
-          <p className="text-sm text-center mt-4 text-slate-500">
-            Уже есть аккаунт?{" "}
-            <Link to="/login" className="text-red-700 dark:text-red-300 font-semibold">
-              Войти
-            </Link>
-          </p>
-
-        </Card>
-
+        </div>
       </motion.div>
-
     </AuthScreenShell>
   )
 }

@@ -19,7 +19,6 @@ function getPageTitle(pathname: string) {
     "/dashboard": "Панель",
     "/course": "Курсы",
     "/task": "AI Code Review",
-    "/learning-paths": "Траектории обучения",
     "/ai-review": "AI-проверка",
     "/assignment-builder": "Конструктор заданий",
     "/teacher/assignments": "Конструктор заданий",

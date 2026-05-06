@@ -1,130 +1,208 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-    :root {
-        --bg: #fafafa;
-        --bg-soft: #f4f4f5;
-        --text: #09090b;
-        --muted: #71717a;
-        --card: rgba(255, 255, 255, 0.7);
-        --card-border: rgba(255, 255, 255, 0.5);
-        --glow-a: rgba(244, 63, 94, 0.06); /* Red logic tint */
-        --glow-b: rgba(59, 130, 246, 0.04); /* Blue logic tint */
-        --grid-line: rgba(0, 0, 0, 0.03);
-    }
+  :root {
+    --bg:          #FFFFFF;
+    --bg-soft:     #FBF8F8;
+    --bg-tint:     #FFF5F5;
+    --surface:     #F9F6F6;
+    --border:      #EDE8E8;
+    --border-soft: #F5F0F0;
+    --text:        #1A0A0A;
+    --text-2:      #4A3030;
+    --muted:       #8A7070;
+    --primary:     #DC2626;
+    --primary-hov: #B91C1C;
+    --burgundy:    #7C1D1D;
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
 
-    .dark {
-        --bg: #09090b;
-        --bg-soft: #18181b;
-        --text: #fafafa;
-        --muted: #a1a1aa;
-        --card: rgba(24, 24, 27, 0.5);
-        --card-border: rgba(255, 255, 255, 0.05);
-        --glow-a: rgba(244, 63, 94, 0.08);
-        --glow-b: rgba(59, 130, 246, 0.05);
-        --grid-line: rgba(255, 255, 255, 0.03);
-    }
+  .dark {
+    --bg:          #100808;
+    --bg-soft:     #1A0D0D;
+    --bg-tint:     #1F1010;
+    --surface:     #231212;
+    --border:      #2E1A1A;
+    --border-soft: #261515;
+    --text:        #FAF5F5;
+    --text-2:      #D4B8B8;
+    --muted:       #8A7070;
+    --primary:     #EF4444;
+    --primary-hov: #DC2626;
+    --burgundy:    #C53030;
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+  }
 
-    * {
-        box-sizing: border-box;
-    }
+  * { box-sizing: border-box; }
 
-    body {
-        @apply antialiased text-slate-900 dark:text-slate-50 transition-colors duration-300;
-        margin: 0;
-        min-height: 100vh;
-        color: var(--text);
-        font-family: "Inter", sans-serif;
-        font-size: 16px;
-        line-height: 1.6;
-        background:
-            radial-gradient(
-                800px 400px at 10% -10%,
-                var(--glow-a),
-                transparent 60%
-            ),
-            radial-gradient(
-                900px 500px at 100% 10%,
-                var(--glow-b),
-                transparent 60%
-            ),
-            linear-gradient(145deg, var(--bg), var(--bg-soft));
-        background-attachment: fixed;
-    }
+  html { scroll-behavior: smooth; }
 
-    h1,
-    h2,
-    h3,
-    h4 {
-        font-family: "Sora", sans-serif;
-        letter-spacing: -0.03em;
-    }
+  body {
+    @apply antialiased;
+    margin: 0;
+    min-height: 100vh;
+    color: var(--text);
+    background-color: var(--bg);
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5 {
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+  }
+
+  ::selection {
+    background-color: rgba(220, 38, 38, 0.15);
+    color: inherit;
+  }
 }
 
 @layer components {
-    .glass-panel {
-        @apply backdrop-blur-2xl transition-all duration-300;
-        background: var(--card);
-        border: 1px solid var(--card-border);
-        box-shadow:
-            0 8px 32px -8px rgba(0, 0, 0, 0.04),
-            0 0 2px rgba(0, 0, 0, 0.02),
-            inset 0 1px 1px rgba(255, 255, 255, 0.4);
-    }
+  /* ── Cards ── */
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+    box-shadow: var(--card-shadow);
+  }
 
-    .dark .glass-panel {
-        box-shadow:
-            0 8px 32px -8px rgba(0, 0, 0, 0.5),
-            inset 0 1px 1px rgba(255, 255, 255, 0.05);
-    }
+  .card-surface {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 1.25rem;
+  }
 
-    .input-field {
-        @apply w-full rounded-2xl bg-white/40 dark:bg-zinc-900/40 border border-white/50 dark:border-white/5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30 transition-all duration-300 shadow-inner dark:shadow-none placeholder-zinc-400 dark:placeholder-zinc-500 text-zinc-800 dark:text-zinc-200 backdrop-blur-md;
-    }
+  /* ── Inputs ── */
+  .input-field {
+    @apply w-full rounded-xl border bg-white dark:bg-white/5 border-[var(--border)] dark:border-white/10
+           text-[var(--text)] placeholder:text-[var(--muted)]
+           focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/50
+           transition-all duration-200;
+  }
 
-    .dark .input-field {
-        @apply focus:bg-zinc-900/60;
-    }
+  /* ── Buttons ── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 font-semibold rounded-xl
+           bg-primary hover:bg-primary-700 active:bg-primary-800
+           text-white shadow-red transition-all duration-200
+           hover:shadow-red-lg hover:-translate-y-px active:translate-y-0;
+  }
 
-    /* Glass-style input — стеклянный фон + кольцо фокуса, используется для всех <input>/<select>/<textarea> с glass-panel */
-    .glass-input {
-        @apply glass-panel outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30 transition-all duration-300;
-    }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 font-medium rounded-xl
+           bg-transparent hover:bg-[var(--surface)] border border-[var(--border)]
+           text-[var(--text-2)] transition-all duration-200;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 font-semibold rounded-xl
+           bg-[var(--bg-tint)] hover:bg-primary-50 dark:hover:bg-primary-900/20
+           border border-primary/20 text-primary transition-all duration-200;
+  }
+
+  /* ── Nav item ── */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm
+           text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]
+           transition-all duration-150 cursor-pointer;
+  }
+
+  .nav-item-active {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm
+           text-white bg-primary shadow-red transition-all duration-150;
+  }
+
+  /* ── Badge ── */
+  .badge {
+    @apply inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full;
+  }
+
+  .badge-red {
+    @apply badge bg-primary-50 dark:bg-primary-900/30 text-primary dark:text-primary-400;
+  }
+
+  .badge-neutral {
+    @apply badge bg-[var(--surface)] text-[var(--text-2)] border border-[var(--border)];
+  }
+
+  /* ── Divider ── */
+  .divider {
+    @apply border-0 border-t border-[var(--border)];
+  }
+
+  /* ── Stat block ── */
+  .stat-value {
+    font-family: "Space Grotesk", sans-serif;
+    @apply text-4xl font-bold tracking-tight text-[var(--text)];
+  }
+
+  /* ── Section heading ── */
+  .section-heading {
+    font-family: "Space Grotesk", sans-serif;
+    @apply text-3xl font-bold tracking-tight text-[var(--text)];
+  }
+
+  /* legacy alias kept for backward compat */
+  .glass-panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+    box-shadow: var(--card-shadow);
+  }
+
+  .glass-input {
+    @apply input-field;
+  }
 }
 
-.hero-grid {
-    background-image:
-        linear-gradient(var(--grid-line) 1px, transparent 1px),
-        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-    background-size: 32px 32px;
-    -webkit-mask-image: radial-gradient(
-        ellipse at center,
-        black 30%,
-        transparent 70%
-    );
-    mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
-}
-
-#root {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+  background: var(--border);
+  border-radius: 99px;
 }
-::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400 dark:bg-slate-600;
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Page shell ── */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Progress bar animation ── */
+@keyframes progress-fill {
+  from { width: 0%; }
+}
+
+/* ── Fade in ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.4s ease both;
+}
+
+/* ── Dot pattern for hero backgrounds ── */
+.dot-pattern {
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── Red gradient text ── */
+.text-gradient-red {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--burgundy) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
