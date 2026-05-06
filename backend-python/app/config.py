@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 from pydantic_settings import BaseSettings
 
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
@@ -36,6 +37,10 @@ class Settings(BaseSettings):
     groq_model: str = "llama-3.3-70b-versatile"
 
     ai_provider: str = "groq"  # groq | gemini
+
+    redis_url: str = "redis://localhost:6379/0"
+    redis_enabled: bool = False
+    ai_review_cache_ttl_seconds: int = 3600
 
     model_config = {"env_file": str(_ENV_FILE), "env_file_encoding": "utf-8"}
 

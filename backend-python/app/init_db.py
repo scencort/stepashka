@@ -280,7 +280,15 @@ async def init_db() -> None:
     await _seed_users()
     await _seed_profiles()
     await _seed_courses()
+    await _seed_course_steps()
     await _seed_enrollments_and_progress()
+    await _seed_extra_users()
+    await _seed_more_enrollments()
+    await _seed_submissions_for_analytics()
+    await _seed_payments()
+    await _seed_support_tickets()
+    await _seed_new_courses()
+    await _seed_python_steps_content()
     await _seed_feature_flags()
 
 
@@ -296,12 +304,7 @@ async def _seed_users() -> None:
         await db.execute(
             """INSERT INTO users (email, password_hash, full_name, role, status)
                VALUES ($1, $2, $3, $4, 'active')
-               ON CONFLICT (email) DO UPDATE
-               SET password_hash=EXCLUDED.password_hash,
-                   full_name=EXCLUDED.full_name,
-                   role=EXCLUDED.role,
-                   status='active',
-                   updated_at=NOW()""",
+               ON CONFLICT (email) DO NOTHING""",
             email,
             password_hash,
             full_name,
@@ -725,32 +728,42 @@ async def _seed_courses() -> None:
 
 
 async def _seed_enrollments_and_progress() -> None:
-    student = await db.fetchrow("SELECT id FROM users WHERE email='student@gradus.dev' LIMIT 1")
+    student = await db.fetchrow(
+        "SELECT id FROM users WHERE email='student@gradus.dev' LIMIT 1"
+    )
     if not student:
         return
     sid = student["id"]
 
-    python_id = await db.fetchval("SELECT id FROM courses WHERE slug='python-backend-fastapi'")
-    react_id = await db.fetchval("SELECT id FROM courses WHERE slug='react-typescript-product'")
+    python_id = await db.fetchval(
+        "SELECT id FROM courses WHERE slug='python-backend-fastapi'"
+    )
+    react_id = await db.fetchval(
+        "SELECT id FROM courses WHERE slug='react-typescript-product'"
+    )
 
     if python_id:
         await db.execute(
             """INSERT INTO enrollments (user_id, course_id, status, progress_percent)
                VALUES ($1, $2, 'active', 45) ON CONFLICT (user_id, course_id) DO NOTHING""",
-            sid, python_id
+            sid,
+            python_id,
         )
         await db.execute(
-            "UPDATE courses SET students_count = GREATEST(students_count, 1) WHERE id=$1", python_id
+            "UPDATE courses SET students_count = GREATEST(students_count, 1) WHERE id=$1",
+            python_id,
         )
 
     if react_id:
         await db.execute(
             """INSERT INTO enrollments (user_id, course_id, status, progress_percent)
                VALUES ($1, $2, 'active', 20) ON CONFLICT (user_id, course_id) DO NOTHING""",
-            sid, react_id
+            sid,
+            react_id,
         )
         await db.execute(
-            "UPDATE courses SET students_count = GREATEST(students_count, 1) WHERE id=$1", react_id
+            "UPDATE courses SET students_count = GREATEST(students_count, 1) WHERE id=$1",
+            react_id,
         )
 
     assignments = await db.fetch("SELECT id FROM assignments LIMIT 3")
@@ -759,14 +772,15 @@ async def _seed_enrollments_and_progress() -> None:
             """INSERT INTO submissions (user_id, assignment_id, answer_text, score, status, ai_feedback)
                VALUES ($1, $2, 'print("hello")', 85, 'passed', 'Хорошее решение')
                ON CONFLICT DO NOTHING""",
-            sid, a["id"]
+            sid,
+            a["id"],
         )
 
     await db.execute(
         """INSERT INTO notifications (user_id, title, body)
            SELECT $1, 'Добро пожаловать в Gradus!', 'Начните обучение с курса Python — он уже доступен в вашем профиле.'
            WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE user_id=$1 AND title='Добро пожаловать в Gradus!')""",
-        sid
+        sid,
     )
 
 
@@ -780,3 +794,773 @@ async def _seed_feature_flags() -> None:
            ('marketplace_enabled', true, 'Маркетплейс курсов преподавателей'),
            ('gamification_enabled', true, 'XP, уровни и бейджи')"""
     )
+
+
+async def _seed_course_steps() -> None:
+    """Seed course_steps for Python course so dashboard/steps work correctly."""
+    python_id = await db.fetchval(
+        "SELECT id FROM courses WHERE slug='python-backend-fastapi'"
+    )
+    if not python_id:
+        return
+
+    existing = await db.fetchval(
+        "SELECT COUNT(*)::int FROM course_steps WHERE course_id=$1", python_id
+    )
+    if existing > 0:
+        return
+
+    # Get all lessons for python course ordered
+    lessons = await db.fetch(
+        """SELECT l.id, l.title, l.lesson_type
+           FROM lessons l
+           INNER JOIN course_modules cm ON cm.id = l.module_id
+           WHERE cm.course_id = $1
+           ORDER BY cm.module_order ASC, l.lesson_order ASC""",
+        python_id,
+    )
+
+    step_order = 1
+    for lesson in lessons:
+        lid = lesson["id"]
+        # Theory step for every lesson
+        await db.execute(
+            """INSERT INTO course_steps (course_id, lesson_id, title, step_order, step_type, content, xp)
+               VALUES ($1, $2, $3, $4, 'theory', '{"text": ""}'::jsonb, 10)
+               ON CONFLICT DO NOTHING""",
+            python_id,
+            lid,
+            f"Теория: {lesson['title']}",
+            step_order,
+        )
+        step_order += 1
+
+        # Check if lesson has assignment → add code/quiz step
+        assignment = await db.fetchrow(
+            'SELECT id, assignment_type AS "assignmentType", title FROM assignments WHERE lesson_id=$1 LIMIT 1',
+            lid,
+        )
+        if assignment:
+            stype = "code" if assignment["assignmentType"] == "code" else "quiz"
+            await db.execute(
+                """INSERT INTO course_steps (course_id, lesson_id, title, step_order, step_type, content, xp)
+                   VALUES ($1, $2, $3, $4, $5, '{}'::jsonb, 20)
+                   ON CONFLICT DO NOTHING""",
+                python_id,
+                lid,
+                assignment["title"],
+                step_order,
+                stype,
+            )
+            step_order += 1
+
+    # For other courses add at least 5 placeholder steps each
+    other_courses = await db.fetch(
+        "SELECT id, title FROM courses WHERE slug != 'python-backend-fastapi' AND status IN ('published', 'pending_review')"
+    )
+    for course in other_courses:
+        cid = course["id"]
+        cexisting = await db.fetchval(
+            "SELECT COUNT(*)::int FROM course_steps WHERE course_id=$1", cid
+        )
+        if cexisting > 0:
+            continue
+        step_titles = [
+            "Введение и основы",
+            "Практика: первое задание",
+            "Углублённая теория",
+            "Практика: задание со звёздочкой",
+            "Финальное задание модуля",
+        ]
+        for i, title in enumerate(step_titles, 1):
+            stype = "code" if i % 2 == 0 else "theory"
+            await db.execute(
+                """INSERT INTO course_steps (course_id, lesson_id, title, step_order, step_type, content, xp)
+                   VALUES ($1, NULL, $2, $3, $4, '{}'::jsonb, $5)
+                   ON CONFLICT DO NOTHING""",
+                cid,
+                title,
+                i,
+                stype,
+                10 if stype == "theory" else 20,
+            )
+
+
+async def _seed_extra_users() -> None:
+    """Add realistic student accounts for community stats."""
+    extra_users = [
+        ("maria.sidorova@example.com", "Student@12345", "Мария Сидорова", "student"),
+        ("dmitry.volkov@example.com", "Student@12345", "Дмитрий Волков", "student"),
+        ("elena.kozlova@example.com", "Student@12345", "Елена Козлова", "student"),
+        ("andrey.morozov@example.com", "Student@12345", "Андрей Морозов", "student"),
+        (
+            "svetlana.novikova@example.com",
+            "Student@12345",
+            "Светлана Новикова",
+            "student",
+        ),
+        ("igor.petrov@example.com", "Student@12345", "Игорь Петров", "student"),
+        ("olga.smirnova@example.com", "Student@12345", "Ольга Смирнова", "student"),
+        (
+            "alexey.kuznetsov@example.com",
+            "Student@12345",
+            "Алексей Кузнецов",
+            "student",
+        ),
+        ("natalia.ivanova@example.com", "Student@12345", "Наталья Иванова", "student"),
+        ("mikhail.sokolov@example.com", "Student@12345", "Михаил Соколов", "student"),
+        ("teacher2@gradus.dev", "Teacher@12345", "Андрей Лектор", "teacher"),
+    ]
+    for email, password, full_name, role in extra_users:
+        password_hash = hash_password(password)
+        await db.execute(
+            """INSERT INTO users (email, password_hash, full_name, role, status)
+               VALUES ($1, $2, $3, $4, 'active')
+               ON CONFLICT (email) DO NOTHING""",
+            email,
+            password_hash,
+            full_name,
+            role,
+        )
+    await db.execute(
+        """INSERT INTO account_profiles (user_id)
+           SELECT id FROM users
+           ON CONFLICT (user_id) DO NOTHING"""
+    )
+
+
+async def _seed_more_enrollments() -> None:
+    """Enroll extra students in courses to get realistic student counts."""
+    courses = await db.fetch(
+        "SELECT id, slug FROM courses WHERE status IN ('published', 'pending_review') ORDER BY id ASC"
+    )
+    extra_students = await db.fetch(
+        "SELECT id FROM users WHERE email LIKE '%@example.com' ORDER BY id ASC"
+    )
+    if not courses or not extra_students:
+        return
+
+    import random as rnd
+
+    rnd.seed(42)
+
+    for student in extra_students:
+        sid = student["id"]
+        # Enroll in 1-3 random courses
+        chosen = rnd.sample([c["id"] for c in courses], min(3, len(courses)))
+        for cid in chosen:
+            progress = rnd.randint(10, 95)
+            await db.execute(
+                """INSERT INTO enrollments (user_id, course_id, status, progress_percent)
+                   VALUES ($1, $2, 'active', $3) ON CONFLICT (user_id, course_id) DO NOTHING""",
+                sid,
+                cid,
+                progress,
+            )
+            await db.execute(
+                "UPDATE courses SET students_count = students_count + 1 WHERE id=$1",
+                cid,
+            )
+
+
+async def _seed_submissions_for_analytics() -> None:
+    """Add submissions with past dates for demo student analytics."""
+    from datetime import date, timedelta
+
+    student = await db.fetchrow(
+        "SELECT id FROM users WHERE email='student@gradus.dev' LIMIT 1"
+    )
+    if not student:
+        return
+    sid = student["id"]
+
+    existing_count = await db.fetchval(
+        "SELECT COUNT(*)::int FROM submissions WHERE user_id=$1", sid
+    )
+    if existing_count >= 15:
+        return
+
+    assignments = await db.fetch("SELECT id FROM assignments ORDER BY id ASC LIMIT 5")
+    if not assignments:
+        return
+
+    a_ids = [a["id"] for a in assignments]
+    today = date.today()
+
+    # Realistic score progression over 30 days
+    history = [
+        (28, 65),
+        (27, 68),
+        (25, 72),
+        (24, 70),
+        (22, 75),
+        (21, 74),
+        (19, 78),
+        (18, 80),
+        (16, 77),
+        (15, 82),
+        (13, 84),
+        (12, 79),
+        (10, 85),
+        (9, 83),
+        (7, 88),
+        (6, 86),
+        (4, 90),
+        (3, 87),
+        (1, 92),
+        (0, 91),
+    ]
+
+    for i, (days_ago, score) in enumerate(history):
+        sub_date = today - timedelta(days=days_ago)
+        sub_ts = f"{sub_date.isoformat()} {9 + (i % 8):02d}:00:00"
+        a_id = a_ids[i % len(a_ids)]
+        status = "passed" if score >= 70 else "failed"
+        await db.execute(
+            """INSERT INTO submissions
+               (user_id, assignment_id, answer_text, code_text, score, status, ai_feedback, created_at, updated_at)
+               VALUES ($1, $2, 'print("solution")', 'def solution():\n    pass', $3, $4, 'Хорошее решение', $5::timestamp, $5::timestamp)""",
+            sid,
+            a_id,
+            score,
+            status,
+            sub_ts,
+        )
+
+    # Also add step_progress for the Python course
+    python_id = await db.fetchval(
+        "SELECT id FROM courses WHERE slug='python-backend-fastapi'"
+    )
+    if python_id:
+        steps = await db.fetch(
+            "SELECT id FROM course_steps WHERE course_id=$1 ORDER BY step_order ASC LIMIT 8",
+            python_id,
+        )
+        for step in steps:
+            comp_date = today - timedelta(days=14)
+            comp_ts = f"{comp_date.isoformat()} 10:00:00"
+            await db.execute(
+                """INSERT INTO step_progress
+                   (user_id, course_id, step_id, step_kind, lesson_id, status, score, completed_at, created_at, updated_at)
+                   SELECT $1, $2, $3, 'theory', COALESCE(lesson_id, (SELECT id FROM lessons LIMIT 1)), 'completed', 100, $4::timestamp, $4::timestamp, $4::timestamp
+                   FROM course_steps WHERE id=$3
+                   ON CONFLICT (user_id, step_id) DO NOTHING""",
+                sid,
+                python_id,
+                step["id"],
+                comp_ts,
+            )
+
+
+async def _seed_payments() -> None:
+    """Add payment records for admin revenue analytics."""
+    existing = await db.fetchval("SELECT COUNT(*)::int FROM payments")
+    if existing > 0:
+        return
+
+    students = await db.fetch(
+        "SELECT id FROM users WHERE role='student' ORDER BY id ASC LIMIT 6"
+    )
+    paid_courses = await db.fetch(
+        "SELECT id, price_cents FROM courses WHERE price_cents > 0 AND status='published' ORDER BY id ASC LIMIT 5"
+    )
+    if not students or not paid_courses:
+        return
+
+    import random as rnd
+    from datetime import date, timedelta
+
+    rnd.seed(99)
+
+    today = date.today()
+    for i, student in enumerate(students):
+        for j, course in enumerate(paid_courses[:2]):
+            days_ago = rnd.randint(1, 60)
+            pay_date = today - timedelta(days=days_ago)
+            pay_ts = f"{pay_date.isoformat()} 12:00:00"
+            await db.execute(
+                """INSERT INTO payments (user_id, course_id, amount_cents, currency, status, provider, created_at)
+                   VALUES ($1, $2, $3, 'RUB', 'paid', 'mockpay', $4::timestamp)""",
+                student["id"],
+                course["id"],
+                course["price_cents"],
+                pay_ts,
+            )
+
+
+async def _seed_support_tickets() -> None:
+    """Add sample support tickets for feedback page."""
+    existing = await db.fetchval("SELECT COUNT(*)::int FROM support_tickets")
+    if existing > 0:
+        return
+
+    student = await db.fetchrow(
+        "SELECT id FROM users WHERE email='student@gradus.dev' LIMIT 1"
+    )
+    if not student:
+        return
+    sid = student["id"]
+
+    tickets = [
+        ("Не могу пройти задание по циклам — подсказка не отображается", "new"),
+        ("Предложение: добавить тёмную тему в редактор кода", "in_progress"),
+        ("Видеоурок по FastAPI не загружается в Safari", "closed"),
+    ]
+    for message, status in tickets:
+        await db.execute(
+            """INSERT INTO support_tickets (user_id, message, subject, status)
+               VALUES ($1, $2, 'Обращение пользователя', $3)""",
+            sid,
+            message,
+            status,
+        )
+
+
+async def _seed_new_courses() -> None:
+    """Add additional courses (languages, etc.) if not already present."""
+    teacher = await db.fetchrow(
+        "SELECT id FROM users WHERE email = 'teacher@gradus.dev' LIMIT 1"
+    )
+    t2 = await db.fetchrow(
+        "SELECT id FROM users WHERE email = 'teacher2@gradus.dev' LIMIT 1"
+    )
+    tid = teacher["id"] if teacher else None
+    tid2 = t2["id"] if t2 else tid
+
+    new_courses = [
+        (
+            "Английский язык A1-B1: с нуля до разговорного",
+            "english-a1-b1-beginner",
+            "Практический курс английского: грамматика, разговор, чтение и письмо. 500+ упражнений с AI-проверкой ответов.",
+            "Beginner",
+            "Languages",
+            50000,
+            tid2,
+            "published",
+            4.8,
+            2340,
+            40,
+        ),
+        (
+            "Деловой английский B2-C1",
+            "business-english-b2",
+            "Переговоры, переписка, презентации на английском. Курс для IT-специалистов и менеджеров.",
+            "Intermediate",
+            "Languages",
+            250000,
+            tid2,
+            "published",
+            4.7,
+            870,
+            30,
+        ),
+        (
+            "SQL и PostgreSQL: от запросов до оптимизации",
+            "sql-postgresql-full",
+            "Полный курс SQL: SELECT, JOIN, оконные функции, индексы, EXPLAIN ANALYZE и оптимизация запросов.",
+            "Beginner",
+            "Databases",
+            120000,
+            tid,
+            "published",
+            4.9,
+            1540,
+            28,
+        ),
+        (
+            "Алгоритмы и структуры данных на Python",
+            "algorithms-python",
+            "Массивы, списки, деревья, графы, сортировки, динамическое программирование. Разбор задач LeetCode.",
+            "Intermediate",
+            "Programming",
+            200000,
+            tid,
+            "published",
+            4.8,
+            1220,
+            36,
+        ),
+        (
+            "Figma: дизайн интерфейсов с нуля",
+            "figma-ui-design",
+            "Компоненты, автолейаут, прототипирование, дизайн-система. Практика на реальных проектах.",
+            "Beginner",
+            "Design",
+            150000,
+            tid2,
+            "published",
+            4.6,
+            980,
+            24,
+        ),
+        (
+            "Machine Learning на практике",
+            "machine-learning-practice",
+            "Regression, Classification, Clustering, Neural Networks. Sklearn, Pandas, Matplotlib и боевые датасеты.",
+            "Intermediate",
+            "Data Science",
+            300000,
+            tid,
+            "published",
+            4.9,
+            730,
+            44,
+        ),
+        (
+            "Математика для программистов",
+            "math-for-programmers",
+            "Линейная алгебра, теория вероятностей, комбинаторика и дискретная математика для разработчиков.",
+            "Beginner",
+            "Math",
+            70000,
+            tid2,
+            "published",
+            4.5,
+            1680,
+            32,
+        ),
+        (
+            "iOS-разработка на Swift",
+            "ios-swift-development",
+            "UIKit, SwiftUI, Core Data, работа с API и публикация приложений в App Store.",
+            "Intermediate",
+            "Mobile",
+            450000,
+            tid,
+            "published",
+            4.7,
+            420,
+            48,
+        ),
+        (
+            "Android разработка на Kotlin",
+            "android-kotlin-development",
+            "Jetpack Compose, ViewModel, Room, Retrofit, WorkManager и публикация в Google Play.",
+            "Intermediate",
+            "Mobile",
+            450000,
+            tid,
+            "published",
+            4.7,
+            380,
+            48,
+        ),
+        (
+            "Основы кибербезопасности",
+            "cybersecurity-basics",
+            "OWASP Top 10, пентест, анализ трафика, CTF-задачи и защита веб-приложений.",
+            "Intermediate",
+            "Security",
+            220000,
+            tid2,
+            "published",
+            4.8,
+            560,
+            36,
+        ),
+        (
+            "Rust: системное программирование",
+            "rust-systems-programming",
+            "Ownership, borrowing, lifetimes, async/await, написание CLI-инструментов и работа с памятью.",
+            "Advanced",
+            "Programming",
+            350000,
+            tid,
+            "published",
+            4.9,
+            310,
+            40,
+        ),
+        (
+            "Английский для IT: технический словарь и документация",
+            "english-for-it",
+            "Читаем документацию, пишем README, участвуем в code review и обсуждаем баги по-английски.",
+            "Beginner",
+            "Languages",
+            80000,
+            tid2,
+            "published",
+            4.6,
+            1890,
+            20,
+        ),
+    ]
+
+    for c in new_courses:
+        await db.execute(
+            """INSERT INTO courses (title, slug, description, level, category, price_cents, teacher_id, status, rating, students_count, duration_hours)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+               ON CONFLICT (slug) DO NOTHING""",
+            *c,
+        )
+
+    # Seed steps for new courses (5 theory + 2 code each)
+    new_slugs = [c[1] for c in new_courses]
+    for slug in new_slugs:
+        cid = await db.fetchval("SELECT id FROM courses WHERE slug=$1", slug)
+        if not cid:
+            continue
+        existing_steps = await db.fetchval(
+            "SELECT COUNT(*)::int FROM course_steps WHERE course_id=$1", cid
+        )
+        if existing_steps > 0:
+            continue
+
+        # Get course info for step content
+        course_row = await db.fetchrow(
+            "SELECT title, category FROM courses WHERE id=$1", cid
+        )
+        if not course_row:
+            continue
+        category = course_row["category"]
+
+        if category == "Languages":
+            step_titles = [
+                (
+                    "Введение: как учить язык эффективно",
+                    "theory",
+                    '{"text": "В этом модуле мы разберём методики и подходы к изучению языка. Ключевые принципы: регулярность, погружение, практика."}',
+                    10,
+                ),
+                (
+                    "Базовый словарный запас",
+                    "theory",
+                    '{"text": "500 самых частых слов языка. Учимся их произносить, писать и использовать в контексте."}',
+                    10,
+                ),
+                (
+                    "Грамматика: основные конструкции",
+                    "quiz",
+                    '{"question": "Выберите правильный вариант: \\"I ___ a student.\\"", "options": ["am", "is", "are", "be"], "correctIndex": 0}',
+                    15,
+                ),
+                (
+                    "Практика: составляем предложения",
+                    "code",
+                    '{"taskDescription": "Напишите 5 предложений на английском, описывающих ваш день. Используйте Present Simple.", "starterCode": "# Пример:\\n# 1. I wake up at 7 am.\\n# 2. ...\\n"}',
+                    20,
+                ),
+                (
+                    "Разговорные фразы и выражения",
+                    "theory",
+                    '{"text": "Повседневные фразы: приветствия, прощания, благодарность, извинения. Примеры диалогов."}',
+                    10,
+                ),
+                (
+                    "Тест: закрепление базы",
+                    "quiz",
+                    '{"question": "What does \\"schedule\\" mean?", "options": ["расписание", "задача", "встреча", "звонок"], "correctIndex": 0}',
+                    15,
+                ),
+                (
+                    "Итоговое практическое задание",
+                    "code",
+                    '{"taskDescription": "Напишите короткое письмо-знакомство на английском (50-80 слов). Используйте изученную лексику.", "starterCode": "# My introduction letter:\\n# Dear...,\\n"}',
+                    25,
+                ),
+            ]
+        elif category == "Databases":
+            step_titles = [
+                (
+                    "Что такое базы данных и SQL",
+                    "theory",
+                    '{"text": "Реляционные БД, таблицы, строки и столбцы. Что такое СУБД и почему PostgreSQL — лучший выбор."}',
+                    10,
+                ),
+                (
+                    "SELECT, WHERE, ORDER BY",
+                    "code",
+                    '{"taskDescription": "Напишите запрос, который выбирает всех пользователей с именем, начинающимся на \\"А\\", отсортированных по дате регистрации.", "starterCode": "SELECT * FROM users\\nWHERE ...\\nORDER BY ...;"}',
+                    20,
+                ),
+                (
+                    "JOIN: объединение таблиц",
+                    "theory",
+                    '{"text": "INNER JOIN, LEFT JOIN, RIGHT JOIN, FULL JOIN. Разбираем на примере таблиц orders и customers."}',
+                    10,
+                ),
+                (
+                    "Агрегации: COUNT, SUM, AVG, GROUP BY",
+                    "code",
+                    '{"taskDescription": "Напишите запрос, подсчитывающий количество заказов по каждому клиенту, исключая клиентов с менее чем 2 заказами.", "starterCode": "SELECT customer_id, COUNT(*) as order_count\\nFROM orders\\nGROUP BY ...\\nHAVING ...;"}',
+                    20,
+                ),
+                (
+                    "Индексы и производительность",
+                    "theory",
+                    '{"text": "B-tree, Hash, GIN, GiST индексы. EXPLAIN ANALYZE — читаем план запроса. Основы оптимизации."}',
+                    10,
+                ),
+                (
+                    "Оконные функции ROW_NUMBER, RANK, LAG",
+                    "code",
+                    '{"taskDescription": "Напишите запрос, который выводит топ-3 продукта по продажам в каждой категории используя оконные функции.", "starterCode": "SELECT *, ROW_NUMBER() OVER (\\n  PARTITION BY category\\n  ORDER BY sales DESC\\n) as rank\\nFROM products;"}',
+                    25,
+                ),
+                (
+                    "Финальный проект: аналитический запрос",
+                    "code",
+                    '{"taskDescription": "Напишите комплексный SQL-запрос с JOIN, GROUP BY, HAVING и оконными функциями для анализа данных интернет-магазина.", "starterCode": "-- Ваш финальный запрос:\\nSELECT\\n  ...\\nFROM orders o\\nJOIN customers c ON ...\\nWHERE ...\\nGROUP BY ...\\nHAVING ...;"}',
+                    30,
+                ),
+            ]
+        elif category == "Math":
+            step_titles = [
+                (
+                    "Векторы и матрицы: основы линейной алгебры",
+                    "theory",
+                    '{"text": "Вектор — это направление и величина. Матрица — таблица чисел. Разбираем умножение матриц и зачем оно нужно в ML."}',
+                    10,
+                ),
+                (
+                    "Практика: операции с матрицами на Python",
+                    "code",
+                    '{"taskDescription": "Используя NumPy, создайте матрицу 3x3 и найдите её детерминант и обратную матрицу.", "starterCode": "import numpy as np\\n\\nA = np.array([[1, 2, 3], [0, 1, 4], [5, 6, 0]])\\n# Найдите определитель:\\ndet = ...\\n# Найдите обратную матрицу:\\ninverse = ..."}',
+                    20,
+                ),
+                (
+                    "Теория вероятностей: основные понятия",
+                    "theory",
+                    '{"text": "Событие, вероятность, условная вероятность. Теорема Байеса. Закон больших чисел."}',
+                    10,
+                ),
+                (
+                    "Комбинаторика: перестановки и сочетания",
+                    "quiz",
+                    '{"question": "Сколько способов выбрать 3 человека из 10 для команды?", "options": ["720", "120", "30", "10"], "correctIndex": 1}',
+                    15,
+                ),
+                (
+                    "Статистика: среднее, дисперсия, корреляция",
+                    "code",
+                    '{"taskDescription": "Подсчитайте среднее, стандартное отклонение и корреляцию Пирсона для двух массивов данных.", "starterCode": "import numpy as np\\n\\nx = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\\ny = [2, 4, 5, 4, 5, 7, 8, 9, 10, 12]\\n\\nmean_x = ...\\nstd_x = ...\\ncorr = ..."}',
+                    20,
+                ),
+                (
+                    "Дискретная математика: графы и деревья",
+                    "theory",
+                    '{"text": "Граф — множество вершин и рёбер. Обход в глубину (DFS) и ширину (BFS). Применение в алгоритмах."}',
+                    10,
+                ),
+                (
+                    "Итоговое задание",
+                    "code",
+                    '{"taskDescription": "Реализуйте алгоритм BFS для нахождения кратчайшего пути в графе.", "starterCode": "from collections import deque\\n\\ndef bfs(graph, start, end):\\n    queue = deque([[start]])\\n    visited = set([start])\\n    while queue:\\n        path = queue.popleft()\\n        node = path[-1]\\n        # Ваш код здесь..."}',
+                    30,
+                ),
+            ]
+        else:
+            # Generic steps for other categories
+            step_titles = [
+                (
+                    "Введение в курс",
+                    "theory",
+                    '{"text": "Добро пожаловать! В этом курсе вы научитесь ключевым навыкам. Начнём с основ."}',
+                    10,
+                ),
+                (
+                    "Базовые концепции",
+                    "theory",
+                    '{"text": "Изучаем фундаментальные понятия. Теория + практические примеры."}',
+                    10,
+                ),
+                (
+                    "Практика: первое задание",
+                    "code",
+                    '{"taskDescription": "Применяем изученное на практике. Реализуйте базовый пример.", "starterCode": "# Ваш код здесь\\n"}',
+                    20,
+                ),
+                (
+                    "Углублённая теория",
+                    "theory",
+                    '{"text": "Погружаемся глубже. Разбираем сложные случаи и исключения."}',
+                    10,
+                ),
+                (
+                    "Проверочный тест",
+                    "quiz",
+                    '{"question": "Что из перечисленного является ключевым принципом изучаемой темы?", "options": ["Регулярная практика", "Изучение одной теории", "Копирование решений", "Случайный подход"], "correctIndex": 0}',
+                    15,
+                ),
+                (
+                    "Практика: задание со звёздочкой",
+                    "code",
+                    '{"taskDescription": "Решите более сложную задачу, применяя всё изученное.", "starterCode": "# Сложное задание\\n# Ваш подход:\\n"}',
+                    25,
+                ),
+                (
+                    "Финальное задание модуля",
+                    "code",
+                    '{"taskDescription": "Итоговое задание: объедините все изученные концепции в одном решении.", "starterCode": "# Финальный проект\\n"}',
+                    30,
+                ),
+            ]
+
+        for i, (title, stype, content_json, xp) in enumerate(step_titles, 1):
+            await db.execute(
+                """INSERT INTO course_steps (course_id, lesson_id, title, step_order, step_type, content, xp)
+                   VALUES ($1, NULL, $2, $3, $4, $5::jsonb, $6)
+                   ON CONFLICT DO NOTHING""",
+                cid,
+                title,
+                i,
+                stype,
+                content_json,
+                xp,
+            )
+
+
+async def _seed_python_steps_content() -> None:
+    """Update Python course steps with rich content."""
+    python_id = await db.fetchval(
+        "SELECT id FROM courses WHERE slug='python-backend-fastapi'"
+    )
+    if not python_id:
+        return
+
+    steps = await db.fetch(
+        "SELECT id, title, step_type FROM course_steps WHERE course_id=$1 ORDER BY step_order ASC",
+        python_id,
+    )
+
+    content_map = {
+        "Теория: Переменные, типы и приведение": '{"text": "Python динамически типизирован. Основные типы: int, float, str, bool, None. Приведение: int(\\"5\\") → 5, str(42) → \\"42\\". Важно: \\"5\\" + \\"3\\" = \\"53\\", но int(\\"5\\") + 3 = 8."}',
+        "Теория: Индексация, срезы и строки": '{"text": "Строки — неизменяемые последовательности. s[0] — первый символ, s[-1] — последний. Срезы: s[1:4], s[::-1] — реверс. Методы: .upper(), .split(), .strip(), .join()."}',
+        "Теория: Условия и логические выражения": '{"text": "if/elif/else. Операторы: and, or, not. Тернарный: x if условие else y. Важно: в Python нет switch — используют if-elif или словарь."}',
+        "Теория: Функции, аргументы и return": '{"text": "def func(a, b=10, *args, **kwargs). Позиционные и ключевые аргументы. return может вернуть несколько значений через tuple. Лямбда: f = lambda x: x**2."}',
+        "Теория: Списки, словари, множества": '{"text": "list: изменяемая последовательность [1,2,3]. dict: ключ→значение {\'a\': 1}. set: уникальные элементы {1,2,3}. Comprehensions: [x*2 for x in range(10) if x%2==0]."}',
+        "Теория: Исключения и защищенный код": '{"text": "try/except/finally. Типы: ValueError, TypeError, KeyError, IndexError. raise MyError(). Кастомные исключения: class MyError(Exception): pass. Контекст: with open() as f."}',
+        "Теория: ООП: классы и методы": '{"text": "class Dog:\\n    def __init__(self, name):\\n        self.name = name\\n    def bark(self):\\n        return f\'{self.name}: Woof!\'\\nИнкапсуляция через _private. Наследование: class Cat(Animal). super()."}',
+        "Теория: Модули и структура проекта": '{"text": "import os, sys. from pathlib import Path. package = папка с __init__.py. Разделение: models.py, services.py, utils.py. Относительные импорты: from .utils import helper."}',
+        "Теория: FastAPI роуты и схемы Pydantic": '{"text": "from fastapi import FastAPI\\nfrom pydantic import BaseModel\\napp = FastAPI()\\n\\nclass Item(BaseModel):\\n    name: str\\n    price: float\\n\\n@app.post(\'/items/\')\\nasync def create(item: Item):\\n    return item"}',
+        "Теория: HTTP-ошибки и статус-коды": '{"text": "200 OK, 201 Created, 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 422 Unprocessable, 500 Server Error. raise HTTPException(status_code=404, detail=\'Not found\')."}',
+        "Теория: SQLAlchemy модели и CRUD": '{"text": "from sqlalchemy.orm import Mapped, mapped_column\\nclass User(Base):\\n    __tablename__ = \'users\'\\n    id: Mapped[int] = mapped_column(primary_key=True)\\n    name: Mapped[str]\\nsession.add(user); session.commit()"}',
+        "Теория: Тесты на pytest: основы": '{"text": "def test_add():\\n    assert add(2, 3) == 5\\npytest автоматически находит тесты. Фикстуры: @pytest.fixture. Параметризация: @pytest.mark.parametrize. Моки: monkeypatch, unittest.mock."}',
+        "Теория: Мини-проект: API заметок": '{"text": "Итоговый проект: REST API для заметок с FastAPI. GET /notes/ — список, POST /notes/ — создать, DELETE /notes/{id} — удалить. Данные в памяти или SQLite через SQLAlchemy."}',
+        "Теория: Циклы for/while и шаблон елочки": '{"text": "for i in range(5): print(\'*\' * i). while с break и continue. enumerate() для индексов. zip() для параллельного перебора. Генераторы: (x for x in range(10))."}',
+    }
+
+    for step in steps:
+        content_key = step["title"]
+        if content_key in content_map and step["step_type"] == "theory":
+            await db.execute(
+                "UPDATE course_steps SET content=$1::jsonb WHERE id=$2",
+                content_map[content_key],
+                step["id"],
+            )
+
+    # Update code/quiz steps content for Python course assignments
+    code_steps = [s for s in steps if s["step_type"] in ("code", "quiz")]
+    code_contents = [
+        '{"taskDescription": "Напишите цикл, печатающий елочку из *, где строка i содержит i звёздочек. Например: строка 1 = \'*\', строка 2 = \'**\', строка 3 = \'***\'", "starterCode": "# Елочка\\nn = 5  # высота\\nfor i in range(1, n + 1):\\n    print(...)"}',
+        '{"taskDescription": "Реализуйте POST /orders endpoint с Pydantic-схемой. Схема: OrderCreate(item: str, quantity: int, price: float). Endpoint должен возвращать order с id.", "starterCode": "from fastapi import FastAPI\\nfrom pydantic import BaseModel\\n\\napp = FastAPI()\\n\\nclass OrderCreate(BaseModel):\\n    item: str\\n    quantity: int\\n    price: float\\n\\n@app.post(\'/orders/\')\\nasync def create_order(order: OrderCreate):\\n    # Ваш код здесь\\n    pass"}',
+        '{"taskDescription": "Добавьте SQLAlchemy модель Product с полями: id, name (str), price (float), in_stock (bool). Реализуйте функции create_product() и get_all_products().", "starterCode": "from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session\\n\\nclass Base(DeclarativeBase):\\n    pass\\n\\nclass Product(Base):\\n    __tablename__ = \'products\'\\n    id: Mapped[int] = mapped_column(primary_key=True)\\n    # Добавьте поля:\\n    ..."}',
+        '{"taskDescription": "Создайте полноценный API заметок: GET /notes/ (список), POST /notes/ (создать заявку с title и body), DELETE /notes/{id}. Используйте словарь для хранения.", "starterCode": "from fastapi import FastAPI, HTTPException\\nfrom pydantic import BaseModel\\nfrom typing import Dict\\n\\napp = FastAPI()\\nnotes: Dict[int, dict] = {}\\ncounter = 0\\n\\nclass NoteCreate(BaseModel):\\n    title: str\\n    body: str\\n\\n# Реализуйте endpoints:\\n@app.get(\'/notes/\')\\nasync def list_notes():\\n    pass"}',
+    ]
+
+    for i, step in enumerate(code_steps[: len(code_contents)]):
+        await db.execute(
+            "UPDATE course_steps SET content=$1::jsonb WHERE id=$2",
+            code_contents[i],
+            step["id"],
+        )

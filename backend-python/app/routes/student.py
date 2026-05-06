@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Request
 
-
 from app import db
 from app.deps import CurrentUser, require_roles
-from app.schemas import SubmitBody, EnrollmentRequestBody, WeeklyGoalBody
-from app.services import write_audit, evaluate_code_by_tests, utcnow
+from app.schemas import EnrollmentRequestBody, SubmitBody, WeeklyGoalBody
+from app.services import evaluate_code_by_tests, utcnow, write_audit
 
 router = APIRouter(prefix="/api/student", tags=["student"])
 
@@ -71,7 +70,6 @@ async def dashboard(user: CurrentUser):
 
     streak = 0
     for i in range(start_offset, 365):
-        from datetime import timedelta
         check = (today - timedelta(days=i)).isoformat()
         if check in days_set:
             streak += 1
@@ -79,7 +77,11 @@ async def dashboard(user: CurrentUser):
             break
 
     active = [dict(e) for e in enrollments if e["status"] == "active"]
-    avg_progress = round(sum(e["progressPercent"] or 0 for e in active) / len(active)) if active else 0
+    avg_progress = (
+        round(sum(e["progressPercent"] or 0 for e in active) / len(active))
+        if active
+        else 0
+    )
     active_ids = [e["courseId"] for e in active]
 
     continue_step = None
@@ -93,7 +95,8 @@ async def dashboard(user: CurrentUser):
                FROM course_steps cs
                LEFT JOIN step_progress sp ON sp.step_id=cs.id AND sp.user_id=$1 AND sp.status='completed'
                WHERE cs.course_id = ANY($2::int[])""",
-            uid, active_ids,
+            uid,
+            active_ids,
         )
         total_steps = summary["total"] or 0
         completed_steps = summary["completed"] or 0
@@ -127,12 +130,17 @@ async def dashboard(user: CurrentUser):
     completed_steps_week = csw or 0
 
     wg = await db.fetchval(
-        "SELECT weekly_goal FROM account_profiles WHERE user_id=$1", uid,
+        "SELECT weekly_goal FROM account_profiles WHERE user_id=$1",
+        uid,
     )
     weekly_goal = wg if wg and 3 <= wg <= 50 else 10
     remaining_course = max(total_steps - completed_steps, 0)
     steps_per_day = completed_steps_week / 7 if completed_steps_week else 0
-    forecast = 0 if remaining_course == 0 else int(remaining_course / max(steps_per_day, 0.5)) + 1
+    forecast = (
+        0
+        if remaining_course == 0
+        else int(remaining_course / max(steps_per_day, 0.5)) + 1
+    )
 
     audits = await db.fetch(
         """SELECT id, action, target_type AS "targetType", target_id AS "targetId", created_at AS "createdAt"
@@ -164,7 +172,9 @@ async def dashboard(user: CurrentUser):
 
     activities = []
     for r in audits:
-        label = ACTION_LABELS.get(r["action"], r["action"].replace(".", " → ").capitalize())
+        label = ACTION_LABELS.get(
+            r["action"], r["action"].replace(".", " → ").capitalize()
+        )
         created = r["createdAt"]
         ts = created.strftime("%d.%m %H:%M") if created else ""
         activities.append({"id": r["id"], "text": label, "time": ts})
@@ -182,9 +192,15 @@ async def dashboard(user: CurrentUser):
         uid,
     )
     deadline = (
-        {"title": f"Следующий дедлайн: {deadline_row['title']}", "text": f"Урок: {deadline_row['lessonTitle']}"}
+        {
+            "title": f"Следующий дедлайн: {deadline_row['title']}",
+            "text": f"Урок: {deadline_row['lessonTitle']}",
+        }
         if deadline_row
-        else {"title": "Дедлайнов пока нет", "text": "Вы завершили все назначенные задания в активных курсах."}
+        else {
+            "title": "Дедлайнов пока нет",
+            "text": "Вы завершили все назначенные задания в активных курсах.",
+        }
     )
 
     return {
@@ -204,9 +220,19 @@ async def dashboard(user: CurrentUser):
             "remainingSteps": max(weekly_goal - completed_steps_week, 0),
             "forecastDays": forecast,
         },
-        "courses": [{"id": e["courseId"], "title": e["title"], "progress": e["progressPercent"] or 0} for e in active[:6]],
+        "courses": [
+            {
+                "id": e["courseId"],
+                "title": e["title"],
+                "progress": e["progressPercent"] or 0,
+            }
+            for e in active[:6]
+        ],
         "activities": activities,
         "deadline": deadline,
+        "activeDays": sorted(
+            [d for d in days_set if d >= (today - timedelta(days=89)).isoformat()]
+        ),
     }
 
 
@@ -214,7 +240,8 @@ async def dashboard(user: CurrentUser):
 async def update_weekly_goal(body: WeeklyGoalBody, user: CurrentUser):
     await db.execute(
         "UPDATE account_profiles SET weekly_goal=$1, updated_at=NOW() WHERE user_id=$2",
-        body.goal, user["id"],
+        body.goal,
+        user["id"],
     )
     return {"goal": body.goal}
 
@@ -225,7 +252,8 @@ async def enroll(course_id: int, user: CurrentUser):
         return {"error": "Некорректный курс"}
 
     course = await db.fetchrow(
-        "SELECT id, title, status, access_type FROM courses WHERE id=$1 LIMIT 1", course_id
+        "SELECT id, title, status, access_type FROM courses WHERE id=$1 LIMIT 1",
+        course_id,
     )
     if not course or course["status"] != "published":
         return {"error": "Курс недоступен для записи"}
@@ -233,12 +261,15 @@ async def enroll(course_id: int, user: CurrentUser):
     access = course["access_type"] or "open"
 
     if access == "invite_only":
-        return {"error": "Этот курс доступен только по приглашению. Отправьте заявку преподавателю."}
+        return {
+            "error": "Этот курс доступен только по приглашению. Отправьте заявку преподавателю."
+        }
 
     if access == "moderated":
         existing = await db.fetchrow(
             "SELECT id, status FROM enrollment_requests WHERE user_id=$1 AND course_id=$2 LIMIT 1",
-            user["id"], course_id,
+            user["id"],
+            course_id,
         )
         if existing:
             if existing["status"] == "approved":
@@ -246,14 +277,19 @@ async def enroll(course_id: int, user: CurrentUser):
             elif existing["status"] == "pending":
                 return {"error": "Ваша заявка уже на рассмотрении"}
             else:
-                return {"error": "Ваша заявка была отклонена. Свяжитесь с преподавателем."}
+                return {
+                    "error": "Ваша заявка была отклонена. Свяжитесь с преподавателем."
+                }
         else:
-            return {"error": "Для этого курса необходимо сначала отправить заявку на вступление."}
+            return {
+                "error": "Для этого курса необходимо сначала отправить заявку на вступление."
+            }
 
     await db.execute(
         """INSERT INTO enrollments (user_id, course_id, status, progress_percent)
            VALUES ($1, $2, 'active', 0) ON CONFLICT (user_id, course_id) DO NOTHING""",
-        user["id"], course_id,
+        user["id"],
+        course_id,
     )
     await db.execute(
         "UPDATE courses SET students_count = students_count + 1 WHERE id=$1",
@@ -261,16 +297,21 @@ async def enroll(course_id: int, user: CurrentUser):
     )
     await db.execute(
         "INSERT INTO notifications (user_id, title, body) VALUES ($1, $2, $3)",
-        user["id"], "Вы успешно записаны на курс", course["title"],
+        user["id"],
+        "Вы успешно записаны на курс",
+        course["title"],
     )
     await write_audit(user["id"], "enrollment.create", "course", course_id)
     return {"success": True}
 
 
 @router.post("/courses/{course_id}/request-enrollment", dependencies=[AllRoles])
-async def request_enrollment(course_id: int, body: EnrollmentRequestBody, user: CurrentUser):
+async def request_enrollment(
+    course_id: int, body: EnrollmentRequestBody, user: CurrentUser
+):
     course = await db.fetchrow(
-        "SELECT id, title, status, access_type FROM courses WHERE id=$1 LIMIT 1", course_id
+        "SELECT id, title, status, access_type FROM courses WHERE id=$1 LIMIT 1",
+        course_id,
     )
     if not course or course["status"] != "published":
         return {"error": "Курс недоступен"}
@@ -281,14 +322,16 @@ async def request_enrollment(course_id: int, body: EnrollmentRequestBody, user: 
 
     already_enrolled = await db.fetchrow(
         "SELECT id FROM enrollments WHERE user_id=$1 AND course_id=$2 LIMIT 1",
-        user["id"], course_id,
+        user["id"],
+        course_id,
     )
     if already_enrolled:
         return {"error": "Вы уже записаны на этот курс"}
 
     existing = await db.fetchrow(
         "SELECT id, status FROM enrollment_requests WHERE user_id=$1 AND course_id=$2 LIMIT 1",
-        user["id"], course_id,
+        user["id"],
+        course_id,
     )
     if existing:
         if existing["status"] == "pending":
@@ -298,20 +341,26 @@ async def request_enrollment(course_id: int, body: EnrollmentRequestBody, user: 
         # rejected — allow resend
         await db.execute(
             "UPDATE enrollment_requests SET status='pending', message=$1, teacher_comment=NULL, updated_at=NOW() WHERE id=$2",
-            body.message, existing["id"],
+            body.message,
+            existing["id"],
         )
         return {"success": True, "message": "Заявка повторно отправлена"}
 
     await db.execute(
         "INSERT INTO enrollment_requests (user_id, course_id, message) VALUES ($1, $2, $3)",
-        user["id"], course_id, body.message,
+        user["id"],
+        course_id,
+        body.message,
     )
     # Notify teacher
-    teacher_id = await db.fetchval("SELECT teacher_id FROM courses WHERE id=$1", course_id)
+    teacher_id = await db.fetchval(
+        "SELECT teacher_id FROM courses WHERE id=$1", course_id
+    )
     if teacher_id:
         await db.execute(
             "INSERT INTO notifications (user_id, title, body) VALUES ($1, $2, $3)",
-            teacher_id, "Новая заявка на курс",
+            teacher_id,
+            "Новая заявка на курс",
             f"Студент {user.get('full_name', user['email'])} подал заявку на курс «{course['title']}»",
         )
     await write_audit(user["id"], "enrollment_request.create", "course", course_id)
@@ -322,17 +371,27 @@ async def request_enrollment(course_id: int, body: EnrollmentRequestBody, user: 
 async def enrollment_status(course_id: int, user: CurrentUser):
     enrollment = await db.fetchrow(
         "SELECT id, status, progress_percent FROM enrollments WHERE user_id=$1 AND course_id=$2 LIMIT 1",
-        user["id"], course_id,
+        user["id"],
+        course_id,
     )
     if enrollment:
-        return {"enrolled": True, "status": enrollment["status"], "progress": enrollment["progress_percent"]}
+        return {
+            "enrolled": True,
+            "status": enrollment["status"],
+            "progress": enrollment["progress_percent"],
+        }
 
     request_row = await db.fetchrow(
         "SELECT id, status, teacher_comment FROM enrollment_requests WHERE user_id=$1 AND course_id=$2 LIMIT 1",
-        user["id"], course_id,
+        user["id"],
+        course_id,
     )
     if request_row:
-        return {"enrolled": False, "requestStatus": request_row["status"], "teacherComment": request_row["teacher_comment"]}
+        return {
+            "enrolled": False,
+            "requestStatus": request_row["status"],
+            "teacherComment": request_row["teacher_comment"],
+        }
 
     return {"enrolled": False, "requestStatus": None}
 
@@ -372,50 +431,59 @@ async def get_steps(course_id: int, user: CurrentUser):
     order = 1
     steps = []
     for lesson in lessons:
-        steps.append({
-            "id": lesson["id"] * 10 + 1,
-            "title": f"{lesson['title']}: теория",
-            "kind": "theory",
-            "taskTypeLabel": "Теория",
-            "theoryText": lesson["contentText"] or "Изучите материал урока.",
-            "options": [],
-            "stepOrder": order,
-            "xp": 10,
-        })
-        order += 1
-
-        steps.append({
-            "id": lesson["id"] * 10 + 2,
-            "title": f"{lesson['title']}: мини-тест",
-            "kind": "quiz",
-            "taskTypeLabel": "Тестовое задание",
-            "theoryText": "Выберите вариант ответа и проверьте знание теории.",
-            "options": ["Понял материал", "Нужно повторить", "Нужны примеры"],
-            "stepOrder": order,
-            "xp": 12,
-        })
-        order += 1
-
-        assignment = next((a for a in assignments_rows if a["lessonId"] == lesson["id"]), None)
-        if assignment:
-            steps.append({
-                "id": lesson["id"] * 10 + 3,
-                "title": f"{assignment['title']}: практика",
-                "kind": "code",
-                "taskTypeLabel": "Кодовое задание",
-                "theoryText": assignment["description"] or "Решите задание.",
-                "checks": [],
-                "checkCount": 0,
+        steps.append(
+            {
+                "id": lesson["id"] * 10 + 1,
+                "title": f"{lesson['title']}: теория",
+                "kind": "theory",
+                "taskTypeLabel": "Теория",
+                "theoryText": lesson["contentText"] or "Изучите материал урока.",
                 "options": [],
                 "stepOrder": order,
-                "xp": 20,
-            })
+                "xp": 10,
+            }
+        )
+        order += 1
+
+        steps.append(
+            {
+                "id": lesson["id"] * 10 + 2,
+                "title": f"{lesson['title']}: мини-тест",
+                "kind": "quiz",
+                "taskTypeLabel": "Тестовое задание",
+                "theoryText": "Выберите вариант ответа и проверьте знание теории.",
+                "options": ["Понял материал", "Нужно повторить", "Нужны примеры"],
+                "stepOrder": order,
+                "xp": 12,
+            }
+        )
+        order += 1
+
+        assignment = next(
+            (a for a in assignments_rows if a["lessonId"] == lesson["id"]), None
+        )
+        if assignment:
+            steps.append(
+                {
+                    "id": lesson["id"] * 10 + 3,
+                    "title": f"{assignment['title']}: практика",
+                    "kind": "code",
+                    "taskTypeLabel": "Кодовое задание",
+                    "theoryText": assignment["description"] or "Решите задание.",
+                    "checks": [],
+                    "checkCount": 0,
+                    "options": [],
+                    "stepOrder": order,
+                    "xp": 20,
+                }
+            )
             order += 1
 
     progress_rows = await db.fetch(
         """SELECT step_id AS "stepId", status, score, attempts, answer_text AS "answerText", completed_at AS "completedAt"
            FROM step_progress WHERE user_id=$1 AND course_id=$2""",
-        user["id"], course_id,
+        user["id"],
+        course_id,
     )
 
     completed = sum(1 for r in progress_rows if r["status"] == "completed")
@@ -435,7 +503,12 @@ async def get_steps(course_id: int, user: CurrentUser):
         },
         "steps": steps,
         "progress": [dict(r) for r in progress_rows],
-        "summary": {"total": total, "completed": completed, "xp": xp, "percent": percent},
+        "summary": {
+            "total": total,
+            "completed": completed,
+            "xp": xp,
+            "percent": percent,
+        },
     }
 
 
@@ -496,7 +569,8 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
 
     existing = await db.fetchrow(
         "SELECT id, attempts FROM step_progress WHERE user_id=$1 AND step_id=$2 LIMIT 1",
-        user["id"], step_id,
+        user["id"],
+        step_id,
     )
 
     if existing:
@@ -506,18 +580,29 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
                    course_id=$6, step_kind=$7, lesson_id=$8, assignment_id=$9
                WHERE id=$10""",
             "completed" if passed else "started",
-            score, answer, (existing["attempts"] or 0) + 1,
+            score,
+            answer,
+            (existing["attempts"] or 0) + 1,
             utcnow() if passed else None,
-            course_id, kind, lesson_id, assignment_id,
+            course_id,
+            kind,
+            lesson_id,
+            assignment_id,
             existing["id"],
         )
     else:
         await db.execute(
             """INSERT INTO step_progress (user_id, course_id, step_id, step_kind, lesson_id, assignment_id, status, score, answer_text, attempts, completed_at)
                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,1,$10)""",
-            user["id"], course_id, step_id, kind, lesson_id, assignment_id,
+            user["id"],
+            course_id,
+            step_id,
+            kind,
+            lesson_id,
+            assignment_id,
             "completed" if passed else "started",
-            score, answer,
+            score,
+            answer,
             utcnow() if passed else None,
         )
 
@@ -531,7 +616,8 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
     )
     completed_val = await db.fetchval(
         "SELECT COUNT(*)::int FROM step_progress WHERE user_id=$1 AND course_id=$2 AND status='completed'",
-        user["id"], course_id,
+        user["id"],
+        course_id,
     )
     total_val = total_val or 0
     completed_val = completed_val or 0
@@ -539,13 +625,16 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
 
     await db.execute(
         "UPDATE enrollments SET progress_percent=$1 WHERE user_id=$2 AND course_id=$3",
-        percent, user["id"], course_id,
+        percent,
+        user["id"],
+        course_id,
     )
 
     cur = await db.fetchrow(
         """SELECT step_id AS "stepId", status, score, attempts, answer_text AS "answerText", completed_at AS "completedAt"
            FROM step_progress WHERE user_id=$1 AND step_id=$2 LIMIT 1""",
-        user["id"], step_id,
+        user["id"],
+        step_id,
     )
 
     return {
@@ -553,5 +642,9 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
         "feedback": feedback,
         "checkResults": check_results,
         "progress": dict(cur) if cur else None,
-        "courseSummary": {"total": total_val, "completed": completed_val, "percent": percent},
+        "courseSummary": {
+            "total": total_val,
+            "completed": completed_val,
+            "percent": percent,
+        },
     }

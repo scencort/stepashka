@@ -210,7 +210,7 @@ function toCourse(catalogItem: {
   const lessons = Math.max(1, Math.round(duration / 2) || 1);
   const priceCents = Math.max(0, Number(catalogItem.priceCents || 0));
   const price =
-    priceCents === 0 ? "Бесплатно" : `$${Math.round(priceCents / 100)}`;
+    priceCents === 0 ? "Бесплатно" : `${Math.round(priceCents / 100)} ₽`;
   const category = (catalogItem.category || "").toLowerCase();
   const normalizedType = category.includes("front")
     ? "Frontend"
@@ -3243,6 +3243,421 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         });
         return data as T;
       }
+
+      // ── AI Review (slash-path variant from Task.tsx) ──
+      if (path === "/ai/review/check" && method === "POST") {
+        const payload = rawBody as { sourceCode: string; language?: string };
+        const data = await backendRequest<{
+          id: number;
+          quality: number;
+          correctness: number;
+          style: number;
+          summary: string;
+          issues: string[];
+          improvements: string[];
+          goodParts: string[];
+          language: string;
+        }>("/ai/review/check", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        return data as T;
+      }
+
+      if (path === "/ai/review/history" && method === "GET") {
+        const data = await backendRequest<
+          Array<{
+            id: number;
+            quality: number;
+            correctness: number;
+            style: number;
+            summary: string;
+            createdAt: string;
+          }>
+        >("/ai/review/history", { method: "GET" });
+        return data as T;
+      }
+
+      // ── Courses: get by id (CourseEditor uses /courses/{id} without /detail) ──
+      if (/^\/courses\/\d+$/.test(path) && method === "GET") {
+        const courseId = path.split("/")[2];
+        const data = await backendRequest<{
+          id: number;
+          title: string;
+          slug: string;
+          description: string;
+          level: string;
+          category: string;
+          status: string;
+          rating: number;
+          studentsCount: number;
+          durationHours: number;
+          priceCents: number;
+          currency: string;
+          accessType: string;
+          coverUrl: string;
+          teacherName: string;
+          teacherId: number;
+          modules: Array<{ id: number; title: string; moduleOrder: number }>;
+          lessonsCount: number;
+          stepsCount: number;
+        }>(`/courses/${courseId}`, { method: "GET" });
+        return data as T;
+      }
+
+      // ── Teacher: create/update course, modules, lessons, steps ──
+      if (path === "/teacher/courses" && method === "POST") {
+        const data = await backendRequest<{
+          id: number;
+          title: string;
+          slug: string;
+          status: string;
+        }>("/teacher/courses", {
+          method: "POST",
+          body: JSON.stringify(rawBody),
+        });
+        return data as T;
+      }
+
+      if (/^\/teacher\/courses\/\d+$/.test(path) && method === "PATCH") {
+        const courseId = path.split("/")[3];
+        const data = await backendRequest<{
+          id: number;
+          title: string;
+          slug: string;
+          status: string;
+        }>(`/teacher/courses/${courseId}`, {
+          method: "PATCH",
+          body: JSON.stringify(rawBody),
+        });
+        return data as T;
+      }
+
+      if (
+        /^\/teacher\/courses\/\d+\/modules$/.test(path) &&
+        method === "POST"
+      ) {
+        const courseId = path.split("/")[3];
+        const data = await backendRequest<{
+          id: number;
+          title: string;
+          moduleOrder: number;
+        }>(`/teacher/courses/${courseId}/modules`, {
+          method: "POST",
+          body: JSON.stringify(rawBody),
+        });
+        return data as T;
+      }
+
+      if (
+        /^\/teacher\/courses\/\d+\/lessons$/.test(path) &&
+        method === "POST"
+      ) {
+        const courseId = path.split("/")[3];
+        const data = await backendRequest<{
+          id: number;
+          title: string;
+          lessonOrder: number;
+        }>(`/teacher/courses/${courseId}/lessons`, {
+          method: "POST",
+          body: JSON.stringify(rawBody),
+        });
+        return data as T;
+      }
+
+      if (/^\/teacher\/courses\/\d+\/steps$/.test(path) && method === "POST") {
+        const courseId = path.split("/")[3];
+        const data = await backendRequest<{
+          id: number;
+          title: string;
+          stepOrder: number;
+        }>(`/teacher/courses/${courseId}/steps`, {
+          method: "POST",
+          body: JSON.stringify(rawBody),
+        });
+        return data as T;
+      }
+
+      // ── Roles members ──
+      if (path === "/roles-members" && method === "GET") {
+        const data = await backendRequest<
+          Array<{ id: number; name: string; role: string }>
+        >("/roles-members", { method: "GET" });
+        return data as T;
+      }
+
+      if (/^\/roles-members\/\d+$/.test(path) && method === "PATCH") {
+        const userId = path.split("/")[2];
+        const data = await backendRequest<{
+          id: number;
+          name: string;
+          role: string;
+        }>(`/roles-members/${userId}`, {
+          method: "PATCH",
+          body: JSON.stringify(rawBody),
+        });
+        return data as T;
+      }
+
+      if (/^\/roles-members\/\d+$/.test(path) && method === "DELETE") {
+        const userId = path.split("/")[2];
+        const data = await backendRequest<{ success: boolean }>(
+          `/roles-members/${userId}`,
+          { method: "DELETE" },
+        );
+        return data as T;
+      }
+
+      // ── Analytics ──
+      if (path.startsWith("/analytics") && method === "GET") {
+        const data = await backendRequest<{
+          values: number[];
+          stats: {
+            averageScore: string;
+            solvedTasks: number;
+            completedCourses: number;
+          };
+        }>(path, { method: "GET" });
+        return data as T;
+      }
+
+      // ── Teacher ──
+      if (path === "/teacher/overview" && method === "GET") {
+        const data = await backendRequest<{
+          stats: {
+            assignments: number;
+            reviews: number;
+            avgProgress: number;
+            publishedCount: number;
+            draftCount: number;
+          };
+        }>("/teacher/overview", { method: "GET" });
+        return data as T;
+      }
+
+      if (path === "/teacher/courses" && method === "GET") {
+        const data = await backendRequest<
+          Array<{
+            id: number;
+            title: string;
+            slug: string;
+            level: string;
+            category: string;
+            status: string;
+            accessType: string;
+            studentsCount: number;
+            rating: number;
+            published: boolean;
+            type: string;
+            students: string;
+            progress: number;
+          }>
+        >("/teacher/courses", { method: "GET" });
+        return data as T;
+      }
+
+      if (
+        /^\/teacher\/courses\/\d+\/publish$/.test(path) &&
+        method === "PATCH"
+      ) {
+        const courseId = path.split("/")[3];
+        const data = await backendRequest<{
+          id: number;
+          title: string;
+          status: string;
+        }>(`/teacher/courses/${courseId}/publish`, {
+          method: "PATCH",
+          body: JSON.stringify(rawBody),
+        });
+        return data as T;
+      }
+
+      if (path === "/teacher/assignments" && method === "POST") {
+        const data = await backendRequest<{
+          id: number;
+          title: string;
+          assignmentType: string;
+          description: string;
+          difficulty: string;
+          tags: string[];
+          status: string;
+          qualityScore: number;
+          testsCount: number;
+        }>("/teacher/assignments", {
+          method: "POST",
+          body: JSON.stringify(rawBody),
+        });
+        return data as T;
+      }
+
+      // ── Assignments list ──
+      if (path === "/assignments" && method === "GET") {
+        const data = await backendRequest<
+          Array<{
+            id: number;
+            title: string;
+            assignmentType: string;
+            description: string;
+            difficulty: string;
+            tags: string[];
+            status: string;
+            qualityScore: number;
+            testsCount: number;
+            createdAt: string;
+          }>
+        >("/assignments", { method: "GET" });
+        return data as T;
+      }
+
+      // ── Admin ──
+      if (path === "/admin/overview" && method === "GET") {
+        const data = await backendRequest<{
+          users: number;
+          students: number;
+          teachers: number;
+          admins: number;
+          courses: number;
+          publishedCourses: number;
+          moderationQueue: number;
+          estimatedRevenue: number;
+        }>("/admin/overview", { method: "GET" });
+        return data as T;
+      }
+
+      if (path === "/admin/courses" && method === "GET") {
+        const data = await backendRequest<
+          Array<{
+            id: number;
+            title: string;
+            author: string;
+            level: string;
+            type: string;
+            students: string;
+            price: string;
+            published: boolean;
+          }>
+        >("/admin/courses", { method: "GET" });
+        return data as T;
+      }
+
+      if (path === "/admin/users" && method === "GET") {
+        const data = await backendRequest<
+          Array<{
+            id: number;
+            name: string;
+            email: string;
+            role: string;
+            status: string;
+            createdAt: string;
+          }>
+        >("/admin/users", { method: "GET" });
+        return data as T;
+      }
+
+      if (path === "/admin/analytics" && method === "GET") {
+        const data = await backendRequest<{
+          kpi: {
+            users: number;
+            activeUsers: number;
+            conversionRate: number;
+            mrr: number;
+          };
+          funnel: Array<{ stage: string; value: number }>;
+          retention: number[];
+          topCourses: Array<{
+            id: number;
+            title: string;
+            students: string;
+            progress: number;
+          }>;
+        }>("/admin/analytics", { method: "GET" });
+        return data as T;
+      }
+
+      if (/^\/admin\/courses\/\d+$/.test(path) && method === "PATCH") {
+        const courseId = path.split("/")[3];
+        const data = await backendRequest<{ id: number; published: boolean }>(
+          `/admin/courses/${courseId}`,
+          { method: "PATCH", body: JSON.stringify(rawBody) },
+        );
+        return data as T;
+      }
+
+      if (/^\/admin\/courses\/\d+$/.test(path) && method === "DELETE") {
+        const courseId = path.split("/")[3];
+        const data = await backendRequest<{ success: boolean }>(
+          `/admin/courses/${courseId}`,
+          { method: "DELETE" },
+        );
+        return data as T;
+      }
+
+      if (/^\/admin\/users\/\d+\/role$/.test(path) && method === "PATCH") {
+        const userId = path.split("/")[3];
+        const data = await backendRequest<{
+          id: number;
+          name: string;
+          email: string;
+          role: string;
+          status: string;
+        }>(`/admin/users/${userId}/role`, {
+          method: "PATCH",
+          body: JSON.stringify(rawBody),
+        });
+        return data as T;
+      }
+
+      if (/^\/admin\/users\/\d+$/.test(path) && method === "DELETE") {
+        const userId = path.split("/")[3];
+        const data = await backendRequest<{ success: boolean }>(
+          `/admin/users/${userId}`,
+          { method: "DELETE" },
+        );
+        return data as T;
+      }
+
+      // ── Feedback ──
+      if (path === "/feedback" && method === "GET") {
+        const data = await backendRequest<
+          Array<{
+            id: number;
+            message: string;
+            status: string;
+          }>
+        >("/feedback", { method: "GET" });
+        return data as T;
+      }
+
+      if (path === "/feedback" && method === "POST") {
+        const data = await backendRequest<{
+          id: number;
+          message: string;
+          status: string;
+        }>("/feedback", { method: "POST", body: JSON.stringify(rawBody) });
+        return data as T;
+      }
+
+      if (/^\/feedback\/\d+\/status$/.test(path) && method === "PATCH") {
+        const ticketId = path.split("/")[2];
+        const data = await backendRequest<{
+          id: number;
+          message: string;
+          status: string;
+        }>(`/feedback/${ticketId}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({}),
+        });
+        return data as T;
+      }
+
+      if (/^\/feedback\/\d+$/.test(path) && method === "DELETE") {
+        const ticketId = path.split("/")[2];
+        const data = await backendRequest<{ success: boolean }>(
+          `/feedback/${ticketId}`,
+          { method: "DELETE" },
+        );
+        return data as T;
+      }
     } catch (error) {
       if (
         path.startsWith("/auth") ||
@@ -3257,7 +3672,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         path.startsWith("/teacher/") ||
         path.startsWith("/ai-review/") ||
         path.startsWith("/ai/") ||
-        path.startsWith("/student/")
+        path.startsWith("/student/") ||
+        path.startsWith("/analytics") ||
+        path.startsWith("/admin/") ||
+        path.startsWith("/feedback") ||
+        path === "/assignments" ||
+        path.startsWith("/roles-members") ||
+        /^\/courses\/\d+$/.test(path)
       ) {
         throw error;
       }
