@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from app import db
 from app.services import hash_password
+
+log = logging.getLogger(__name__)
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -266,6 +269,9 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 ALTER TABLE assignments ALTER COLUMN lesson_id DROP NOT NULL;
 ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_level_check;
 ALTER TABLE courses ADD CONSTRAINT courses_level_check CHECK (level IN ('Beginner', 'Intermediate', 'Advanced', 'beginner', 'intermediate', 'advanced'));
+UPDATE courses
+   SET cover_url = 'https://picsum.photos/seed/' || slug || '/960/540'
+ WHERE cover_url IS NULL OR cover_url = '';
 """
 
 
@@ -275,8 +281,8 @@ async def init_db() -> None:
         await conn.execute(SCHEMA_SQL)
         try:
             await conn.execute(MIGRATIONS_SQL)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("migrations failed: %s", exc)
     await _seed_users()
     await _seed_profiles()
     await _seed_courses()
@@ -1011,15 +1017,16 @@ async def _seed_submissions_for_analytics() -> None:
         (0, 91),
     ]
 
+    from datetime import datetime as _dt
     for i, (days_ago, score) in enumerate(history):
         sub_date = today - timedelta(days=days_ago)
-        sub_ts = f"{sub_date.isoformat()} {9 + (i % 8):02d}:00:00"
+        sub_ts = _dt.combine(sub_date, _dt.min.time()).replace(hour=9 + (i % 8))
         a_id = a_ids[i % len(a_ids)]
         status = "passed" if score >= 70 else "failed"
         await db.execute(
             """INSERT INTO submissions
                (user_id, assignment_id, answer_text, code_text, score, status, ai_feedback, created_at, updated_at)
-               VALUES ($1, $2, 'print("solution")', 'def solution():\n    pass', $3, $4, 'Хорошее решение', $5::timestamp, $5::timestamp)""",
+               VALUES ($1, $2, 'print("solution")', 'def solution():\n    pass', $3, $4, 'Хорошее решение', $5, $5)""",
             sid,
             a_id,
             score,
@@ -1036,13 +1043,14 @@ async def _seed_submissions_for_analytics() -> None:
             "SELECT id FROM course_steps WHERE course_id=$1 ORDER BY step_order ASC LIMIT 8",
             python_id,
         )
+        from datetime import datetime as _dt2
         for step in steps:
             comp_date = today - timedelta(days=14)
-            comp_ts = f"{comp_date.isoformat()} 10:00:00"
+            comp_ts = _dt2.combine(comp_date, _dt2.min.time()).replace(hour=10)
             await db.execute(
                 """INSERT INTO step_progress
                    (user_id, course_id, step_id, step_kind, lesson_id, status, score, completed_at, created_at, updated_at)
-                   SELECT $1, $2, $3, 'theory', COALESCE(lesson_id, (SELECT id FROM lessons LIMIT 1)), 'completed', 100, $4::timestamp, $4::timestamp, $4::timestamp
+                   SELECT $1, $2, $3, 'theory', COALESCE(lesson_id, (SELECT id FROM lessons LIMIT 1)), 'completed', 100, $4, $4, $4
                    FROM course_steps WHERE id=$3
                    ON CONFLICT (user_id, step_id) DO NOTHING""",
                 sid,
@@ -1073,14 +1081,15 @@ async def _seed_payments() -> None:
     rnd.seed(99)
 
     today = date.today()
+    from datetime import datetime as _dt3
     for i, student in enumerate(students):
         for j, course in enumerate(paid_courses[:2]):
             days_ago = rnd.randint(1, 60)
             pay_date = today - timedelta(days=days_ago)
-            pay_ts = f"{pay_date.isoformat()} 12:00:00"
+            pay_ts = _dt3.combine(pay_date, _dt3.min.time()).replace(hour=12)
             await db.execute(
                 """INSERT INTO payments (user_id, course_id, amount_cents, currency, status, provider, created_at)
-                   VALUES ($1, $2, $3, 'RUB', 'paid', 'mockpay', $4::timestamp)""",
+                   VALUES ($1, $2, $3, 'RUB', 'paid', 'mockpay', $4)""",
                 student["id"],
                 course["id"],
                 course["price_cents"],

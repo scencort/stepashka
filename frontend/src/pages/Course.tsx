@@ -1,6 +1,6 @@
 import MainLayout from "../layout/MainLayout";
 import { motion } from "framer-motion";
-import { cloneElement, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Users,
@@ -30,6 +30,7 @@ import {
 import { api } from "../lib/api";
 import Modal from "../components/ui/Modal";
 import { useToast } from "../hooks/useToast";
+import { useAppStore } from "../store/AppStore";
 
 type CourseItem = {
   id: number;
@@ -242,6 +243,16 @@ export default function Course() {
     },
   ]);
   const toast = useToast();
+  const { user } = useAppStore();
+  const canCreateCourse = user?.role === "teacher" || user?.role === "admin";
+
+  const courseCoverUrl = (course: { id: number; title: string; coverUrl?: string }) => {
+    if (course.coverUrl && course.coverUrl.trim()) return course.coverUrl;
+    const seed = `course-${course.id}-${(course.title || "").slice(0, 24)}`
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-");
+    return `https://picsum.photos/seed/${encodeURIComponent(seed)}/960/540`;
+  };
 
   const requestedStepId = useMemo(() => {
     const value = Number(searchParams.get("step") || 0);
@@ -1260,12 +1271,14 @@ export default function Course() {
               </button>
             )}
           </div>
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            className="btn-primary px-4 py-2 text-sm shrink-0"
-          >
-            + Добавить курс
-          </button>
+          {canCreateCourse && (
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              className="btn-primary px-4 py-2 text-sm shrink-0"
+            >
+              + Добавить курс
+            </button>
+          )}
         </div>
 
         {/* Tab: Все курсы / Мои курсы */}
@@ -1359,24 +1372,24 @@ export default function Course() {
                   onClick={() => navigate(`/course/${course.id}`)}
                 >
                   {/* Cover */}
-                  {course.coverUrl ? (
-                    <div className="h-32 overflow-hidden relative shrink-0">
-                      <img
-                        src={course.coverUrl}
-                        alt={course.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-32 bg-gradient-to-br from-primary to-burgundy flex items-center justify-center shrink-0">
-                      <div className="text-white/40">
-                        {cloneElement(
-                          catMeta.icon as React.ReactElement<{ size?: number }>,
-                          { size: 36 },
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  <div className="h-32 overflow-hidden relative shrink-0 bg-gradient-to-br from-primary to-burgundy">
+                    <img
+                      src={courseCoverUrl(course)}
+                      alt={course.title}
+                      loading="lazy"
+                      onError={(event) => {
+                        const target =
+                          event.currentTarget as HTMLImageElement & {
+                            dataset: DOMStringMap;
+                          };
+                        if (target.dataset.fallback === "1") return;
+                        target.dataset.fallback = "1";
+                        const seed = `c${course.id}`;
+                        target.src = `https://picsum.photos/seed/${encodeURIComponent(seed)}/960/540`;
+                      }}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
 
                   {/* Content */}
                   <div className="p-4 flex-1 flex flex-col">

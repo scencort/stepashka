@@ -629,26 +629,38 @@ async def submissions_history(user: CurrentUser):
 # ---- Admin ----
 
 
+def _serialize_ticket(row) -> dict:
+    keys = set(row.keys())
+    created_at = row["created_at"] if "created_at" in keys else None
+    updated_at = row["updated_at"] if "updated_at" in keys else None
+    return {
+        "id": row["id"],
+        "subject": row["subject"] if "subject" in keys else "",
+        "message": row["message"],
+        "status": (row["status"] or "new").replace("_", " "),
+        "adminReply": (row["admin_reply"] if "admin_reply" in keys else "") or "",
+        "repliedBy": row["replied_by"] if "replied_by" in keys else None,
+        "createdAt": created_at.isoformat() if created_at else None,
+        "updatedAt": updated_at.isoformat() if updated_at else None,
+    }
+
+
 @router.get(
     "/feedback", dependencies=[Depends(require_roles("student", "teacher", "admin"))]
 )
 async def list_feedback(user: CurrentUser):
     rows = await db.fetch(
-        """SELECT id, message, status, created_at AS "createdAt"
+        """SELECT id, subject, message, status,
+                  COALESCE(admin_reply, '') AS admin_reply,
+                  replied_by,
+                  created_at, updated_at
            FROM support_tickets
            WHERE user_id=$1 OR $2='admin'
            ORDER BY created_at DESC LIMIT 50""",
         user["id"],
         user["role"],
     )
-    return [
-        {
-            "id": r["id"],
-            "message": r["message"],
-            "status": (r["status"] or "new").replace("_", " "),
-        }
-        for r in rows
-    ]
+    return [_serialize_ticket(r) for r in rows]
 
 
 @router.post(
@@ -659,48 +671,80 @@ async def list_feedback(user: CurrentUser):
 async def create_feedback(request: Request, user: CurrentUser):
     body = await request.json()
     message = (body.get("message") or "").strip()
+    subject = (body.get("subject") or "").strip() or "Обращение пользователя"
     if not message:
         return {"error": "Сообщение не может быть пустым"}
     row = await db.fetchrow(
         """INSERT INTO support_tickets (user_id, message, subject)
-           VALUES ($1, $2, 'Обращение пользователя')
-           RETURNING id, message, status""",
+           VALUES ($1, $2, $3)
+           RETURNING id, subject, message, status,
+                     COALESCE(admin_reply, '') AS admin_reply,
+                     replied_by, created_at, updated_at""",
         user["id"],
         message,
+        subject,
     )
-    return {
-        "id": row["id"],
-        "message": row["message"],
-        "status": (row["status"] or "new").replace("_", " "),
-    }
+    return _serialize_ticket(row)
 
 
 @router.patch(
     "/feedback/{ticket_id}/status",
-    dependencies=[Depends(require_roles("student", "teacher", "admin"))],
+    dependencies=[Depends(require_roles("admin"))],
 )
 async def update_feedback_status(ticket_id: int, user: CurrentUser):
     row = await db.fetchrow(
-        "SELECT id, status, user_id FROM support_tickets WHERE id=$1 LIMIT 1", ticket_id
+        "SELECT id, status FROM support_tickets WHERE id=$1 LIMIT 1", ticket_id
     )
     if not row:
         return {"error": "Обращение не найдено"}
-    if user["role"] not in ("admin", "teacher") and row["user_id"] != user["id"]:
-        return {"error": "Нет доступа"}
     status_flow = {"new": "in_progress", "in_progress": "closed", "closed": "new"}
     new_status = status_flow.get(row["status"], "new")
     updated = await db.fetchrow(
-        "UPDATE support_tickets SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING id, message, status",
+        """UPDATE support_tickets SET status=$1, updated_at=NOW() WHERE id=$2
+           RETURNING id, subject, message, status,
+                     COALESCE(admin_reply, '') AS admin_reply,
+                     replied_by, created_at, updated_at""",
         new_status,
         ticket_id,
     )
-    # Map underscore status to space for frontend
-    status_display = (updated["status"] or "new").replace("_", " ")
-    return {
-        "id": updated["id"],
-        "message": updated["message"],
-        "status": status_display,
-    }
+    return _serialize_ticket(updated)
+
+
+@router.post(
+    "/feedback/{ticket_id}/reply",
+    dependencies=[Depends(require_roles("admin"))],
+)
+async def reply_feedback(ticket_id: int, request: Request, user: CurrentUser):
+    body = await request.json()
+    reply = (body.get("reply") or "").strip()
+    if not reply:
+        return {"error": "Ответ не может быть пустым"}
+    requested_status = body.get("status")
+    valid_statuses = {"new", "in_progress", "closed"}
+    if isinstance(requested_status, str) and requested_status in valid_statuses:
+        new_status = requested_status
+    else:
+        new_status = "in_progress"
+
+    existing = await db.fetchrow(
+        "SELECT id FROM support_tickets WHERE id=$1 LIMIT 1", ticket_id
+    )
+    if not existing:
+        return {"error": "Обращение не найдено"}
+
+    updated = await db.fetchrow(
+        """UPDATE support_tickets
+           SET admin_reply=$1, replied_by=$2, status=$3, updated_at=NOW()
+           WHERE id=$4
+           RETURNING id, subject, message, status,
+                     COALESCE(admin_reply, '') AS admin_reply,
+                     replied_by, created_at, updated_at""",
+        reply,
+        user["id"],
+        new_status,
+        ticket_id,
+    )
+    return _serialize_ticket(updated)
 
 
 @router.delete(
@@ -713,7 +757,7 @@ async def delete_feedback(ticket_id: int, user: CurrentUser):
     )
     if not row:
         return {"error": "Обращение не найдено"}
-    if user["role"] not in ("admin", "teacher") and row["user_id"] != user["id"]:
+    if user["role"] != "admin" and row["user_id"] != user["id"]:
         return {"error": "Нет доступа"}
     await db.execute("DELETE FROM support_tickets WHERE id=$1", ticket_id)
     return {"success": True}

@@ -83,7 +83,14 @@ type Assignment = {
 };
 
 type Member = { id: number; name: string; role: string };
-type FeedbackItem = { id: number; message: string; status: string };
+type FeedbackItem = {
+  id: number;
+  message: string;
+  status: string;
+  subject?: string;
+  adminReply?: string;
+  repliedBy?: number | null;
+};
 type AdminUser = { id: number; name: string; email: string; role: Role };
 type AccountProfile = {
   userId: number;
@@ -2309,16 +2316,51 @@ async function handlePost<T>(path: string, body: unknown): Promise<T> {
 
   if (path === "/feedback") {
     requireAuth(db);
-    const payload = body as { message?: string };
+    const payload = body as { message?: string; subject?: string };
     const message = String(payload?.message || "").trim();
     if (!message) {
       throw new Error("Сообщение обязательно");
     }
 
-    const next: FeedbackItem = { id: Date.now(), message, status: "new" };
+    const next: FeedbackItem = {
+      id: Date.now(),
+      message,
+      status: "new",
+      subject: String(payload?.subject || "").trim() || "Обращение пользователя",
+      adminReply: "",
+      repliedBy: null,
+    };
     db.feedback.unshift(next);
     setDb(db);
     return next as T;
+  }
+
+  if (path.startsWith("/feedback/") && path.endsWith("/reply")) {
+    requireRole(db, ["admin"]);
+    const id = Number(path.split("/")[2]);
+    const payload = body as { reply?: string; status?: string };
+    const reply = String(payload?.reply || "").trim();
+    if (!reply) {
+      throw new Error("Ответ не может быть пустым");
+    }
+    const item = db.feedback.find((value) => value.id === id);
+    if (!item) {
+      throw new Error("Обращение не найдено");
+    }
+    item.adminReply = reply;
+    const allowed = ["new", "in progress", "closed"];
+    if (
+      typeof payload.status === "string" &&
+      allowed.includes(payload.status)
+    ) {
+      item.status = payload.status;
+    } else {
+      item.status = "in progress";
+    }
+    const currentUser = getCurrentUser(db);
+    item.repliedBy = currentUser?.id ?? null;
+    setDb(db);
+    return item as T;
   }
 
   throw new Error("Неизвестный POST endpoint");
@@ -2439,13 +2481,19 @@ async function handlePatch<T>(path: string, body: unknown): Promise<T> {
   }
 
   if (path.startsWith("/feedback/") && path.endsWith("/status")) {
+    requireRole(db, ["admin"]);
     const id = Number(path.split("/")[2]);
     const item = db.feedback.find((value) => value.id === id);
     if (!item) {
       throw new Error("Обращение не найдено");
     }
 
-    item.status = item.status === "new" ? "in progress" : "closed";
+    item.status =
+      item.status === "new"
+        ? "in progress"
+        : item.status === "in progress"
+          ? "closed"
+          : "new";
     setDb(db);
     return item as T;
   }
@@ -3646,6 +3694,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         }>(`/feedback/${ticketId}/status`, {
           method: "PATCH",
           body: JSON.stringify({}),
+        });
+        return data as T;
+      }
+
+      if (/^\/feedback\/\d+\/reply$/.test(path) && method === "POST") {
+        const ticketId = path.split("/")[2];
+        const data = await backendRequest<{
+          id: number;
+          message: string;
+          status: string;
+          subject?: string;
+          adminReply?: string;
+        }>(`/feedback/${ticketId}/reply`, {
+          method: "POST",
+          body: JSON.stringify(rawBody),
         });
         return data as T;
       }

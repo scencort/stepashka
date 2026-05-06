@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/theme";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -37,6 +37,63 @@ import {
 type MainLayoutProps = { children: ReactNode };
 type NotificationItem = { id: number; title: string; time: string };
 
+const READ_NOTIFICATIONS_KEY = "gradus_read_notifications_v1";
+
+function loadReadIds(): Set<number> {
+  try {
+    const raw = localStorage.getItem(READ_NOTIFICATIONS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return new Set();
+    return new Set(arr.filter((v) => typeof v === "number"));
+  } catch {
+    return new Set();
+  }
+}
+
+function persistReadIds(ids: Set<number>) {
+  try {
+    localStorage.setItem(
+      READ_NOTIFICATIONS_KEY,
+      JSON.stringify(Array.from(ids)),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+const RU_WEEKDAYS_SHORT = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
+const RU_MONTHS_FULL = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+];
+
+function toIsoDay(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function startOfIsoWeek(d: Date): Date {
+  const copy = new Date(d);
+  copy.setHours(0, 0, 0, 0);
+  const dow = copy.getDay(); // 0=Sun..6=Sat
+  const diff = dow === 0 ? -6 : 1 - dow; // shift to Monday
+  copy.setDate(copy.getDate() + diff);
+  return copy;
+}
+
 export default function MainLayout({ children }: MainLayoutProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -54,11 +111,38 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState("");
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<number>>(
+    () => loadReadIds(),
+  );
+  const notificationsListRef = useRef<HTMLDivElement | null>(null);
+  const [showStreakPanel, setShowStreakPanel] = useState(false);
   const [courseFormError, setCourseFormError] = useState("");
   const [streakDays, setStreakDays] = useState(0);
   const [weeklyCompleted, setWeeklyCompleted] = useState(0);
   const [weeklyGoal, setWeeklyGoal] = useState(10);
   const [activeDays, setActiveDays] = useState<string[]>([]);
+
+  const unreadNotificationsCount = useMemo(
+    () => notifications.filter((n) => !readNotificationIds.has(n.id)).length,
+    [notifications, readNotificationIds],
+  );
+
+  const markAllNotificationsRead = () => {
+    if (notifications.length === 0) return;
+    const next = new Set(readNotificationIds);
+    notifications.forEach((n) => next.add(n.id));
+    setReadNotificationIds(next);
+    persistReadIds(next);
+  };
+
+  const handleNotificationsScroll = (
+    event: React.UIEvent<HTMLDivElement>,
+  ) => {
+    const el = event.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) {
+      markAllNotificationsRead();
+    }
+  };
 
   const loadNotifications = async () => {
     setNotificationsLoading(true);
@@ -110,12 +194,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const toggleNotifications = () => {
     setShowNotifications((p) => !p);
     setShowProfile(false);
+    setShowStreakPanel(false);
     setMobileMenuOpen(false);
   };
 
   const toggleProfile = () => {
     setShowProfile((p) => !p);
     setShowNotifications(false);
+    setShowStreakPanel(false);
+    setMobileMenuOpen(false);
+  };
+
+  const toggleStreakPanel = () => {
+    setShowStreakPanel((p) => !p);
+    setShowNotifications(false);
+    setShowProfile(false);
     setMobileMenuOpen(false);
   };
 
@@ -538,17 +631,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
 
           {/* Right side */}
-          <div className="relative flex items-center gap-2">
+          <div className="relative flex items-center gap-2 ml-auto">
             {/* Streak badge */}
             {streakDays > 0 && (
-              <div
+              <button
+                onClick={toggleStreakPanel}
+                title="Календарь активности"
                 className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                bg-orange-50 dark:bg-orange-900/20 border border-orange-200/60 dark:border-orange-800/40
-                text-orange-600 dark:text-orange-400 text-xs font-semibold"
+                bg-primary-50 dark:bg-primary-900/20 border border-primary-200/60 dark:border-primary-800/40
+                text-primary-600 dark:text-primary-400 text-xs font-semibold
+                hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
               >
                 <Flame size={13} />
                 {streakDays} дней
-              </div>
+              </button>
             )}
 
             {/* Add course — teachers only */}
@@ -570,37 +666,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 border border-[var(--border)] transition-colors"
             >
               <Bell size={16} />
-              {notifications.length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute top-1 right-1 min-w-[8px] h-2 px-[2px] rounded-full bg-red-500" />
               )}
             </button>
-
-            {/* Activity heatmap (last 9 weeks) */}
-            <div
-              className="hidden lg:flex items-end gap-[2px] mr-1"
-              title="Активность за последние 9 недель"
-            >
-              {Array.from({ length: 9 }).map((_, weekIdx) => (
-                <div key={weekIdx} className="flex flex-col gap-[2px]">
-                  {Array.from({ length: 7 }).map((_, dayIdx) => {
-                    const daysAgo = (8 - weekIdx) * 7 + (6 - dayIdx);
-                    const d = new Date();
-                    d.setDate(d.getDate() - daysAgo);
-                    const iso = d.toISOString().slice(0, 10);
-                    const active = activeDays.includes(iso);
-                    return (
-                      <div
-                        key={dayIdx}
-                        title={iso}
-                        className={`w-[7px] h-[7px] rounded-[1px] transition-colors ${
-                          active ? "bg-primary" : "bg-[var(--border)]"
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
 
             {/* Avatar / profile */}
             <button
@@ -631,18 +700,37 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   transition={{ duration: 0.15 }}
                   className="absolute right-0 top-12 w-80 card shadow-card-lg z-50 overflow-hidden"
                 >
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] gap-2">
                     <h3 className="font-semibold text-sm font-display">
                       Уведомления
+                      {unreadNotificationsCount > 0 && (
+                        <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold align-middle">
+                          {unreadNotificationsCount}
+                        </span>
+                      )}
                     </h3>
-                    <button
-                      onClick={() => setShowNotifications(false)}
-                      className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface)]"
-                    >
-                      <X size={13} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {unreadNotificationsCount > 0 && (
+                        <button
+                          onClick={markAllNotificationsRead}
+                          className="text-xs font-medium text-primary hover:underline px-2 py-1 rounded-md"
+                        >
+                          Прочитать всё
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowNotifications(false)}
+                        className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface)]"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="max-h-72 overflow-y-auto">
+                  <div
+                    ref={notificationsListRef}
+                    onScroll={handleNotificationsScroll}
+                    className="max-h-72 overflow-y-auto"
+                  >
                     {notificationsLoading && (
                       <p className="text-sm text-[var(--muted)] px-4 py-8 text-center">
                         Загрузка...
@@ -661,19 +749,43 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         </p>
                       )}
                     {!notificationsLoading &&
-                      notifications.map((item) => (
-                        <div
-                          key={item.id}
-                          className="px-4 py-3 border-b border-[var(--border-soft)] hover:bg-[var(--surface)] cursor-pointer transition-colors last:border-0"
-                        >
-                          <p className="text-sm font-medium text-[var(--text)]">
-                            {item.title}
-                          </p>
-                          <p className="text-xs text-[var(--muted)] mt-0.5">
-                            {item.time}
-                          </p>
-                        </div>
-                      ))}
+                      notifications.map((item) => {
+                        const isUnread = !readNotificationIds.has(item.id);
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              if (!isUnread) return;
+                              const next = new Set(readNotificationIds);
+                              next.add(item.id);
+                              setReadNotificationIds(next);
+                              persistReadIds(next);
+                            }}
+                            className={`px-4 py-3 border-b border-[var(--border-soft)] hover:bg-[var(--surface)] cursor-pointer transition-colors last:border-0 flex items-start gap-2 ${
+                              isUnread ? "bg-primary/5" : ""
+                            }`}
+                          >
+                            <span
+                              className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
+                                isUnread ? "bg-red-500" : "bg-transparent"
+                              }`}
+                              aria-hidden
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p
+                                className={`text-sm text-[var(--text)] ${
+                                  isUnread ? "font-semibold" : "font-medium"
+                                }`}
+                              >
+                                {item.title}
+                              </p>
+                              <p className="text-xs text-[var(--muted)] mt-0.5">
+                                {item.time}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 </motion.div>
               )}
@@ -738,6 +850,139 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       <LogOut size={15} />
                       Выйти
                     </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Streak panel */}
+            <AnimatePresence>
+              {showStreakPanel && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-12 w-[320px] card shadow-card-lg z-50 overflow-hidden"
+                >
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200/60 dark:border-primary-800/40 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                        <Flame size={14} />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm font-display leading-tight">
+                          {streakDays > 0
+                            ? `${streakDays} ${streakDays === 1 ? "день" : streakDays >= 2 && streakDays <= 4 ? "дня" : "дней"} подряд`
+                            : "0 дней без перерыва"}
+                        </p>
+                        <p className="text-[11px] text-[var(--muted)]">
+                          Календарь активности
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowStreakPanel(false)}
+                      className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface)]"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {/* Current week */}
+                    {(() => {
+                      const today = new Date();
+                      const todayIso = toIsoDay(today);
+                      const weekStart = startOfIsoWeek(today);
+                      const days = Array.from({ length: 7 }).map((_, idx) => {
+                        const d = new Date(weekStart);
+                        d.setDate(d.getDate() + idx);
+                        const iso = toIsoDay(d);
+                        return {
+                          iso,
+                          label: RU_WEEKDAYS_SHORT[idx],
+                          dayNumber: d.getDate(),
+                          isFuture: iso > todayIso,
+                          isToday: iso === todayIso,
+                          isActive: activeDays.includes(iso),
+                        };
+                      });
+                      const monthLabel = `${RU_MONTHS_FULL[today.getMonth()]} ${today.getFullYear()}`;
+                      return (
+                        <>
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--muted)] font-semibold">
+                            Эта неделя · {monthLabel}
+                          </p>
+                          <div className="grid grid-cols-7 gap-1.5">
+                            {days.map((d) => (
+                              <div
+                                key={d.iso}
+                                title={`${d.iso}${d.isActive ? " · были активности" : d.isFuture ? "" : " · без активности"}`}
+                                className="flex flex-col items-center gap-1"
+                              >
+                                <span className="text-[10px] uppercase text-[var(--muted)] font-medium">
+                                  {d.label}
+                                </span>
+                                <div
+                                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-semibold border transition-colors ${
+                                    d.isFuture
+                                      ? "bg-transparent border-dashed border-[var(--border)] text-[var(--muted)]"
+                                      : d.isActive
+                                        ? "bg-primary text-white border-primary"
+                                        : "bg-[var(--surface)] border-[var(--border)] text-[var(--muted)]"
+                                  } ${
+                                    d.isToday ? "ring-2 ring-primary/40" : ""
+                                  }`}
+                                >
+                                  {d.dayNumber}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      );
+                    })()}
+
+                    {/* Last 9 weeks heatmap */}
+                    <div className="pt-2 border-t border-[var(--border)]">
+                      <p className="text-[11px] uppercase tracking-wide text-[var(--muted)] font-semibold mb-2">
+                        Последние 9 недель
+                      </p>
+                      <div className="flex items-end gap-[3px]">
+                        {Array.from({ length: 9 }).map((_, weekIdx) => (
+                          <div
+                            key={weekIdx}
+                            className="flex flex-col gap-[3px]"
+                          >
+                            {Array.from({ length: 7 }).map((_, dayIdx) => {
+                              const daysAgo =
+                                (8 - weekIdx) * 7 + (6 - dayIdx);
+                              const d = new Date();
+                              d.setHours(0, 0, 0, 0);
+                              d.setDate(d.getDate() - daysAgo);
+                              const iso = toIsoDay(d);
+                              const active = activeDays.includes(iso);
+                              return (
+                                <div
+                                  key={dayIdx}
+                                  title={`${iso}${active ? " · были активности" : ""}`}
+                                  className={`w-[10px] h-[10px] rounded-[2px] ${
+                                    active
+                                      ? "bg-primary"
+                                      : "bg-[var(--border)]"
+                                  }`}
+                                />
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-[var(--muted)] pt-1">
+                      Чтобы продлить серию, выполните хотя бы одно задание
+                      сегодня.
+                    </p>
                   </div>
                 </motion.div>
               )}
@@ -829,12 +1074,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
       </div>
 
       {/* Dismiss overlays on outside click */}
-      {(showNotifications || showProfile) && (
+      {(showNotifications || showProfile || showStreakPanel) && (
         <div
           className="fixed inset-0 z-20"
           onClick={() => {
             setShowNotifications(false);
             setShowProfile(false);
+            setShowStreakPanel(false);
           }}
         />
       )}

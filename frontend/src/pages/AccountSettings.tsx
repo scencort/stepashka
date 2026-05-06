@@ -9,7 +9,7 @@ import { useAppStore } from "../store/AppStore"
 import {
   User, Mail, Phone, Globe, Languages, Camera, Trash2, Lock,
   Shield, ShieldCheck, ShieldOff, Monitor, LogOut, Clock,
-  ChevronRight, Bell, BellOff, X, Check, AlertCircle,
+  ChevronRight, Bell, X, Check, AlertCircle,
   KeyRound, Eye, EyeOff, Smartphone,
 } from "lucide-react"
 
