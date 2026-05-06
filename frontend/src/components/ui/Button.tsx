@@ -1,12 +1,10 @@
-import { motion } from "framer-motion";
-import { scaleHover, smooth } from "../../lib/animations";
-
 type Props = {
   children: React.ReactNode;
-  variant?: "primary" | "outline";
+  variant?: "primary" | "outline" | "ghost";
   className?: string;
   onClick?: () => void | Promise<void>;
   disabled?: boolean;
+  type?: "button" | "submit" | "reset";
 };
 
 export default function Button({
@@ -15,26 +13,24 @@ export default function Button({
   className = "",
   onClick,
   disabled = false,
+  type = "button",
 }: Props) {
-  const base =
-    "px-5 py-2.5 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-all duration-300";
+  const base = "inline-flex items-center justify-center gap-2 font-semibold rounded-xl px-5 py-2.5 transition-all duration-200 text-sm";
 
   const variants = {
-    primary:
-      "text-white shadow-lg shadow-rose-500/25 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 hover:shadow-xl hover:shadow-rose-500/30",
-    outline:
-      "bg-white/40 dark:bg-zinc-900/40 border border-white/50 dark:border-white/5 shadow-sm hover:bg-white/60 dark:hover:bg-zinc-800/60 backdrop-blur-md text-slate-700 dark:text-slate-200",
+    primary: "bg-primary hover:bg-primary-700 active:bg-primary-800 text-white shadow-red hover:shadow-red-lg hover:-translate-y-px active:translate-y-0",
+    outline: "bg-transparent border border-[var(--border)] text-[var(--text-2)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
+    ghost: "bg-transparent text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
   };
 
   return (
-    <motion.button
+    <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
-      {...scaleHover}
-      {...smooth}
-      className={`${base} ${variants[variant]} ${disabled ? "opacity-60 pointer-events-none" : ""} ${className}`}
+      className={`${base} ${variants[variant]} ${disabled ? "opacity-50 cursor-not-allowed pointer-events-none" : ""} ${className}`}
     >
       {children}
-    </motion.button>
+    </button>
   );
 }
