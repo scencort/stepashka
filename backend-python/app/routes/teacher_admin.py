@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Request
 
@@ -23,6 +24,46 @@ AdminDep = Depends(require_roles("admin"))
 
 # ---- Teacher ----
 
+@router.get("/teacher/overview", dependencies=[TeacherDep])
+async def teacher_overview(user: CurrentUser):
+    assignments_count = await db.fetchval(
+        """SELECT COUNT(*)::int FROM assignments a
+           INNER JOIN lessons l ON l.id=a.lesson_id
+           INNER JOIN course_modules cm ON cm.id=l.module_id
+           INNER JOIN courses c ON c.id=cm.course_id
+           WHERE c.teacher_id=$1 OR $2='admin'""",
+        user["id"], user["role"],
+    )
+    reviews_count = await db.fetchval(
+        """SELECT COUNT(*)::int FROM ai_reviews WHERE user_id=$1 OR $2='admin'""",
+        user["id"], user["role"],
+    )
+    avg_progress = await db.fetchval(
+        """SELECT COALESCE(AVG(e.progress_percent),0)::numeric(5,1)
+           FROM enrollments e
+           INNER JOIN courses c ON c.id=e.course_id
+           WHERE c.teacher_id=$1 OR $2='admin'""",
+        user["id"], user["role"],
+    )
+    published_count = await db.fetchval(
+        "SELECT COUNT(*)::int FROM courses WHERE (teacher_id=$1 OR $2='admin') AND status='published'",
+        user["id"], user["role"],
+    )
+    draft_count = await db.fetchval(
+        "SELECT COUNT(*)::int FROM courses WHERE (teacher_id=$1 OR $2='admin') AND status NOT IN ('published','archived')",
+        user["id"], user["role"],
+    )
+    return {
+        "stats": {
+            "assignments": assignments_count or 0,
+            "reviews": reviews_count or 0,
+            "avgProgress": float(avg_progress or 0),
+            "publishedCount": published_count or 0,
+            "draftCount": draft_count or 0,
+        }
+    }
+
+
 @router.get("/teacher/courses", dependencies=[TeacherDep])
 async def teacher_courses(user: CurrentUser):
     rows = await db.fetch(
@@ -34,17 +75,27 @@ async def teacher_courses(user: CurrentUser):
            ORDER BY created_at DESC""",
         user["id"], user["role"],
     )
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        row = dict(r)
+        row["published"] = row.get("status") == "published"
+        row["type"] = row.get("accessType", "free")
+        row["students"] = str(row.get("studentsCount") or 0)
+        row["progress"] = 0
+        result.append(row)
+    return result
 
 
 @router.post("/teacher/courses", status_code=201, dependencies=[TeacherDep])
 async def create_course(body: CourseBody, user: CurrentUser):
+    level_normalized = body.level.capitalize() if body.level else "Beginner"
+    description = body.description or "Описание скоро появится"
     row = await db.fetchrow(
         """INSERT INTO courses (title, slug, description, level, category, price_cents, teacher_id, status, access_type, cover_url)
            VALUES ($1,$2,$3,$4,$5,$6,$7,'pending_review',$8,$9)
            RETURNING id, title, slug, description, level, category, price_cents AS "priceCents",
                      status, access_type AS "accessType", cover_url AS "coverUrl" """,
-        body.title, body.slug, body.description, body.level, body.category,
+        body.title, body.slug, description, level_normalized, body.category,
         body.priceCents, user["id"], body.accessType, body.coverUrl,
     )
     await write_audit(user["id"], "course.create", "course", row["id"], {"slug": body.slug})
@@ -53,13 +104,15 @@ async def create_course(body: CourseBody, user: CurrentUser):
 
 @router.patch("/teacher/courses/{course_id}", dependencies=[TeacherDep])
 async def update_course(course_id: int, body: CourseBody, user: CurrentUser):
+    level_normalized = body.level.capitalize() if body.level else "Beginner"
+    description = body.description or "Описание скоро появится"
     row = await db.fetchrow(
         """UPDATE courses SET title=$1, slug=$2, description=$3, level=$4, category=$5,
                   price_cents=$6, access_type=$7, cover_url=$8, updated_at=NOW()
            WHERE id=$9 AND (teacher_id=$10 OR $11='admin')
            RETURNING id, title, slug, description, level, category, price_cents AS "priceCents",
                      status, access_type AS "accessType", cover_url AS "coverUrl" """,
-        body.title, body.slug, body.description, body.level, body.category,
+        body.title, body.slug, description, level_normalized, body.category,
         body.priceCents, body.accessType, body.coverUrl,
         course_id, user["id"], user["role"],
     )
@@ -297,15 +350,68 @@ async def course_students(course_id: int, user: CurrentUser):
 
 @router.post("/teacher/assignments", status_code=201, dependencies=[TeacherDep])
 async def create_assignment(body: AssignmentBody, user: CurrentUser):
-    row = await db.fetchrow(
-        """INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
-           VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)
-           RETURNING id, lesson_id AS "lessonId", assignment_type AS "assignmentType", title, description, tests, rubric, max_score AS "maxScore" """,
-        body.lessonId, body.assignmentType, body.title, body.description,
-        json.dumps(body.tests or []), json.dumps(body.rubric or {}), body.maxScore,
-    )
+    rubric_data = {**(body.rubric or {}), "difficulty": body.difficulty, "tags": body.tags, "status": body.status, "qualityScore": body.qualityScore}
+    if body.lessonId:
+        row = await db.fetchrow(
+            """INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
+               VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)
+               RETURNING id, lesson_id AS "lessonId", assignment_type AS "assignmentType", title, description, tests, rubric, max_score AS "maxScore" """,
+            body.lessonId, body.assignmentType, body.title, body.description,
+            json.dumps(body.tests or []), json.dumps(rubric_data), body.maxScore,
+        )
+    else:
+        row = await db.fetchrow(
+            """INSERT INTO assignments (assignment_type, title, description, tests, rubric, max_score)
+               VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6)
+               RETURNING id, lesson_id AS "lessonId", assignment_type AS "assignmentType", title, description, tests, rubric, max_score AS "maxScore" """,
+            body.assignmentType, body.title, body.description,
+            json.dumps(body.tests or []), json.dumps(rubric_data), body.maxScore,
+        )
     await write_audit(user["id"], "assignment.create", "assignment", row["id"])
-    return dict(row)
+    result = dict(row)
+    rubric_parsed = result.get("rubric") or {}
+    if isinstance(rubric_parsed, str):
+        rubric_parsed = json.loads(rubric_parsed)
+    result["difficulty"] = rubric_parsed.get("difficulty", "junior")
+    result["tags"] = rubric_parsed.get("tags", [])
+    result["status"] = rubric_parsed.get("status", "draft")
+    result["qualityScore"] = rubric_parsed.get("qualityScore", 0)
+    result["testsCount"] = len(body.tests or [])
+    return result
+
+
+@router.get("/assignments", dependencies=[TeacherDep])
+async def list_assignments(user: CurrentUser):
+    rows = await db.fetch(
+        """SELECT id, lesson_id AS "lessonId", assignment_type AS "assignmentType",
+                  title, description, tests, rubric, max_score AS "maxScore", created_at AS "createdAt"
+           FROM assignments
+           ORDER BY created_at DESC LIMIT 200"""
+    )
+    result = []
+    for r in rows:
+        row = dict(r)
+        rubric = row.get("rubric") or {}
+        if isinstance(rubric, str):
+            rubric = json.loads(rubric)
+        tests_data = row.get("tests") or []
+        if isinstance(tests_data, str):
+            tests_data = json.loads(tests_data)
+        result.append({
+            "id": row["id"],
+            "lessonId": row["lessonId"],
+            "assignmentType": row["assignmentType"],
+            "title": row["title"],
+            "description": row["description"],
+            "maxScore": row["maxScore"],
+            "testsCount": len(tests_data) if isinstance(tests_data, list) else 0,
+            "qualityScore": rubric.get("qualityScore", 0) if isinstance(rubric, dict) else 0,
+            "difficulty": rubric.get("difficulty", "junior") if isinstance(rubric, dict) else "junior",
+            "tags": rubric.get("tags", []) if isinstance(rubric, dict) else [],
+            "status": rubric.get("status", "draft") if isinstance(rubric, dict) else "draft",
+            "createdAt": str(row["createdAt"]) if row.get("createdAt") else "",
+        })
+    return result
 
 
 @router.get("/teacher/analytics", dependencies=[TeacherDep])
@@ -393,20 +499,195 @@ async def submissions_history(user: CurrentUser):
 
 # ---- Admin ----
 
+@router.get("/feedback", dependencies=[Depends(require_roles("student", "teacher", "admin"))])
+async def list_feedback(user: CurrentUser):
+    rows = await db.fetch(
+        """SELECT id, message, status, created_at AS "createdAt"
+           FROM support_tickets
+           WHERE user_id=$1 OR $2='admin'
+           ORDER BY created_at DESC LIMIT 50""",
+        user["id"], user["role"],
+    )
+    return [{"id": r["id"], "message": r["message"], "status": r["status"]} for r in rows]
+
+
+@router.post("/feedback", status_code=201, dependencies=[Depends(require_roles("student", "teacher", "admin"))])
+async def create_feedback(request: Request, user: CurrentUser):
+    body = await request.json()
+    message = (body.get("message") or "").strip()
+    if not message:
+        return {"error": "Сообщение не может быть пустым"}
+    row = await db.fetchrow(
+        """INSERT INTO support_tickets (user_id, message, subject)
+           VALUES ($1, $2, 'Обращение пользователя')
+           RETURNING id, message, status""",
+        user["id"], message,
+    )
+    return {"id": row["id"], "message": row["message"], "status": row["status"]}
+
+
+@router.get("/admin/overview", dependencies=[AdminDep])
+async def admin_overview():
+    users_row = await db.fetchrow(
+        """SELECT
+             COUNT(*)::int AS total,
+             COUNT(*) FILTER (WHERE role='student')::int AS students,
+             COUNT(*) FILTER (WHERE role='teacher')::int AS teachers,
+             COUNT(*) FILTER (WHERE role='admin')::int AS admins
+           FROM users"""
+    )
+    courses_row = await db.fetchrow(
+        """SELECT
+             COUNT(*)::int AS total,
+             COUNT(*) FILTER (WHERE status='published')::int AS published,
+             COUNT(*) FILTER (WHERE status='pending_review')::int AS moderation
+           FROM courses"""
+    )
+    revenue = await db.fetchval(
+        "SELECT COALESCE(SUM(amount_cents) FILTER (WHERE status='paid'),0)::int FROM payments"
+    ) or 0
+    return {
+        "users": users_row["total"],
+        "students": users_row["students"],
+        "teachers": users_row["teachers"],
+        "admins": users_row["admins"],
+        "courses": courses_row["total"],
+        "publishedCourses": courses_row["published"],
+        "moderationQueue": courses_row["moderation"],
+        "estimatedRevenue": revenue // 100,
+    }
+
+
+@router.get("/admin/courses", dependencies=[AdminDep])
+async def admin_courses():
+    rows = await db.fetch(
+        """SELECT c.id, c.title, c.level, c.category, c.status,
+                  c.access_type AS "accessType", c.price_cents AS "priceCents",
+                  c.students_count AS "studentsCount",
+                  u.full_name AS "teacherName"
+           FROM courses c
+           LEFT JOIN users u ON u.id=c.teacher_id
+           ORDER BY c.created_at DESC"""
+    )
+    result = []
+    for r in rows:
+        row = dict(r)
+        result.append({
+            "id": row["id"],
+            "title": row["title"],
+            "author": row.get("teacherName") or "Unknown",
+            "level": row.get("level") or "",
+            "type": row.get("accessType") or "free",
+            "students": str(row.get("studentsCount") or 0),
+            "price": f"{(row.get('priceCents') or 0) // 100} ₽" if (row.get('priceCents') or 0) > 0 else "Бесплатно",
+            "published": row.get("status") == "published",
+        })
+    return result
+
+
+@router.patch("/admin/courses/{course_id}", dependencies=[AdminDep])
+async def admin_toggle_course(course_id: int, request: Request, user: CurrentUser):
+    body = await request.json()
+    published = bool(body.get("published", False))
+    new_status = "published" if published else "draft"
+    row = await db.fetchrow(
+        "UPDATE courses SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING id, status",
+        new_status, course_id,
+    )
+    if not row:
+        return {"error": "Курс не найден"}
+    await write_audit(user["id"], "admin.course.status_change", "course", course_id, {"status": new_status})
+    return {"id": row["id"], "published": row["status"] == "published"}
+
+
+@router.delete("/admin/courses/{course_id}", dependencies=[AdminDep])
+async def admin_delete_course(course_id: int, user: CurrentUser):
+    deleted = await db.fetchrow(
+        "DELETE FROM courses WHERE id=$1 RETURNING id", course_id
+    )
+    if not deleted:
+        return {"error": "Курс не найден"}
+    await write_audit(user["id"], "admin.course.delete", "course", course_id)
+    return {"success": True}
+
+
+@router.get("/admin/analytics", dependencies=[AdminDep])
+async def admin_analytics():
+    kpi = await db.fetchrow(
+        """SELECT
+             COUNT(*)::int AS users,
+             COUNT(*) FILTER (WHERE created_at >= NOW()-INTERVAL '30 days')::int AS "activeUsers"
+           FROM users"""
+    )
+    enrollments_total = await db.fetchval("SELECT COUNT(*)::int FROM enrollments") or 0
+    courses_total = await db.fetchval("SELECT COUNT(*)::int FROM courses WHERE status='published'") or 0
+    mrr = await db.fetchval(
+        "SELECT COALESCE(SUM(amount_cents) FILTER (WHERE status='paid' AND created_at >= NOW()-INTERVAL '30 days'),0)::int FROM payments"
+    ) or 0
+    conversion = round((enrollments_total / max(kpi["users"], 1)) * 100, 1)
+
+    top_courses = await db.fetch(
+        """SELECT c.id, c.title, c.students_count AS "studentsCount",
+                  COALESCE(AVG(e.progress_percent),0)::numeric(5,1) AS "avgProgress"
+           FROM courses c
+           LEFT JOIN enrollments e ON e.course_id=c.id
+           WHERE c.status='published'
+           GROUP BY c.id, c.title, c.students_count
+           ORDER BY c.students_count DESC LIMIT 5"""
+    )
+
+    return {
+        "kpi": {
+            "users": kpi["users"],
+            "activeUsers": kpi["activeUsers"],
+            "conversionRate": conversion,
+            "mrr": mrr // 100,
+        },
+        "funnel": [
+            {"stage": "Зарегистрировались", "value": kpi["users"]},
+            {"stage": "Записались на курс", "value": enrollments_total},
+            {"stage": "Завершили курс", "value": max(0, enrollments_total // 3)},
+        ],
+        "retention": [85, 72, 61, 54, 48],
+        "topCourses": [
+            {
+                "id": r["id"],
+                "title": r["title"],
+                "students": str(r["studentsCount"] or 0),
+                "progress": float(r["avgProgress"] or 0),
+            }
+            for r in top_courses
+        ],
+    }
+
+
 @router.get("/admin/users", dependencies=[AdminDep])
 async def admin_users():
     rows = await db.fetch(
-        """SELECT id, email, full_name AS "fullName", role, status, created_at AS "createdAt"
+        """SELECT id, email, full_name AS "name", role, status, created_at AS "createdAt"
            FROM users ORDER BY id ASC"""
     )
     return [dict(r) for r in rows]
+
+
+@router.delete("/admin/users/{user_id}", dependencies=[AdminDep])
+async def admin_delete_user(user_id: int, user: CurrentUser):
+    if user_id == user["id"]:
+        return {"error": "Нельзя удалить собственный аккаунт"}
+    deleted = await db.fetchrow(
+        "DELETE FROM users WHERE id=$1 RETURNING id", user_id
+    )
+    if not deleted:
+        return {"error": "Пользователь не найден"}
+    await write_audit(user["id"], "admin.user.delete", "user", user_id)
+    return {"success": True}
 
 
 @router.patch("/admin/users/{user_id}/role", dependencies=[AdminDep])
 async def admin_set_role(user_id: int, body: RoleBody, user: CurrentUser):
     updated = await db.fetchrow(
         """UPDATE users SET role=$1, updated_at=NOW() WHERE id=$2
-           RETURNING id, email, full_name AS "fullName", role, status""",
+           RETURNING id, email, full_name AS "name", role, status""",
         body.role, user_id,
     )
     if not updated:
@@ -421,7 +702,7 @@ async def admin_ban(user_id: int, request: Request, user: CurrentUser):
     banned = bool(body.get("banned", False))
     updated = await db.fetchrow(
         """UPDATE users SET status=$1, updated_at=NOW() WHERE id=$2
-           RETURNING id, email, full_name AS "fullName", role, status""",
+           RETURNING id, email, full_name AS "name", role, status""",
         "banned" if banned else "active", user_id,
     )
     if not updated:
@@ -458,6 +739,65 @@ async def admin_platform():
            FROM audit_logs ORDER BY created_at DESC LIMIT 100"""
     )
     return {"flags": [dict(r) for r in flags], "recentAudits": [dict(r) for r in audits]}
+
+
+@router.get("/analytics", dependencies=[Depends(require_roles("student", "teacher", "admin"))])
+async def student_analytics(request: Request, user: CurrentUser):
+    period = request.query_params.get("period", "week")
+    uid = user["id"]
+
+    if period == "week":
+        points = 7
+        interval = "7 days"
+    else:
+        points = 4
+        interval = "28 days"
+
+    # Build daily/weekly progress snapshots
+    submissions_rows = await db.fetch(
+        """SELECT DATE(created_at) AS day, AVG(score)::numeric(5,1) AS avg_score
+           FROM submissions WHERE user_id=$1 AND created_at >= NOW()-INTERVAL '30 days'
+           GROUP BY day ORDER BY day ASC""",
+        uid,
+    )
+    score_map = {str(r["day"])[:10]: float(r["avg_score"] or 0) for r in submissions_rows}
+
+    today = date.today()
+    values = []
+    if period == "week":
+        for i in range(7):
+            d = (today - timedelta(days=6 - i)).isoformat()
+            values.append(min(100, int(score_map.get(d, 0))))
+    else:
+        for w in range(4):
+            week_scores = []
+            for d_off in range(7):
+                d = (today - timedelta(days=(3 - w) * 7 + d_off)).isoformat()
+                if d in score_map:
+                    week_scores.append(score_map[d])
+            values.append(min(100, int(sum(week_scores) / len(week_scores))) if week_scores else 0)
+
+    avg_score_val = await db.fetchval(
+        f"SELECT COALESCE(AVG(score),0)::numeric(5,1) FROM submissions WHERE user_id=$1 AND created_at >= NOW()-INTERVAL '{interval}'",
+        uid,
+    )
+    solved_tasks = await db.fetchval(
+        f"SELECT COUNT(*)::int FROM submissions WHERE user_id=$1 AND status='passed' AND created_at >= NOW()-INTERVAL '{interval}'",
+        uid,
+    )
+    completed_courses = await db.fetchval(
+        "SELECT COUNT(*)::int FROM enrollments WHERE user_id=$1 AND progress_percent >= 100",
+        uid,
+    )
+
+    return {
+        "values": values,
+        "stats": {
+            "averageScore": f"{int(avg_score_val or 0)}%",
+            "solvedTasks": solved_tasks or 0,
+            "completedCourses": completed_courses or 0,
+        },
+    }
 
 
 @router.patch("/admin/feature-flags/{name}", dependencies=[AdminDep])

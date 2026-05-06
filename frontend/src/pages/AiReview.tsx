@@ -43,7 +43,7 @@ export default function AiReview() {
       const data =
         await api.get<
           Array<{ id: number; quality: number; created_at: string }>
-        >("/ai-review/history");
+        >("/ai/review/history");
       setHistory(data);
     } catch {
       setHistory([]);
@@ -60,7 +60,7 @@ export default function AiReview() {
     setError("");
 
     try {
-      const response = await api.post<Verdict>("/ai-review/check", {
+      const response = await api.post<Verdict>("/ai/review/check", {
         sourceCode: code,
       });
       setVerdict(response);

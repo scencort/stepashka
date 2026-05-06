@@ -87,9 +87,10 @@ export default function AssignmentBuilder() {
     }
 
     try {
-      await api.post("/assignments", {
+      await api.post("/teacher/assignments", {
         title,
         description,
+        assignmentType: "code",
         status,
         difficulty,
         qualityScore,
@@ -145,9 +146,9 @@ export default function AssignmentBuilder() {
                 onChange={(event) => setStatus(event.target.value as "draft" | "ready" | "published")}
                 className="mt-1 w-full rounded-xl glass-input px-3 py-2"
               >
-                <option value="draft">Draft</option>
-                <option value="ready">Ready for review</option>
-                <option value="published">Published</option>
+                <option value="draft">Черновик</option>
+                <option value="ready">Готово к проверке</option>
+                <option value="published">Опубликовано</option>
               </select>
             </label>
 
@@ -158,9 +159,9 @@ export default function AssignmentBuilder() {
                 onChange={(event) => setDifficulty(event.target.value as "junior" | "middle" | "senior")}
                 className="mt-1 w-full rounded-xl glass-input px-3 py-2"
               >
-                <option value="junior">Junior</option>
-                <option value="middle">Middle</option>
-                <option value="senior">Senior</option>
+                <option value="junior">Джуниор</option>
+                <option value="middle">Мидл</option>
+                <option value="senior">Сеньор</option>
               </select>
             </label>
 
@@ -175,7 +176,7 @@ export default function AssignmentBuilder() {
             <input
               value={tags}
               onChange={(event) => setTags(event.target.value)}
-              placeholder="arrays, two-pointers, complexity"
+              placeholder="массивы, два указателя, сложность"
               className="mt-1 w-full rounded-xl glass-input px-3 py-2"
             />
           </label>
@@ -223,11 +224,11 @@ export default function AssignmentBuilder() {
             <div key={item.id} className="rounded-xl glass-panel p-3 space-y-1">
               <p className="text-sm font-medium">#{item.id} {item.title}</p>
               <p className="text-xs text-slate-500">
-                {item.difficulty.toUpperCase()} • {item.testsCount} тестов • score {item.qualityScore}/100
+                {{ junior: "Джуниор", middle: "Мидл", senior: "Сеньор" }[item.difficulty] ?? item.difficulty.toUpperCase()} • {item.testsCount} тестов • score {item.qualityScore}/100
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`text-xs px-2 py-1 rounded-lg ${item.status === "published" ? "bg-emerald-100 text-emerald-800" : item.status === "ready" ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800"}`}>
-                  {item.status}
+                  {{ draft: "Черновик", ready: "Готово к проверке", published: "Опубликовано" }[item.status] ?? item.status}
                 </span>
                 {item.tags.slice(0, 4).map((tag) => (
                   <span key={`${item.id}-${tag}`} className="text-xs px-2 py-1 rounded-lg bg-slate-200/70 dark:bg-slate-700/70">

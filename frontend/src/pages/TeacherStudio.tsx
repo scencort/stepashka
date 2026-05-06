@@ -79,12 +79,13 @@ export default function TeacherStudio() {
     setActionId(course.id)
     setError("")
     try {
-      const response = await api.patch<{ id: number; published: boolean }>(`/teacher/courses/${course.id}`, {
-        published: !course.published,
+      const newStatus = course.published ? "draft" : "published"
+      const response = await api.patch<{ id: number; status: string }>(`/teacher/courses/${course.id}/publish`, {
+        status: newStatus,
       })
-      setCourses((prev) => prev.map((item) => (item.id === response.id ? { ...item, published: response.published } : item)))
+      setCourses((prev) => prev.map((item) => (item.id === response.id ? { ...item, published: response.status === "published" } : item)))
       await load()
-      toast.success(response.published ? "Курс отправлен в публикацию" : "Курс переведен в черновик")
+      toast.success(response.status === "published" ? "Курс опубликован" : "Курс переведен в черновик")
     } catch (err) {
       const message = err instanceof Error ? err.message : "Не удалось изменить публикацию"
       setError(message)
@@ -97,7 +98,12 @@ export default function TeacherStudio() {
   return (
     <MainLayout>
       <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
-        <h2 className="text-2xl md:text-3xl font-bold">Кабинет преподавателя</h2>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <h2 className="text-2xl md:text-3xl font-bold">Кабинет преподавателя</h2>
+          <Link to="/teacher/courses/new">
+            <Button>+ Создать курс</Button>
+          </Link>
+        </div>
 
         {loading && (
           <div className="space-y-3">
@@ -195,6 +201,9 @@ export default function TeacherStudio() {
                         <span className={`text-xs px-2 py-1 rounded-lg ${course.published ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
                           {course.published ? "опубликован" : "черновик"}
                         </span>
+                        <Link to={`/teacher/courses/${course.id}/edit`}>
+                          <Button variant="outline">Редактировать</Button>
+                        </Link>
                         <Button
                           variant="outline"
                           onClick={() => togglePublish(course)}

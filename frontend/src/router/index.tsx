@@ -18,6 +18,7 @@ const HelpCenter = lazy(() => import("../pages/HelpCenter"))
 const AdminPanel = lazy(() => import("../pages/AdminPanel"))
 const TeacherStudio = lazy(() => import("../pages/TeacherStudio"))
 const AccountSettings = lazy(() => import("../pages/AccountSettings"))
+const CourseEditor = lazy(() => import("../pages/CourseEditor"))
 import ProtectedRoute from "../features/auth/ProtectedRoute"
 
 const pageFallback = (
@@ -43,13 +44,15 @@ export const Router = () => {
       <Route path="/ai-review" element={withSuspense(<ProtectedRoute><AiReview /></ProtectedRoute>)} />
       <Route path="/assignment-builder" element={withSuspense(<ProtectedRoute allowedRoles={["teacher", "admin"]}><AssignmentBuilder /></ProtectedRoute>)} />
       <Route path="/teacher/assignments" element={withSuspense(<ProtectedRoute allowedRoles={["teacher", "admin"]}><AssignmentBuilder /></ProtectedRoute>)} />
-      <Route path="/analytics" element={withSuspense(<ProtectedRoute allowedRoles={["teacher", "admin"]}><Analytics /></ProtectedRoute>)} />
+      <Route path="/analytics" element={withSuspense(<ProtectedRoute><Analytics /></ProtectedRoute>)} />
       <Route path="/course/:courseId" element={withSuspense(<ProtectedRoute><Course /></ProtectedRoute>)} />
       <Route path="/roles-access" element={withSuspense(<ProtectedRoute allowedRoles={["admin"]}><RolesAccess /></ProtectedRoute>)} />
       <Route path="/feedback" element={withSuspense(<ProtectedRoute><Feedback /></ProtectedRoute>)} />
       <Route path="/help-center" element={withSuspense(<ProtectedRoute><HelpCenter /></ProtectedRoute>)} />
       <Route path="/account" element={withSuspense(<ProtectedRoute><AccountSettings /></ProtectedRoute>)} />
       <Route path="/teacher" element={withSuspense(<ProtectedRoute allowedRoles={["teacher", "admin"]}><TeacherStudio /></ProtectedRoute>)} />
+      <Route path="/teacher/courses/new" element={withSuspense(<ProtectedRoute allowedRoles={["teacher", "admin"]}><CourseEditor /></ProtectedRoute>)} />
+      <Route path="/teacher/courses/:courseId/edit" element={withSuspense(<ProtectedRoute allowedRoles={["teacher", "admin"]}><CourseEditor /></ProtectedRoute>)} />
       <Route path="/admin" element={withSuspense(<ProtectedRoute allowedRoles={["admin"]}><AdminPanel /></ProtectedRoute>)} />
     </Routes>
   )

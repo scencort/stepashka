@@ -263,6 +263,9 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+ALTER TABLE assignments ALTER COLUMN lesson_id DROP NOT NULL;
+ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_level_check;
+ALTER TABLE courses ADD CONSTRAINT courses_level_check CHECK (level IN ('Beginner', 'Intermediate', 'Advanced', 'beginner', 'intermediate', 'advanced'));
 """
 
 
@@ -277,6 +280,7 @@ async def init_db() -> None:
     await _seed_users()
     await _seed_profiles()
     await _seed_courses()
+    await _seed_enrollments_and_progress()
     await _seed_feature_flags()
 
 
@@ -718,6 +722,52 @@ async def _seed_courses() -> None:
                 rubric_json,
                 max_score,
             )
+
+
+async def _seed_enrollments_and_progress() -> None:
+    student = await db.fetchrow("SELECT id FROM users WHERE email='student@gradus.dev' LIMIT 1")
+    if not student:
+        return
+    sid = student["id"]
+
+    python_id = await db.fetchval("SELECT id FROM courses WHERE slug='python-backend-fastapi'")
+    react_id = await db.fetchval("SELECT id FROM courses WHERE slug='react-typescript-product'")
+
+    if python_id:
+        await db.execute(
+            """INSERT INTO enrollments (user_id, course_id, status, progress_percent)
+               VALUES ($1, $2, 'active', 45) ON CONFLICT (user_id, course_id) DO NOTHING""",
+            sid, python_id
+        )
+        await db.execute(
+            "UPDATE courses SET students_count = GREATEST(students_count, 1) WHERE id=$1", python_id
+        )
+
+    if react_id:
+        await db.execute(
+            """INSERT INTO enrollments (user_id, course_id, status, progress_percent)
+               VALUES ($1, $2, 'active', 20) ON CONFLICT (user_id, course_id) DO NOTHING""",
+            sid, react_id
+        )
+        await db.execute(
+            "UPDATE courses SET students_count = GREATEST(students_count, 1) WHERE id=$1", react_id
+        )
+
+    assignments = await db.fetch("SELECT id FROM assignments LIMIT 3")
+    for a in assignments:
+        await db.execute(
+            """INSERT INTO submissions (user_id, assignment_id, answer_text, score, status, ai_feedback)
+               VALUES ($1, $2, 'print("hello")', 85, 'passed', 'Хорошее решение')
+               ON CONFLICT DO NOTHING""",
+            sid, a["id"]
+        )
+
+    await db.execute(
+        """INSERT INTO notifications (user_id, title, body)
+           SELECT $1, 'Добро пожаловать в Gradus!', 'Начните обучение с курса Python — он уже доступен в вашем профиле.'
+           WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE user_id=$1 AND title='Добро пожаловать в Gradus!')""",
+        sid
+    )
 
 
 async def _seed_feature_flags() -> None:

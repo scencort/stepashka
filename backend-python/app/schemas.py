@@ -77,10 +77,10 @@ class TwoFactorDisableBody(BaseModel):
 class CourseBody(BaseModel):
     title: str = Field(min_length=3, max_length=180)
     slug: str = Field(min_length=3, max_length=180, pattern=r"^[a-z0-9-]+$")
-    description: str = Field(min_length=20, max_length=5000)
-    level: Literal["Beginner", "Intermediate", "Advanced"]
-    category: str = Field(min_length=2, max_length=80)
-    priceCents: int = Field(ge=0, le=10_000_000)
+    description: str = Field(default="", max_length=5000)
+    level: str = Field(default="beginner", max_length=40)
+    category: str = Field(default="other", max_length=80)
+    priceCents: int = Field(default=0, ge=0, le=10_000_000)
     accessType: Literal["open", "invite_only", "moderated"] = "open"
     coverUrl: str = Field(default="", max_length=2_000_000)
 
@@ -121,13 +121,17 @@ class RoleBody(BaseModel):
 
 
 class AssignmentBody(BaseModel):
-    lessonId: int = Field(gt=0)
-    assignmentType: Literal["code", "essay", "quiz"]
-    title: str = Field(min_length=3, max_length=180)
-    description: str = Field(min_length=10, max_length=5000)
-    tests: list | None = None
-    rubric: dict | None = None
+    lessonId: int | None = None
+    assignmentType: Literal["code", "essay", "quiz"] = "code"
+    title: str = Field(min_length=3, max_length=300)
+    description: str = Field(default="", max_length=5000)
+    tests: list = Field(default_factory=list)
+    rubric: dict = Field(default_factory=dict)
     maxScore: int = Field(default=100, ge=1, le=1000)
+    difficulty: str = Field(default="junior", max_length=20)
+    tags: list[str] = Field(default_factory=list)
+    status: str = Field(default="draft", max_length=20)
+    qualityScore: int = Field(default=0, ge=0, le=100)
 
 
 class SubmitBody(BaseModel):

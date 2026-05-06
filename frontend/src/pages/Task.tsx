@@ -64,7 +64,7 @@ export default function Task() {
     try {
       const data =
         await api.get<Array<CheckResult & { id: number; createdAt: string }>>(
-          "/ai-review/history",
+          "/ai/review/history",
         );
       setHistory(data);
     } catch {
@@ -85,7 +85,7 @@ export default function Task() {
     setError("");
 
     try {
-      const data = await api.post<CheckResult>("/ai-review/check", {
+      const data = await api.post<CheckResult>("/ai/review/check", {
         sourceCode: code,
         language,
       });

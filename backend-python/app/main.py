@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -18,6 +18,7 @@ from app.routes.account import router as account_router
 from app.routes.student import router as student_router
 from app.routes.teacher_admin import router as teacher_admin_router
 from app.routes.ai import router as ai_router
+from app.deps import CurrentUser, require_roles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -112,6 +113,105 @@ async def course_detail(course_id: int):
         "lessonsCount": lessons_count or 0,
         "stepsCount": steps_count or 0,
     }
+
+
+# ── Alias: /api/courses → /api/catalog (Landing page compatibility) ──
+@app.get("/api/courses")
+async def courses_alias():
+    rows = await database.fetch(
+        """SELECT c.id, c.title, c.slug, c.description, c.level, c.category, c.status, c.rating,
+                  c.students_count AS "studentsCount", c.duration_hours AS "durationHours",
+                  c.price_cents AS "priceCents", c.currency, c.access_type AS "accessType",
+                  c.cover_url AS "coverUrl", u.full_name AS "teacherName", u.full_name AS "author"
+           FROM courses c LEFT JOIN users u ON u.id=c.teacher_id
+           WHERE c.status IN ('published','pending_review')
+           ORDER BY c.created_at DESC"""
+    )
+    result = []
+    for r in rows:
+        row = dict(r)
+        price_cents = row.get("priceCents") or 0
+        row["price"] = "Бесплатно" if price_cents == 0 else f"{price_cents // 100} ₽"
+        row["students"] = str(row.get("studentsCount") or 0)
+        row["rating"] = str(round(float(row.get("rating") or 0), 1))
+        row["duration"] = f"{row.get('durationHours') or 0} ч"
+        row["lessons"] = 0
+        row["progress"] = 0
+        result.append(row)
+    return result
+
+
+# ── Alias: /api/landing/stats → /api/public/stats ──
+@app.get("/api/landing/stats")
+async def landing_stats():
+    cat = await database.fetchrow(
+        """SELECT COUNT(*)::int AS "coursesTotal",
+                  COALESCE(SUM(students_count),0)::int AS "studentsTotal",
+                  COALESCE(AVG(rating),0)::numeric(5,2) AS "averageRating"
+           FROM courses WHERE status IN ('published','pending_review')"""
+    )
+    comm = await database.fetchval("SELECT COUNT(*)::int FROM users WHERE status='active'")
+    return {
+        "coursesTotal": cat["coursesTotal"] or 0,
+        "studentsTotal": cat["studentsTotal"] or 0,
+        "averageRating": float(cat["averageRating"] or 0),
+        "communityMembers": comm or 0,
+    }
+
+
+# ── Alias: /api/dashboard → /api/student/dashboard ──
+# (frontend calls /dashboard but student router prefix is /api/student)
+@app.get("/api/dashboard")
+async def dashboard_alias(user: CurrentUser):
+    from app.routes.student import dashboard as _dashboard
+    return await _dashboard(user)
+
+
+# ── Alias: /api/my-progress → /api/student/my-progress ──
+@app.get("/api/my-progress")
+async def my_progress_alias(user: CurrentUser):
+    rows = await database.fetch(
+        """SELECT course_id AS "courseId", progress_percent AS "progressPercent"
+           FROM enrollments WHERE user_id=$1 AND status='active'""",
+        user["id"],
+    )
+    return {r["courseId"]: r["progressPercent"] or 0 for r in rows}
+
+
+# ── /api/roles-members (used by RolesAccess page — admin only) ──
+_AdminDep = Depends(require_roles("admin"))
+
+@app.get("/api/roles-members", dependencies=[_AdminDep])
+async def roles_members():
+    rows = await database.fetch(
+        """SELECT id, full_name AS "name", role FROM users ORDER BY id ASC"""
+    )
+    role_map = {"student": "student", "teacher": "instructor", "admin": "administrator"}
+    return [{"id": r["id"], "name": r["name"], "role": role_map.get(r["role"], r["role"])} for r in rows]
+
+
+@app.patch("/api/roles-members/{user_id}", dependencies=[_AdminDep])
+async def update_roles_member(user_id: int, request: Request, user: CurrentUser):
+    body = await request.json()
+    new_role_display = body.get("role", "student")
+    role_reverse = {"student": "student", "instructor": "teacher", "administrator": "admin", "methodologist": "teacher"}
+    db_role = role_reverse.get(new_role_display, "student")
+    updated = await database.fetchrow(
+        'UPDATE users SET role=$1, updated_at=NOW() WHERE id=$2 RETURNING id, full_name AS "name", role',
+        db_role, user_id,
+    )
+    if not updated:
+        return {"error": "Пользователь не найден"}
+    role_map = {"student": "student", "teacher": "instructor", "admin": "administrator"}
+    return {"id": updated["id"], "name": updated["name"], "role": role_map.get(updated["role"], updated["role"])}
+
+
+@app.delete("/api/roles-members/{user_id}", dependencies=[_AdminDep])
+async def delete_roles_member(user_id: int, user: CurrentUser):
+    if user_id == user["id"]:
+        return {"error": "Нельзя удалить собственный аккаунт"}
+    await database.execute("DELETE FROM users WHERE id=$1", user_id)
+    return {"success": True}
 
 
 @app.get("/api/public/stats")

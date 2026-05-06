@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile app/routes/teacher_admin.py)",
+      "Bash(python -m py_compile app/schemas.py)",
+      "Bash(python -m py_compile app/init_db.py)",
+      "Bash(python -m py_compile app/main.py)"
+    ]
+  }
+}

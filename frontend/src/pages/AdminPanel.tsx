@@ -174,7 +174,7 @@ export default function AdminPanel() {
   const changeUserRole = async (targetUser: AdminUser, nextRole: AdminUser["role"]) => {
     setActionId(targetUser.id)
     try {
-      const updated = await api.patch<AdminUser>(`/admin/users/${targetUser.id}`, { role: nextRole })
+      const updated = await api.patch<AdminUser>(`/admin/users/${targetUser.id}/role`, { role: nextRole })
       setUsers((prev) => prev.map((item) => (item.id === targetUser.id ? updated : item)))
       await load()
       toast.success("Роль пользователя обновлена")
@@ -459,13 +459,13 @@ export default function AdminPanel() {
                           <p className="text-xs text-slate-500 mt-1">{item.email}</p>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-stretch gap-2">
                           <select
                             value={item.role}
                             onChange={(event) => changeUserRole(item, event.target.value as AdminUser["role"])}
                             aria-label="Роль пользователя"
                             disabled={actionId === item.id || isCurrent}
-                            className="rounded-xl glass-input px-3 py-2 text-sm"
+                            className="rounded-xl glass-input px-3 text-sm h-10"
                           >
                             <option value="student">Студент</option>
                             <option value="teacher">Преподаватель</option>
