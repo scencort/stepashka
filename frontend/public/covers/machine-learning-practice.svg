@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="100%" stop-color="#7C1D1D"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="270" r="220" fill="white" opacity="0.06"/>
+  <circle cx="480" cy="270" r="160" fill="white" opacity="0.04"/>
+  <!-- Brain / neural net -->
+  <g transform="translate(390, 160)" fill="white" opacity="0.9">
+    <!-- Left hemisphere -->
+    <path d="M90 0 C40 0 0 40 0 90 C0 140 35 175 70 190 L70 170 C45 158 20 130 20 90 C20 50 50 20 90 20 Z" opacity="0.7"/>
+    <!-- Right hemisphere -->
+    <path d="M90 0 C140 0 180 40 180 90 C180 140 145 175 110 190 L110 170 C135 158 160 130 160 90 C160 50 130 20 90 20 Z" opacity="0.7"/>
+    <!-- Neural connections inside -->
+    <circle cx="60" cy="60" r="6" opacity="0.5"/><circle cx="120" cy="60" r="6" opacity="0.5"/>
+    <circle cx="50" cy="100" r="6" opacity="0.5"/><circle cx="130" cy="100" r="6" opacity="0.5"/>
+    <circle cx="70" cy="140" r="6" opacity="0.5"/><circle cx="110" cy="140" r="6" opacity="0.5"/>
+    <circle cx="90" cy="90" r="8" opacity="0.6"/>
+    <line x1="60" y1="60" x2="90" y2="90" stroke="white" stroke-width="1.5" opacity="0.3"/>
+    <line x1="120" y1="60" x2="90" y2="90" stroke="white" stroke-width="1.5" opacity="0.3"/>
+    <line x1="50" y1="100" x2="90" y2="90" stroke="white" stroke-width="1.5" opacity="0.3"/>
+    <line x1="130" y1="100" x2="90" y2="90" stroke="white" stroke-width="1.5" opacity="0.3"/>
+    <line x1="70" y1="140" x2="90" y2="90" stroke="white" stroke-width="1.5" opacity="0.3"/>
+    <line x1="110" y1="140" x2="90" y2="90" stroke="white" stroke-width="1.5" opacity="0.3"/>
+  </g>
+</svg>

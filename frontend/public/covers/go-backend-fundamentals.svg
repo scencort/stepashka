@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="100%" stop-color="#7C1D1D"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="270" r="220" fill="white" opacity="0.06"/>
+  <circle cx="480" cy="270" r="160" fill="white" opacity="0.04"/>
+  <!-- Go gopher silhouette -->
+  <g transform="translate(410, 160)" fill="white" opacity="0.9">
+    <!-- Body -->
+    <ellipse cx="70" cy="130" rx="60" ry="70"/>
+    <!-- Head -->
+    <circle cx="70" cy="55" r="45"/>
+    <!-- Eyes -->
+    <circle cx="50" cy="45" r="18" fill="white"/><circle cx="90" cy="45" r="18" fill="white"/>
+    <circle cx="50" cy="45" r="14" fill="#DC2626"/><circle cx="90" cy="45" r="14" fill="#DC2626"/>
+    <circle cx="53" cy="42" r="6" fill="white"/><circle cx="93" cy="42" r="6" fill="white"/>
+    <!-- Ears -->
+    <ellipse cx="25" cy="20" rx="8" ry="18"/>
+    <ellipse cx="115" cy="20" rx="8" ry="18"/>
+    <!-- Teeth -->
+    <rect x="58" y="75" width="10" height="12" rx="2"/><rect x="72" y="75" width="10" height="12" rx="2"/>
+    <!-- Arms -->
+    <ellipse cx="5" cy="120" rx="12" ry="30" transform="rotate(-10, 5, 120)"/>
+    <ellipse cx="135" cy="120" rx="12" ry="30" transform="rotate(10, 135, 120)"/>
+  </g>
+</svg>

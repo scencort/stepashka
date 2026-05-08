@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="100%" stop-color="#7C1D1D"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="270" r="220" fill="white" opacity="0.06"/>
+  <circle cx="480" cy="270" r="160" fill="white" opacity="0.04"/>
+  <!-- Globe with speech bubble -->
+  <g transform="translate(410, 155)" fill="white" opacity="0.9">
+    <!-- Globe -->
+    <circle cx="70" cy="85" r="70" fill="none" stroke="white" stroke-width="3.5"/>
+    <ellipse cx="70" cy="85" rx="35" ry="70" fill="none" stroke="white" stroke-width="2" opacity="0.5"/>
+    <line x1="0" y1="85" x2="140" y2="85" stroke="white" stroke-width="2" opacity="0.4"/>
+    <line x1="12" y1="50" x2="128" y2="50" stroke="white" stroke-width="1.5" opacity="0.3"/>
+    <line x1="12" y1="120" x2="128" y2="120" stroke="white" stroke-width="1.5" opacity="0.3"/>
+    <!-- Speech bubble -->
+    <rect x="95" y="-10" width="75" height="50" rx="10"/>
+    <polygon points="105,40 115,55 120,40" fill="white"/>
+    <text x="132" y="22" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#DC2626" text-anchor="middle">EN</text>
+  </g>
+</svg>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="100%" stop-color="#7C1D1D"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="270" r="220" fill="white" opacity="0.06"/>
+  <circle cx="480" cy="270" r="160" fill="white" opacity="0.04"/>
+  <!-- Bar chart + trend line -->
+  <g transform="translate(370, 170)" fill="white" opacity="0.9">
+    <rect x="0" y="130" width="30" height="70" rx="4"/>
+    <rect x="45" y="90" width="30" height="110" rx="4"/>
+    <rect x="90" y="110" width="30" height="90" rx="4"/>
+    <rect x="135" y="50" width="30" height="150" rx="4"/>
+    <rect x="180" y="70" width="30" height="130" rx="4"/>
+    <!-- Trend line -->
+    <polyline points="15,120 60,85 105,95 150,40 195,55" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+    <circle cx="15" cy="120" r="5" opacity="0.5"/><circle cx="60" cy="85" r="5" opacity="0.5"/>
+    <circle cx="105" cy="95" r="5" opacity="0.5"/><circle cx="150" cy="40" r="5" opacity="0.5"/>
+    <circle cx="195" cy="55" r="5" opacity="0.5"/>
+  </g>
+</svg>

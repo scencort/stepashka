@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="100%" stop-color="#7C1D1D"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="270" r="220" fill="white" opacity="0.06"/>
+  <circle cx="480" cy="270" r="160" fill="white" opacity="0.04"/>
+  <!-- Math symbols -->
+  <g fill="white" font-family="Georgia, serif" opacity="0.9" text-anchor="middle">
+    <text x="480" y="220" font-size="72">∑ ∫ π</text>
+    <text x="480" y="330" font-size="52" opacity="0.5">∂ Δ ∞ √ λ</text>
+    <text x="480" y="400" font-size="36" opacity="0.3">f(x) = ax² + bx + c</text>
+  </g>
+</svg>

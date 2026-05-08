@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="100%" stop-color="#7C1D1D"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="270" r="220" fill="white" opacity="0.06"/>
+  <circle cx="480" cy="270" r="160" fill="white" opacity="0.04"/>
+  <!-- Figma logo shapes -->
+  <g transform="translate(420, 145)" fill="white" opacity="0.9">
+    <rect x="0" y="0" width="50" height="50" rx="25" ry="25" opacity="0.6"/>
+    <circle cx="75" cy="25" r="25"/>
+    <rect x="0" y="60" width="50" height="50" rx="25" ry="25" opacity="0.7"/>
+    <rect x="50" y="60" width="50" height="50" rx="25" ry="25" opacity="0.5"/>
+    <rect x="0" y="120" width="50" height="50" rx="25" ry="25" opacity="0.8"/>
+    <rect x="50" y="120" width="50" height="50" rx="0" ry="0" opacity="0.0"/>
+    <circle cx="75" cy="145" r="25" opacity="0.4"/>
+    <rect x="0" y="180" width="50" height="50" rx="0 0 25 25" opacity="0.5"/>
+    <path d="M0 205 Q0 230 25 230 Q50 230 50 205 L50 180 L0 180 Z" opacity="0.55"/>
+  </g>
+</svg>

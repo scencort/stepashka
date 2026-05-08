@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="100%" stop-color="#7C1D1D"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="270" r="220" fill="white" opacity="0.06"/>
+  <circle cx="480" cy="270" r="160" fill="white" opacity="0.04"/>
+  <!-- Python logo -->
+  <g transform="translate(400, 170)" fill="white" opacity="0.9">
+    <path d="M80 0C48 0 40 16 40 32v24h40v8H24C8 64 0 80 0 112s8 48 24 48h16v-24c0-16 8-32 24-32h48c16 0 24-8 24-24V32C136 16 128 0 112 0H80z"/>
+    <path d="M80 200c32 0 40-16 40-32v-24h-40v-8h56c16 0 24-16 24-48s-8-48-24-48H120v24c0 16-8 32-24 32H48c-16 0-24 8-24 24v40c0 16 8 32 24 32h32z"/>
+    <circle cx="64" cy="24" r="7" fill="#DC2626"/>
+    <circle cx="96" cy="176" r="7" fill="#7C1D1D"/>
+  </g>
+</svg>

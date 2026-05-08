@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="100%" stop-color="#7C1D1D"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="270" r="220" fill="white" opacity="0.06"/>
+  <circle cx="480" cy="270" r="160" fill="white" opacity="0.04"/>
+  <!-- Container boxes + gear -->
+  <g transform="translate(380, 175)" fill="white" opacity="0.9">
+    <rect x="0" y="60" width="55" height="45" rx="4"/><rect x="65" y="60" width="55" height="45" rx="4"/><rect x="130" y="60" width="55" height="45" rx="4"/>
+    <rect x="0" y="115" width="55" height="45" rx="4" opacity="0.6"/><rect x="65" y="115" width="55" height="45" rx="4" opacity="0.6"/><rect x="130" y="115" width="55" height="45" rx="4" opacity="0.6"/>
+    <!-- Gear -->
+    <g transform="translate(92, 20)">
+      <circle cx="0" cy="0" r="14" fill="none" stroke="white" stroke-width="4"/>
+      <rect x="-3" y="-22" width="6" height="10" rx="2"/>
+      <rect x="-3" y="12" width="6" height="10" rx="2"/>
+      <rect x="-22" y="-3" width="10" height="6" rx="2"/>
+      <rect x="12" y="-3" width="10" height="6" rx="2"/>
+    </g>
+  </g>
+</svg>
