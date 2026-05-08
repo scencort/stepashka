@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="100%" stop-color="#7C1D1D"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="270" r="220" fill="white" opacity="0.06"/>
+  <circle cx="480" cy="270" r="160" fill="white" opacity="0.04"/>
+  <!-- Briefcase -->
+  <g transform="translate(400, 170)" fill="white" opacity="0.9">
+    <rect x="0" y="40" width="160" height="110" rx="12"/>
+    <!-- Handle -->
+    <path d="M50 40 L50 20 C50 8 60 0 70 0 L90 0 C100 0 110 8 110 20 L110 40" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
+    <!-- Clasp -->
+    <rect x="70" y="80" width="20" height="25" rx="4" fill="#DC2626"/>
+    <!-- Chat bubbles -->
+    <g transform="translate(130, -15)" opacity="0.6">
+      <rect x="0" y="0" width="50" height="30" rx="8"/>
+      <polygon points="10,30 15,40 20,30"/>
+      <text x="25" y="21" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#DC2626" text-anchor="middle">B2</text>
+    </g>
+  </g>
+</svg>
