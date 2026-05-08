@@ -754,7 +754,7 @@ export default function CourseEditor() {
                     idx < activeStep
                       ? "bg-emerald-500 text-white"
                       : idx === activeStep
-                        ? "btn-gradient text-white"
+                        ? "bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-md shadow-rose-500/30"
                         : "bg-slate-100 dark:bg-zinc-800 text-slate-400"
                   }`}
                 >

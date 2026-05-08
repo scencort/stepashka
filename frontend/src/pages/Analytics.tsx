@@ -78,13 +78,13 @@ export default function Analytics() {
           <div className="flex gap-2">
             <button
               onClick={() => setPeriod("week")}
-              className={`px-4 py-2 rounded-xl ${period === "week" ? "btn-gradient text-white" : "glass-panel"}`}
+              className={`px-4 py-2 rounded-xl ${period === "week" ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900" : "glass-panel"}`}
             >
               Неделя
             </button>
             <button
               onClick={() => setPeriod("month")}
-              className={`px-4 py-2 rounded-xl ${period === "month" ? "btn-gradient text-white" : "glass-panel"}`}
+              className={`px-4 py-2 rounded-xl ${period === "month" ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900" : "glass-panel"}`}
             >
               Месяц
             </button>

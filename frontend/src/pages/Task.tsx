@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import CodeEditor from "../components/ui/CodeEditor";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Code2,
   Sparkles,
@@ -14,6 +15,8 @@ import {
 import { api } from "../lib/api";
 import EmptyState from "../components/ui/EmptyState";
 import { useToast } from "../hooks/useToast";
+
+import { fadeInUp } from "../lib/animations";
 
 const LANGUAGES = [
   { value: "auto", label: "Авто-определение" },
@@ -111,8 +114,16 @@ export default function Task() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 lg:space-y-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2">
+      <motion.div
+        variants={fadeInUp}
+        initial="initial"
+        animate="animate"
+        className="space-y-6 lg:space-y-8"
+      >
+        <motion.div
+          variants={fadeInUp}
+          className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2"
+        >
           <div>
             <h2 className="text-3xl md:text-5xl font-extrabold mb-2 tracking-tight">
               AI Code Review
@@ -132,7 +143,7 @@ export default function Task() {
               </option>
             ))}
           </select>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
           {/* Editor */}
@@ -177,8 +188,13 @@ export default function Task() {
               </Card>
             )}
 
-            {result && (
-              <div className="space-y-6">
+            <AnimatePresence>
+              {result && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-6"
+                >
                   {/* Scores */}
                   <Card className="space-y-4 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 relative overflow-hidden group">
                     <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform duration-700" />
@@ -312,8 +328,9 @@ export default function Task() {
                       ))}
                     </Card>
                   )}
-              </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {!loading && error && (
               <Card className="!rounded-[2rem]">
@@ -395,7 +412,7 @@ export default function Task() {
             </Card>
           </div>
         </div>
-      </div>
+      </motion.div>
     </MainLayout>
   );
 }

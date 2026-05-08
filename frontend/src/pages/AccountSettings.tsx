@@ -8,9 +8,9 @@ import { useToast } from "../hooks/useToast"
 import { useAppStore } from "../store/AppStore"
 import {
   User, Mail, Phone, Globe, Languages, Camera, Trash2, Lock,
-  Shield, Monitor, LogOut, Clock,
+  Shield, ShieldCheck, ShieldOff, Monitor, LogOut, Clock,
   ChevronRight, Bell, X, Check, AlertCircle,
-  KeyRound, Eye, EyeOff,
+  KeyRound, Eye, EyeOff, Smartphone,
 } from "lucide-react"
 
 type AccountProfile = {
@@ -25,6 +25,7 @@ type AccountProfile = {
   language: string
   emailNotifications: boolean
   marketingNotifications: boolean
+  twoFactorEnabled?: boolean
   pendingEmail?: string | null
 }
 
@@ -84,6 +85,8 @@ export default function AccountSettings() {
   const [showCurrentPw, setShowCurrentPw] = useState(false)
   const [showNewPw, setShowNewPw] = useState(false)
   const [emailConfirmCode, setEmailConfirmCode] = useState("")
+  const [twoFactorCode, setTwoFactorCode] = useState("")
+  const [disable2faPassword, setDisable2faPassword] = useState("")
   const avatarInputRef = useRef<HTMLInputElement | null>(null)
 
   const onCropComplete = useCallback((_croppedArea: Area, croppedPixels: Area) => {
@@ -277,6 +280,36 @@ export default function AccountSettings() {
     finally { setSaving(false) }
   }
 
+  const requestEnable2fa = async () => {
+    setSaving(true); setError("")
+    try {
+      const res = await api.post<{ success: boolean; message: string; devCode?: string | null }>("/account/2fa/request-enable", {})
+      toast.success(res.message)
+      if (res.devCode) toast.success(`DEV: ${res.devCode}`)
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка") }
+    finally { setSaving(false) }
+  }
+
+  const confirmEnable2fa = async () => {
+    if (!twoFactorCode.trim()) { toast.error("Введите код"); return }
+    setSaving(true); setError("")
+    try {
+      const res = await api.post<{ success: boolean; message: string }>("/account/2fa/confirm-enable", { code: twoFactorCode.trim() })
+      setTwoFactorCode(""); toast.success(res.message); await load()
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка") }
+    finally { setSaving(false) }
+  }
+
+  const disable2fa = async () => {
+    if (!disable2faPassword.trim()) { toast.error("Введите пароль"); return }
+    setSaving(true); setError("")
+    try {
+      const res = await api.post<{ success: boolean; message: string }>("/account/2fa/disable", { password: disable2faPassword })
+      setDisable2faPassword(""); toast.success(res.message); await load()
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка") }
+    finally { setSaving(false) }
+  }
+
   const revokeSession = async (sessionId: number) => {
     setSaving(true)
     try {
@@ -359,7 +392,7 @@ export default function AccountSettings() {
                       onClick={() => setTab(tab.key)}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                         isActive
-                          ? "btn-gradient shadow-sm"
+                          ? "bg-primary text-white shadow-sm"
                           : "text-[var(--text)] hover:bg-[var(--surface)]"
                       }`}
                     >
@@ -373,6 +406,13 @@ export default function AccountSettings() {
 
               {/* Quick status */}
               <div className="card p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[var(--muted)]">2FA</span>
+                  {profile.twoFactorEnabled
+                    ? <span className="flex items-center gap-1 text-xs font-semibold text-green-600 dark:text-green-400"><ShieldCheck size={12} />Вкл</span>
+                    : <span className="flex items-center gap-1 text-xs font-semibold text-[var(--muted)]"><ShieldOff size={12} />Выкл</span>
+                  }
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-[var(--muted)]">Сессии</span>
                   <span className="text-xs font-semibold text-[var(--text)]">{sessions.length}</span>
@@ -556,6 +596,68 @@ export default function AccountSettings() {
                     </div>
                   </div>
 
+                  {/* 2FA */}
+                  <div className="card p-5 space-y-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Shield size={16} className="text-[var(--muted)]" />
+                      <p className="font-semibold text-sm text-[var(--text)]">Двухфакторная аутентификация</p>
+                    </div>
+
+                    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
+                      profile.twoFactorEnabled
+                        ? "border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/10"
+                        : "border-[var(--border)] bg-[var(--surface)]"
+                    }`}>
+                      <Smartphone size={18} className={profile.twoFactorEnabled ? "text-green-500" : "text-[var(--muted)]"} />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-[var(--text)]">
+                          {profile.twoFactorEnabled ? "2FA включена" : "2FA выключена"}
+                        </p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {profile.twoFactorEnabled ? "Код подтверждения требуется при каждом входе" : "Включите для дополнительной защиты аккаунта"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {!profile.twoFactorEnabled && (
+                      <div className="space-y-3">
+                        <button onClick={requestEnable2fa} disabled={saving} className="btn-secondary px-4 py-2 text-sm">
+                          Запросить код включения
+                        </button>
+                        <div className="flex gap-2">
+                          <input
+                            value={twoFactorCode}
+                            onChange={(e) => setTwoFactorCode(e.target.value)}
+                            placeholder="Код 2FA"
+                            maxLength={6}
+                            className="input-field px-3 py-2 text-sm w-36 tracking-widest"
+                          />
+                          <button onClick={confirmEnable2fa} disabled={saving || !twoFactorCode.trim()} className="btn-primary px-4 py-2 text-sm">
+                            Подтвердить
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {profile.twoFactorEnabled && (
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={disable2faPassword}
+                          onChange={(e) => setDisable2faPassword(e.target.value)}
+                          placeholder="Пароль для отключения"
+                          className="input-field px-3 py-2 text-sm flex-1 max-w-xs"
+                        />
+                        <button
+                          onClick={disable2fa}
+                          disabled={saving || !disable2faPassword.trim()}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 border border-red-200 dark:border-red-800/30 transition-colors font-medium"
+                        >
+                          <ShieldOff size={14} />Отключить
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

@@ -37,12 +37,12 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
-        display: ["Inter", "system-ui", "sans-serif"],
+        display: ["Space Grotesk", "Inter", "sans-serif"],
       },
       fontSize: {
-        'xs':   ['0.875rem', { lineHeight: '1.25rem' }],
-        'sm':   ['1rem', { lineHeight: '1.5rem' }],
-        'base': ['1.125rem', { lineHeight: '1.75rem' }],
+        'xs':   ['0.8125rem', { lineHeight: '1.125rem' }],
+        'sm':   ['0.9375rem', { lineHeight: '1.375rem' }],
+        'base': ['1.0625rem', { lineHeight: '1.625rem' }],
       },
       boxShadow: {
         'card':    '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)',

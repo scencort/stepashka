@@ -372,7 +372,7 @@ export default function AdminPanel() {
                       <button
                         key={item.value}
                         onClick={() => setFilter(item.value)}
-                        className={`px-3 py-1.5 rounded-xl text-xs ${filter === item.value ? "btn-gradient text-white" : "glass-panel"}`}
+                        className={`px-3 py-1.5 rounded-xl text-xs ${filter === item.value ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900" : "glass-panel"}`}
                       >
                         {item.label}
                       </button>
@@ -439,7 +439,7 @@ export default function AdminPanel() {
                       <button
                         key={item.value}
                         onClick={() => setUserFilter(item.value)}
-                        className={`px-3 py-1.5 rounded-xl text-xs ${userFilter === item.value ? "btn-gradient text-white" : "glass-panel"}`}
+                        className={`px-3 py-1.5 rounded-xl text-xs ${userFilter === item.value ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900" : "glass-panel"}`}
                       >
                         {item.label}
                       </button>

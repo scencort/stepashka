@@ -1,5 +1,6 @@
 import { BrowserRouter, useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Router } from "./router";
 
 const BASE_TITLE = "Gradus";
@@ -33,7 +34,7 @@ function getPageTitle(pathname: string) {
   return titles[pathname] || "Платформа обучения";
 }
 
-function AppRoutes() {
+function AnimatedRoutes() {
   const location = useLocation();
 
   useEffect(() => {
@@ -41,13 +42,25 @@ function AppRoutes() {
     document.title = `${pageTitle} | ${BASE_TITLE}`;
   }, [location.pathname]);
 
-  return <Router />;
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -15 }}
+        transition={{ duration: 0.25 }}
+      >
+        <Router />
+      </motion.div>
+    </AnimatePresence>
+  );
 }
 
 export default function App() {
   return (
     <BrowserRouter>
-      <AppRoutes />
+      <AnimatedRoutes />
     </BrowserRouter>
   );
 }
