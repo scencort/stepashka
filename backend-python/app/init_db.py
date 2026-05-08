@@ -239,7 +239,6 @@ ALTER TABLE course_steps ADD COLUMN IF NOT EXISTS step_type TEXT;
 ALTER TABLE course_steps ADD COLUMN IF NOT EXISTS content JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE course_steps ADD COLUMN IF NOT EXISTS xp INTEGER NOT NULL DEFAULT 10;
 ALTER TABLE course_steps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW();
-UPDATE course_steps SET step_type = kind WHERE step_type IS NULL;
 ALTER TABLE step_progress DROP CONSTRAINT IF EXISTS step_progress_step_kind_check;
 ALTER TABLE step_progress ALTER COLUMN step_kind DROP NOT NULL;
 

@@ -32,5 +32,5 @@
   <rect x="328" y="108" width="96" height="312" rx="20" fill="url(#gradus-bar3)"/>
 
   <!-- Upward arrow above bar 3 -->
-  <path d="M376 68 L348 100 L364 100 L364 108 L388 108 L388 100 L404 100 Z" fill="white" opacity="0.5"/>
+  <path d="M376 72 L352 100 L362 100 L362 108 L390 108 L390 100 L400 100 Z" fill="white" opacity="0.55"/>
 </svg>
