@@ -150,7 +150,7 @@ export default function Feedback() {
                   onClick={() => setFilter(item)}
                   className={`px-3 py-1.5 rounded-xl text-xs ${
                     filter === item
-                      ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900"
+                      ? "btn-gradient text-white"
                       : "glass-panel"
                   }`}
                 >

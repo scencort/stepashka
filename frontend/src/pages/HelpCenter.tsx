@@ -17,7 +17,7 @@ const FAQ_DATA: FaqItem[] = [
   { id: 8, category: "AI-функции", question: "Что делает AI-чат?", answer: "AI-чат — это ваш персональный помощник по обучению. Задавайте вопросы по программированию, просите объяснить тему или помочь с кодом." },
   { id: 9, category: "AI-функции", question: "AI-ассистент платный?", answer: "Нет, AI-функции доступны бесплатно для всех зарегистрированных пользователей без ограничений." },
   { id: 10, category: "Аккаунт", question: "Как сменить пароль?", answer: "Перейдите в «Настройки аккаунта» → раздел «Безопасность» → «Сменить пароль». Введите текущий и новый пароль." },
-  { id: 11, category: "Аккаунт", question: "Как включить двухфакторную аутентификацию?", answer: "В настройках аккаунта в разделе «Безопасность» нажмите «Включить 2FA». Вам будет отправлен код подтверждения." },
+  { id: 11, category: "Аккаунт", question: "Как защитить аккаунт?", answer: "Используйте сложный уникальный пароль, не передавайте доступ третьим лицам и регулярно выходите из чужих устройств через раздел «Сессии»." },
   { id: 12, category: "Аккаунт", question: "Забыл пароль, что делать?", answer: "На странице входа нажмите «Забыли пароль?», введите свой email. Вы получите код для сброса пароля." },
   { id: 13, category: "Аккаунт", question: "Как изменить email?", answer: "В настройках аккаунта нажмите «Сменить email», введите новый адрес и подтвердите его кодом, который придёт на новый email." },
   { id: 14, category: "Курсы", question: "Как записаться на закрытый курс?", answer: "Для закрытых курсов нужно отправить заявку. Преподаватель рассмотрит её и примет решение о допуске." },
@@ -91,7 +91,7 @@ export default function HelpCenter() {
             <button
               onClick={askAi}
               disabled={aiLoading || !query.trim()}
-              className="shrink-0 px-4 py-2 rounded-xl text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900 disabled:opacity-50"
+              className="shrink-0 px-4 py-2 rounded-xl btn-gradient text-white disabled:opacity-50"
             >
               {aiLoading ? "Думаю..." : "Спросить AI"}
             </button>
@@ -108,7 +108,7 @@ export default function HelpCenter() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setActiveCategory(null)}
-            className={`px-3 py-1.5 rounded-xl text-xs transition ${!activeCategory ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900" : "glass-panel"}`}
+            className={`px-3 py-1.5 rounded-xl text-xs transition ${!activeCategory ? "btn-gradient text-white" : "glass-panel"}`}
           >
             Все
           </button>
@@ -116,7 +116,7 @@ export default function HelpCenter() {
             <button
               key={cat}
               onClick={() => setActiveCategory((prev) => (prev === cat ? null : cat))}
-              className={`px-3 py-1.5 rounded-xl text-xs transition ${activeCategory === cat ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900" : "glass-panel"}`}
+              className={`px-3 py-1.5 rounded-xl text-xs transition ${activeCategory === cat ? "btn-gradient text-white" : "glass-panel"}`}
             >
               {cat}
             </button>

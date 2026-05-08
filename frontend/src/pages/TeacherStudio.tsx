@@ -178,7 +178,7 @@ export default function TeacherStudio() {
                     <button
                       key={item.value}
                       onClick={() => setCourseFilter(item.value)}
-                      className={`px-3 py-1.5 rounded-xl text-xs ${courseFilter === item.value ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900" : "glass-panel"}`}
+                      className={`px-3 py-1.5 rounded-xl text-xs ${courseFilter === item.value ? "btn-gradient text-white" : "glass-panel"}`}
                     >
                       {item.label}
                     </button>

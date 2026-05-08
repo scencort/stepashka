@@ -205,7 +205,7 @@ export default function AssignmentBuilder() {
                 />
                 <button
                   onClick={() => removeTest(test.id)}
-                  className="rounded-xl px-3 py-2 text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900"
+                  className="rounded-xl px-3 py-2 btn-gradient text-white"
                 >
                   Удалить
                 </button>

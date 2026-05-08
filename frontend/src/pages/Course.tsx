@@ -1,5 +1,4 @@
 import MainLayout from "../layout/MainLayout";
-import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -1215,12 +1214,7 @@ export default function Course() {
 
   return (
     <MainLayout>
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="space-y-6 max-w-7xl"
-      >
+      <div className="space-y-6 max-w-7xl">
         {/* Header */}
         <div>
           <h1 className="font-display font-bold text-3xl text-[var(--text)] mb-1">
@@ -1255,7 +1249,7 @@ export default function Course() {
                 }
                 className={`px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
                   selectedLevel === lvl
-                    ? "bg-primary text-white border-primary"
+                    ? "btn-gradient text-white border-transparent"
                     : "border-[var(--border)] text-[var(--muted)] hover:border-primary/40"
                 }`}
               >
@@ -1289,7 +1283,7 @@ export default function Course() {
               onClick={() => setViewTab(tab)}
               className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
                 viewTab === tab
-                  ? "bg-primary text-white"
+                  ? "btn-gradient text-white"
                   : "bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--text)]"
               }`}
             >
@@ -1306,7 +1300,7 @@ export default function Course() {
             onClick={() => setSelectedCategory(null)}
             className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
               !selectedCategory
-                ? "bg-primary text-white border-primary"
+                ? "btn-gradient text-white border-transparent"
                 : "border-[var(--border)] text-[var(--muted)] hover:border-primary/40"
             }`}
           >
@@ -1321,7 +1315,7 @@ export default function Course() {
                 onClick={() => setSelectedCategory(isSelected ? null : cat)}
                 className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
                   isSelected
-                    ? "bg-primary text-white border-primary"
+                    ? "btn-gradient text-white border-transparent"
                     : "border-[var(--border)] text-[var(--muted)] hover:border-primary/40"
                 }`}
               >
@@ -1363,11 +1357,8 @@ export default function Course() {
             {catalogFiltered.map((course) => {
               const catMeta = getCatMeta(course.category || "");
               return (
-                <motion.div
+                <div
                   key={course.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  whileHover={{ y: -3 }}
                   className="card p-0 overflow-hidden cursor-pointer group flex flex-col"
                   onClick={() => navigate(`/course/${course.id}`)}
                 >
@@ -1451,7 +1442,7 @@ export default function Course() {
                               e.stopPropagation();
                               enrollCourse(course.id);
                             }}
-                            className="text-[10px] px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-700 transition-colors font-semibold"
+                            className="btn-gradient text-[10px] px-3 py-1.5 rounded-lg font-semibold"
                           >
                             Записаться
                           </button>
@@ -1459,7 +1450,7 @@ export default function Course() {
                       </div>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               );
             })}
 
@@ -1552,7 +1543,7 @@ export default function Course() {
             </div>
           </div>
         </Modal>
-      </motion.div>
+      </div>
     </MainLayout>
   );
 }

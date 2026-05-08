@@ -1,15 +1,9 @@
 import { useEffect, useState } from "react";
 import MainLayout from "../layout/MainLayout";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Flame, Award, CalendarDays, ArrowRight, BookOpen, Clock, TrendingUp } from "lucide-react";
+import { Flame, Award, CalendarDays, ArrowRight, BookOpen, Clock, TrendingUp, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
 import { useAppStore } from "../store/AppStore";
-
-const fadeUp = (i = 0) => ({
-  initial: { opacity: 0, y: 16 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.07, ease: "easeOut" as const } },
-});
 
 type DashboardPayload = {
   stats: { activeCourses: number; streakDays: number; averageScore: string; tasksWeek: number };
@@ -68,12 +62,15 @@ export default function Dashboard() {
     <MainLayout>
       <div className="space-y-6 max-w-7xl">
         {/* Page header */}
-        <motion.div {...fadeUp(0)}>
+        <div>
           <h1 className="font-display font-bold text-3xl md:text-4xl text-[var(--text)] mb-1">
-            Привет, {firstName} 👋
+            <span className="inline-flex items-center gap-2">
+              Привет, {firstName}
+              <Sparkles size={30} className="text-primary" aria-hidden="true" />
+            </span>
           </h1>
           <p className="text-[var(--muted)]">Вот ваш прогресс на сегодня</p>
-        </motion.div>
+        </div>
 
         {loading && (
           <div className="space-y-4">
@@ -93,16 +90,16 @@ export default function Dashboard() {
           <div className="space-y-5">
             {/* Stats row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {statCards.map((s, i) => {
+              {statCards.map((s) => {
                 const Icon = s.icon;
                 return (
-                  <motion.div key={s.label} {...fadeUp(i)} className="card p-5">
+                  <div key={s.label} className="card p-5">
                     <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center ${s.color} mb-3`}>
                       <Icon size={18} />
                     </div>
                     <p className="font-display font-bold text-3xl text-[var(--text)] leading-none mb-1">{s.value}</p>
                     <p className="text-xs text-[var(--muted)] font-medium">{s.label}</p>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
@@ -110,7 +107,7 @@ export default function Dashboard() {
             {/* Main grid: weekly plan + continue */}
             <div className="grid lg:grid-cols-5 gap-4">
               {/* Weekly plan */}
-              <motion.div {...fadeUp(4)} className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-primary p-6 text-white">
+              <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-primary p-6 text-white">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/4" />
                 <div className="relative z-10">
                   <p className="text-xs font-semibold uppercase tracking-widest text-white/60 mb-4">План на неделю</p>
@@ -137,10 +134,10 @@ export default function Dashboard() {
                     <span className="text-xs text-white/60">шагов</span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Continue learning */}
-              <motion.div {...fadeUp(5)} className="lg:col-span-3 card p-6">
+              <div className="lg:col-span-3 card p-6">
                 <p className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)] mb-4">В фокусе</p>
 
                 {continueStep ? (
@@ -172,13 +169,13 @@ export default function Dashboard() {
                     </button>
                   </div>
                 )}
-              </motion.div>
+              </div>
             </div>
 
             {/* Courses + Activity */}
             <div className="grid lg:grid-cols-3 gap-4">
               {/* My courses */}
-              <motion.div {...fadeUp(6)} className="lg:col-span-2 card p-6">
+              <div className="lg:col-span-2 card p-6">
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="font-display font-semibold text-lg text-[var(--text)]">Мои курсы</h2>
                   <button onClick={() => navigate("/course")} className="text-xs font-semibold text-primary hover:text-primary-700 transition-colors flex items-center gap-1">
@@ -221,10 +218,10 @@ export default function Dashboard() {
                     ))}
                   </div>
                 )}
-              </motion.div>
+              </div>
 
               {/* Activity feed */}
-              <motion.div {...fadeUp(7)} className="card p-6">
+              <div className="card p-6">
                 <h2 className="font-display font-semibold text-lg text-[var(--text)] mb-5">Активность</h2>
 
                 {/* Deadline alert */}
@@ -261,7 +258,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                 )}
-              </motion.div>
+              </div>
             </div>
           </div>
         )}
