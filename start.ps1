@@ -7,6 +7,9 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $frontendDir = Join-Path $root "frontend"
 $backendDir  = Join-Path $root "backend"
+$venvDir     = Join-Path $backendDir "venv"
+$pipExe      = Join-Path $venvDir "Scripts\pip.exe"
+$uvicornExe  = Join-Path $venvDir "Scripts\uvicorn.exe"
 
 if (-not (Test-Path $backendDir) -or -not (Test-Path $frontendDir)) {
   Write-Error "Missing folders. Run from project root."
@@ -15,10 +18,10 @@ if (-not (Test-Path $backendDir) -or -not (Test-Path $frontendDir)) {
 if (-not $NoInstall) {
   Write-Host "[1/4] Installing backend deps..." -ForegroundColor Green
   Push-Location $backendDir
-  if (-not (Test-Path "venv")) {
-    python -m venv venv
+  if (-not (Test-Path $venvDir)) {
+    python -m venv $venvDir
   }
-  & "venv\Scripts\pip.exe" install -q -r requirements.txt
+  & $pipExe install -q -r requirements.txt
   Pop-Location
 
   Write-Host "[2/4] Installing frontend deps..." -ForegroundColor Green
@@ -31,7 +34,7 @@ Write-Host "[3/4] Starting backend (FastAPI on :4000)..." -ForegroundColor Green
 Start-Process powershell -ArgumentList @(
   "-NoExit",
   "-Command",
-  "Set-Location '$backendDir'; & 'venv\Scripts\uvicorn.exe' app.main:app --host 0.0.0.0 --port 4000 --reload"
+  "Set-Location '$backendDir'; & '$uvicornExe' app.main:app --host 0.0.0.0 --port 4000 --reload"
 )
 
 Write-Host "[4/4] Starting frontend (Vite on :5173)..." -ForegroundColor Green
