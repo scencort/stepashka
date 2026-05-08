@@ -269,8 +269,7 @@ ALTER TABLE assignments ALTER COLUMN lesson_id DROP NOT NULL;
 ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_level_check;
 ALTER TABLE courses ADD CONSTRAINT courses_level_check CHECK (level IN ('Beginner', 'Intermediate', 'Advanced', 'beginner', 'intermediate', 'advanced'));
 UPDATE courses
-   SET cover_url = '/covers/' || slug || '.svg'
- WHERE cover_url IS NULL OR cover_url = '';
+   SET cover_url = '/covers/' || slug || '.svg';
 
 CREATE TABLE IF NOT EXISTS faq_items (
     id SERIAL PRIMARY KEY,
