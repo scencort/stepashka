@@ -1,4 +1,13 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: stepashka-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend-python
+
   backend-python:
     build:
       context: ./backend-python
