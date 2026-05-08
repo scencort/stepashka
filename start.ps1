@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $frontendDir = Join-Path $root "frontend"
-$backendDir  = Join-Path $root "backend-python"
+$backendDir  = Join-Path $root "backend"
 
 if (-not (Test-Path $backendDir) -or -not (Test-Path $frontendDir)) {
   Write-Error "Missing folders. Run from project root."
@@ -47,4 +47,4 @@ Write-Host "  Site:    http://localhost:5173" -ForegroundColor Cyan
 Write-Host "  API:     http://localhost:4000"
 Write-Host "  Docs:    http://localhost:4000/api/docs"
 Write-Host ""
-Write-Host "Requires: PostgreSQL running, DATABASE_URL set in backend-python/.env"
+Write-Host "Requires: PostgreSQL running, DATABASE_URL set in backend/.env"

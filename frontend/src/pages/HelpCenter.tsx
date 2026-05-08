@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
@@ -7,39 +7,26 @@ import { api } from "../lib/api"
 
 type FaqItem = { id: number; question: string; answer: string; category: string }
 
-const FAQ_DATA: FaqItem[] = [
-  { id: 1, category: "Обучение", question: "Как начать обучение на платформе?", answer: "Зарегистрируйтесь, перейдите в каталог курсов и запишитесь на интересующий курс. После записи курс появится на вашей панели управления." },
-  { id: 2, category: "Обучение", question: "Как отправить решение на проверку?", answer: "Откройте страницу задачи, введите код или текст ответа в поле ввода и нажмите кнопку «Проверить». Результат проверки появится сразу." },
-  { id: 3, category: "Обучение", question: "Где отслеживать прогресс?", answer: "Ваш прогресс отображается на панели управления (Dashboard) и на странице каждого курса в виде процента завершения." },
-  { id: 4, category: "Обучение", question: "Сколько попыток для решения задачи?", answer: "Количество попыток не ограничено. Вы можете отправлять решения столько раз, сколько нужно, пока не получите максимальный балл." },
-  { id: 6, category: "Обучение", question: "Можно ли проходить несколько курсов одновременно?", answer: "Да, вы можете записаться на любое количество курсов и проходить их параллельно. Прогресс по каждому курсу отслеживается независимо." },
-  { id: 7, category: "AI-функции", question: "Как работает AI-проверка кода?", answer: "AI-ассистент анализирует ваш код по трём критериям: качество, корректность и стиль. Вы получите числовые оценки и текстовые рекомендации по улучшению." },
-  { id: 8, category: "AI-функции", question: "Что делает AI-чат?", answer: "AI-чат — это ваш персональный помощник по обучению. Задавайте вопросы по программированию, просите объяснить тему или помочь с кодом." },
-  { id: 9, category: "AI-функции", question: "AI-ассистент платный?", answer: "Нет, AI-функции доступны бесплатно для всех зарегистрированных пользователей без ограничений." },
-  { id: 10, category: "Аккаунт", question: "Как сменить пароль?", answer: "Перейдите в «Настройки аккаунта» → раздел «Безопасность» → «Сменить пароль». Введите текущий и новый пароль." },
-  { id: 11, category: "Аккаунт", question: "Как включить двухфакторную аутентификацию?", answer: "В настройках аккаунта в разделе «Безопасность» нажмите «Включить 2FA». Вам будет отправлен код подтверждения." },
-  { id: 12, category: "Аккаунт", question: "Забыл пароль, что делать?", answer: "На странице входа нажмите «Забыли пароль?», введите свой email. Вы получите код для сброса пароля." },
-  { id: 13, category: "Аккаунт", question: "Как изменить email?", answer: "В настройках аккаунта нажмите «Сменить email», введите новый адрес и подтвердите его кодом, который придёт на новый email." },
-  { id: 14, category: "Курсы", question: "Как записаться на закрытый курс?", answer: "Для закрытых курсов нужно отправить заявку. Преподаватель рассмотрит её и примет решение о допуске." },
-  { id: 15, category: "Курсы", question: "Курсы платные?", answer: "На платформе есть как бесплатные, так и платные курсы. Информация о стоимости указана на странице каждого курса." },
-  { id: 16, category: "Курсы", question: "Как получить сертификат?", answer: "Сертификат выдаётся автоматически после прохождения всех шагов курса на 100%." },
-  { id: 17, category: "Преподавателям", question: "Как создать свой курс?", answer: "Перейдите в «Кабинет преподавателя» → «Создать курс». Заполните информацию, добавьте модули, уроки и шаги. После этого отправьте курс на модерацию." },
-  { id: 18, category: "Преподавателям", question: "Как добавить задания в курс?", answer: "В конструкторе заданий выберите тип (код, тест, эссе), настройте условия и прикрепите задание к уроку." },
-  { id: 19, category: "Техническое", question: "Какие браузеры поддерживаются?", answer: "Поддерживаются последние версии Chrome, Firefox, Safari и Edge. Рекомендуем Chrome для лучшей производительности." },
-  { id: 20, category: "Техническое", question: "Как связаться с поддержкой?", answer: "Используйте раздел «Обратная связь» в меню. Ваше обращение будет рассмотрено администрацией в кратчайшие сроки." },
-]
-
-const CATEGORIES = [...new Set(FAQ_DATA.map((item) => item.category))]
-
 export default function HelpCenter() {
+  const [faqData, setFaqData] = useState<FaqItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
   const [openIds, setOpenIds] = useState<Set<number>>(new Set())
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [aiAnswer, setAiAnswer] = useState("")
   const [aiLoading, setAiLoading] = useState(false)
 
+  useEffect(() => {
+    api.get<FaqItem[]>("/help/faq")
+      .then(setFaqData)
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const categories = useMemo(() => [...new Set(faqData.map((item) => item.category))], [faqData])
+
   const filtered = useMemo(() => {
-    let items = FAQ_DATA
+    let items = faqData
     if (activeCategory) {
       items = items.filter((item) => item.category === activeCategory)
     }
@@ -48,7 +35,7 @@ export default function HelpCenter() {
       items = items.filter((item) => item.question.toLowerCase().includes(q) || item.answer.toLowerCase().includes(q))
     }
     return items
-  }, [query, activeCategory])
+  }, [faqData, query, activeCategory])
 
   const toggle = (id: number) => {
     setOpenIds((prev) => {
@@ -112,7 +99,7 @@ export default function HelpCenter() {
           >
             Все
           </button>
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory((prev) => (prev === cat ? null : cat))}
@@ -124,7 +111,9 @@ export default function HelpCenter() {
         </div>
 
         <Card className="divide-y divide-slate-200/50 dark:divide-slate-700/50">
-          {filtered.map((item) => {
+          {loading && <p className="text-sm py-4 text-center text-slate-500">Загрузка...</p>}
+
+          {!loading && filtered.map((item) => {
             const isOpen = openIds.has(item.id)
             return (
               <div key={item.id} className="py-3 first:pt-0 last:pb-0">
@@ -157,7 +146,7 @@ export default function HelpCenter() {
             )
           })}
 
-          {filtered.length === 0 && (
+          {!loading && filtered.length === 0 && (
             <p className="text-sm py-4 text-center text-slate-500">Ничего не найдено. Попробуйте задать вопрос AI-ассистенту.</p>
           )}
         </Card>

@@ -1,6 +1,0 @@
-INFO:     Started server process [10916]
-INFO:     Waiting for application startup.
-2026-05-01 21:48:37,346 INFO Connecting to PostgreSQL...
-2026-05-01 21:48:37,431 INFO PostgreSQL connected and initialized
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:4001 (Press CTRL+C to quit)

@@ -1,10 +1,19 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: stepashka-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend-python
+
   backend-python:
     build:
-      context: ./backend-python
+      context: ./backend
     container_name: stepashka-backend-python
     env_file:
-      - ./backend-python/.env
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/stepashka
       REDIS_ENABLED: "true"
