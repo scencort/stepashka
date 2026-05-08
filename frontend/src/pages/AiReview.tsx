@@ -4,7 +4,7 @@ import MainLayout from "../layout/MainLayout";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { fadeInUp } from "../lib/animations";
-import { api } from "../lib/api";
+import { api, getAccessToken, API_BASE_URL } from "../lib/api";
 import { Send, History, Code2, Bot, User } from "lucide-react";
 
 type Verdict = {
@@ -88,13 +88,9 @@ export default function AiReview() {
     setError("");
 
     try {
-      const baseUrl = String(import.meta.env.VITE_API_URL || "").replace(
-        /\/+$/,
-        "",
-      );
-      const accessToken = localStorage.getItem("gradus_access_token");
-      const streamResponse = baseUrl
-        ? await fetch(`${baseUrl}/ai/chat/stream`, {
+      const accessToken = getAccessToken();
+      const streamResponse = API_BASE_URL
+        ? await fetch(`${API_BASE_URL}/ai/chat/stream`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

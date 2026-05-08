@@ -232,6 +232,30 @@ async def public_stats():
     }
 
 
+# ── Notifications ──
+
+@app.get("/api/notifications")
+async def get_notifications(user: CurrentUser):
+    rows = await database.fetch(
+        """SELECT id, title, created_at AS "time"
+           FROM notifications WHERE user_id=$1
+           ORDER BY created_at DESC LIMIT 20""",
+        user["id"],
+    )
+    return [{"id": r["id"], "title": r["title"], "time": str(r["time"])} for r in rows]
+
+
+# ── Help / FAQ ──
+
+@app.get("/api/help/faq")
+async def help_faq():
+    rows = await database.fetch(
+        """SELECT id, question, answer, category
+           FROM faq_items ORDER BY sort_order ASC, id ASC"""
+    )
+    return [dict(r) for r in rows]
+
+
 app.include_router(auth_router)
 app.include_router(account_router)
 app.include_router(student_router)
