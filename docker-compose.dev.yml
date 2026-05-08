@@ -2,7 +2,7 @@ services:
   frontend:
     build:
       context: ./frontend
-    container_name: stepashka-frontend
+    container_name: gradus-frontend
     ports:
       - "80:80"
     depends_on:
@@ -11,11 +11,11 @@ services:
   backend-python:
     build:
       context: ./backend
-    container_name: stepashka-backend-python
+    container_name: gradus-backend-python
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/stepashka
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/gradus
       REDIS_ENABLED: "true"
       REDIS_URL: redis://redis:6379/0
     ports:
@@ -28,28 +28,28 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: stepashka-postgres
+    container_name: gradus-postgres
     environment:
-      POSTGRES_DB: stepashka
+      POSTGRES_DB: gradus
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "5433:5432"
     volumes:
-      - stepashka_pg_data:/var/lib/postgresql/data
+      - gradus_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d stepashka"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gradus"]
       interval: 5s
       timeout: 3s
       retries: 20
 
   redis:
     image: redis:7-alpine
-    container_name: stepashka-redis
+    container_name: gradus-redis
     ports:
       - "6379:6379"
     volumes:
-      - stepashka_redis_data:/data
+      - gradus_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -57,5 +57,5 @@ services:
       retries: 20
 
 volumes:
-  stepashka_pg_data:
-  stepashka_redis_data:
+  gradus_pg_data:
+  gradus_redis_data:

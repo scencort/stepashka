@@ -9,7 +9,7 @@ _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 class Settings(BaseSettings):
     port: int = 4000
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/stepashka"
+    database_url: str = "postgresql://postgres:postgres@localhost:5432/gradus"
     frontend_origin: str = "http://localhost:5173,http://localhost:5174"
 
     jwt_access_secret: str = "dev_access_secret_change_me"

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/yaros/Desktop/stepashka/**)",
+      "Bash(rm -rf .claude)",
+      "Bash(cd \"C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\" && ls frontend/public/covers/ | sed 's/.svg//' | sort > /tmp/have.txt && grep -oP \"\\(?<='\\)[a-z0-9-]+\\(?='\\)\" backend/app/init_db.py | sort -u > /tmp/slugs.txt && diff /tmp/have.txt /tmp/slugs.txt)",
+      "Bash(where python *)",
+      "Bash(where python3 *)",
+      "Bash(rm -rf venv)",
+      "Bash(python -m venv venv)",
+      "Bash(ls \"C:/Program Files/PostgreSQL/\" 2>&1)",
+      "Bash(\"C:/Program Files/PostgreSQL/18/bin/psql.exe\" -U postgres -c \"SELECT 1\")"
+    ]
+  }
+}
