@@ -1,8 +1,16 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@font-face {
+  font-family: "CoFo Sans";
+  src: url("/fonts/CoFo Sans.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 @layer base {
   :root {
@@ -18,6 +26,8 @@
     --primary:     #DC2626;
     --primary-hov: #B91C1C;
     --burgundy:    #7C1D1D;
+    --btn-grad-from: #CD3036;
+    --btn-grad-to:   #7A171C;
     --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
   }
 
@@ -34,6 +44,8 @@
     --primary:     #EF4444;
     --primary-hov: #DC2626;
     --burgundy:    #C53030;
+    --btn-grad-from: #D53C43;
+    --btn-grad-to:   #8A1D24;
     --card-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
   }
 
@@ -48,14 +60,20 @@
     color: var(--text);
     background-color: var(--bg);
     font-family: "Inter", system-ui, sans-serif;
-    font-size: 16px;
+    font-size: 18px;
     line-height: 1.6;
   }
 
-  h1, h2, h3, h4, h5 {
-    font-family: "Space Grotesk", "Inter", sans-serif;
-    letter-spacing: -0.025em;
-    line-height: 1.15;
+  h1, h2 {
+    font-family: "Inter", system-ui, sans-serif;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  h3, h4, h5 {
+    font-family: "Inter", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
   }
 
   ::selection {
@@ -90,9 +108,33 @@
   /* ── Buttons ── */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 font-semibold rounded-xl
-           bg-primary hover:bg-primary-700 active:bg-primary-800
-           text-white shadow-red transition-all duration-200
-           hover:shadow-red-lg hover:-translate-y-px active:translate-y-0;
+           text-white transition-all duration-200
+           hover:-translate-y-px active:translate-y-0;
+    background-image: linear-gradient(135deg, var(--btn-grad-from) 0%, var(--btn-grad-to) 100%);
+    box-shadow: 0 4px 14px rgba(122, 23, 28, 0.25);
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.06);
+    box-shadow: 0 6px 20px rgba(122, 23, 28, 0.32);
+  }
+
+  .btn-primary:active {
+    filter: brightness(0.98);
+  }
+
+  .btn-gradient {
+    @apply text-white transition-all duration-200;
+    background-image: linear-gradient(135deg, var(--btn-grad-from) 0%, var(--btn-grad-to) 100%);
+    box-shadow: 0 4px 14px rgba(122, 23, 28, 0.25);
+  }
+
+  .btn-gradient:hover {
+    filter: brightness(1.06);
+  }
+
+  .btn-gradient:active {
+    filter: brightness(0.98);
   }
 
   .btn-ghost {
@@ -116,7 +158,9 @@
 
   .nav-item-active {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm
-           text-white bg-primary shadow-red transition-all duration-150;
+           text-white transition-all duration-150;
+    background-image: linear-gradient(135deg, var(--btn-grad-from) 0%, var(--btn-grad-to) 100%);
+    box-shadow: 0 4px 14px rgba(122, 23, 28, 0.25);
   }
 
   /* ── Badge ── */
@@ -139,13 +183,13 @@
 
   /* ── Stat block ── */
   .stat-value {
-    font-family: "Space Grotesk", sans-serif;
+    font-family: "Inter", sans-serif;
     @apply text-4xl font-bold tracking-tight text-[var(--text)];
   }
 
   /* ── Section heading ── */
   .section-heading {
-    font-family: "Space Grotesk", sans-serif;
+    font-family: "Inter", sans-serif;
     @apply text-3xl font-bold tracking-tight text-[var(--text)];
   }
 
