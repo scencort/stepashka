@@ -285,16 +285,18 @@ async def enroll(course_id: int, user: CurrentUser):
                 "error": "Для этого курса необходимо сначала отправить заявку на вступление."
             }
 
-    await db.execute(
+    inserted = await db.fetchrow(
         """INSERT INTO enrollments (user_id, course_id, status, progress_percent)
-           VALUES ($1, $2, 'active', 0) ON CONFLICT (user_id, course_id) DO NOTHING""",
+           VALUES ($1, $2, 'active', 0) ON CONFLICT (user_id, course_id) DO NOTHING
+           RETURNING id""",
         user["id"],
         course_id,
     )
-    await db.execute(
-        "UPDATE courses SET students_count = students_count + 1 WHERE id=$1",
-        course_id,
-    )
+    if inserted:
+        await db.execute(
+            "UPDATE courses SET students_count = students_count + 1 WHERE id=$1",
+            course_id,
+        )
     await db.execute(
         "INSERT INTO notifications (user_id, title, body) VALUES ($1, $2, $3)",
         user["id"],
@@ -340,7 +342,7 @@ async def request_enrollment(
             return {"error": "Заявка уже одобрена — запишитесь на курс"}
         # rejected — allow resend
         await db.execute(
-            "UPDATE enrollment_requests SET status='pending', message=$1, teacher_comment=NULL, updated_at=NOW() WHERE id=$2",
+            "UPDATE enrollment_requests SET status='pending', message=$1, teacher_comment='', updated_at=NOW() WHERE id=$2",
             body.message,
             existing["id"],
         )
@@ -361,7 +363,7 @@ async def request_enrollment(
             "INSERT INTO notifications (user_id, title, body) VALUES ($1, $2, $3)",
             teacher_id,
             "Новая заявка на курс",
-            f"Студент {user.get('full_name', user['email'])} подал заявку на курс «{course['title']}»",
+            f"Студент {user.get('fullName', user['email'])} подал заявку на курс «{course['title']}»",
         )
     await write_audit(user["id"], "enrollment_request.create", "course", course_id)
     return {"success": True, "message": "Заявка отправлена"}

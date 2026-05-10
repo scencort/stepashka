@@ -1,8 +1,17 @@
 import { useEffect, useState } from "react"
 import { ThemeContext, type Theme } from "./theme"
 
+const STORAGE_KEY = "gradus_theme"
+
+function getInitialTheme(): Theme {
+  const stored = localStorage.getItem(STORAGE_KEY)
+  if (stored === "light" || stored === "dark") return stored
+  if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark"
+  return "light"
+}
+
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [theme, setTheme] = useState<Theme>("light")
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
 
   const toggleTheme = () => {
     setTheme(prev => (prev === "light" ? "dark" : "light"))
@@ -16,6 +25,8 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     } else {
       root.classList.remove("dark")
     }
+
+    localStorage.setItem(STORAGE_KEY, theme)
   }, [theme])
 
   return (

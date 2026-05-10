@@ -1,25 +1,43 @@
-# Stepashka EdTech Platform
+# Gradus — EdTech Platform
 
-Production-ready образовательная платформа с RBAC, AI-проверкой заданий и модульной архитектурой.
+Образовательная платформа с RBAC, AI-проверкой заданий и модульной архитектурой.
 
-## Монорепо структура
-- frontend/ — React приложение
-- backend/ — API, RBAC, JWT, AI grading
-- docs/ — архитектура, безопасность, каталоги курсов
-- infra/ — мониторинг и инфраструктурные шаблоны
+## Структура проекта
+- `frontend/` — React + TypeScript (Vite, Tailwind CSS)
+- `backend/` — Python FastAPI (asyncpg, PostgreSQL, JWT)
 
 ## Быстрый старт
-1. Запустите из корня проекта:
-   - ./start.ps1
-2. Откройте:
-   - Frontend: http://localhost:5173
-   - Backend health: http://localhost:4000/api/health
 
-Если backend не стартует, проверьте:
-- файл backend/.env (можно создать из backend/.env.example)
-- запущенный локальный PostgreSQL и корректный DATABASE_URL
+### Требования
+- Python 3.12+
+- Node.js 18+
+- PostgreSQL 15+
+
+### Запуск
+1. Создайте базу данных:
+   ```sql
+   CREATE DATABASE gradus;
+   ```
+2. Скопируйте конфиг:
+   ```powershell
+   cp backend/.env.example backend/.env
+   ```
+3. Запустите из корня проекта:
+   ```powershell
+   .\start.ps1
+   ```
+4. Откройте:
+   - Сайт: http://localhost:5173
+   - API Docs: http://localhost:4000/api/docs
+
+### Docker
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
 
 ## Тестовые пользователи
-- admin@stepashka.dev / Admin@12345
-- teacher@stepashka.dev / Teacher@12345
-- student@stepashka.dev / Student@12345
+| Роль | Email | Пароль |
+|------|-------|--------|
+| Админ | admin@gradus.dev | Admin@12345 |
+| Учитель | teacher@gradus.dev | Teacher@12345 |
+| Студент | student@gradus.dev | Student@12345 |

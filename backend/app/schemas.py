@@ -180,11 +180,3 @@ class AiFaqBody(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
 
 
-class TicketCreateBody(BaseModel):
-    subject: str = Field(default="", max_length=200)
-    message: str = Field(min_length=1, max_length=5000)
-
-
-class TicketReplyBody(BaseModel):
-    reply: str = Field(min_length=1, max_length=5000)
-    status: str = Field(default="in_progress")

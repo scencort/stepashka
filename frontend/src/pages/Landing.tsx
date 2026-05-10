@@ -22,9 +22,6 @@ import {
   ChevronRight,
   Sparkles,
   Send,
-  MapPin,
-  Wifi,
-  Activity,
   Flame,
 } from "lucide-react";
 import { api } from "../lib/api";
@@ -33,54 +30,6 @@ import BinaryGlobe from "../components/BinaryGlobe";
 import ParticleNetwork from "../components/ParticleNetwork";
 import { useTheme } from "../context/theme";
 import { useAppStore } from "../store/AppStore";
-
-// ── Live community feed data ──
-const FEED_NAMES = [
-  "Аня", "Иван", "Мария", "Дмитрий", "Никита", "Софья", "Артём", "Полина",
-  "Антон", "Вера", "Тимур", "Камилла", "Олег", "Лиза", "Гриша", "Регина",
-  "Денис", "Алина", "Сергей", "Юля", "Богдан", "Лера", "Максим", "Кира",
-];
-const FEED_CITIES = [
-  "Минск", "Москва", "СПб", "Алматы", "Астана", "Киев", "Ташкент", "Бишкек",
-  "Тбилиси", "Ереван", "Душанбе", "Баку", "Кишинёв", "Рига", "Вильнюс",
-  "Варшава", "Прага", "Берлин", "Львов", "Гомель",
-];
-type FeedTemplate = { kind: "task" | "course" | "cert" | "ai" | "rating"; subjects: string[] };
-const FEED_TEMPLATES: FeedTemplate[] = [
-  { kind: "task",   subjects: ["Python · for", "JavaScript · async", "TypeScript · generics", "Алгоритмы · DFS", "React · hooks", "SQL · JOIN"] },
-  { kind: "course", subjects: ["Python Backend", "React + TS", "DevOps основы", "Data Science", "UI/UX Design"] },
-  { kind: "cert",   subjects: ["Junior Developer", "Mid-level", "Frontend Pro", "Algorithms"] },
-  { kind: "ai",     subjects: ["+12 советов", "+5 правок", "оптимизация", "рефактор-подсказки"] },
-  { kind: "rating", subjects: ["★★★★★", "★★★★★ • «Огонь!»", "★★★★★ • «Лучший курс»"] },
-];
-const FEED_VERBS: Record<FeedTemplate["kind"], string> = {
-  task:   "решил задачу",
-  course: "завершил курс",
-  cert:   "получил сертификат",
-  ai:     "получил AI-ревью",
-  rating: "оценил курс",
-};
-
-type FeedItem = {
-  id: number;
-  name: string;
-  city: string;
-  kind: FeedTemplate["kind"];
-  subject: string;
-};
-
-const pickRandom = <T,>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)];
-
-const makeFeedItem = (id: number): FeedItem => {
-  const tpl = pickRandom(FEED_TEMPLATES);
-  return {
-    id,
-    name: pickRandom(FEED_NAMES),
-    city: pickRandom(FEED_CITIES),
-    kind: tpl.kind,
-    subject: pickRandom(tpl.subjects),
-  };
-};
 
 export default function Landing() {
   const { theme, toggleTheme } = useTheme();
@@ -113,33 +62,6 @@ export default function Landing() {
   });
 
   const [coursesLoading, setCoursesLoading] = useState(true);
-
-  // ── Live community feed (фейковый, чисто визуальный) ──
-  const [feed, setFeed] = useState<FeedItem[]>(() => {
-    const seed: FeedItem[] = [];
-    for (let i = 0; i < 5; i++) seed.push(makeFeedItem(i));
-    return seed;
-  });
-  const [onlineCount, setOnlineCount] = useState(12480);
-
-  useEffect(() => {
-    let nextId = 1000;
-    const tick = setInterval(() => {
-      setFeed(prev => [makeFeedItem(nextId++), ...prev].slice(0, 5));
-      setOnlineCount(c => c + Math.floor(Math.random() * 7) - 2);
-    }, 2400);
-    return () => clearInterval(tick);
-  }, []);
-
-  const feedIcon = (kind: FeedTemplate["kind"]) => {
-    switch (kind) {
-      case "task":   return <Code size={14} />;
-      case "course": return <CheckCircle2 size={14} />;
-      case "cert":   return <Trophy size={14} />;
-      case "ai":     return <Brain size={14} />;
-      case "rating": return <Star size={14} />;
-    }
-  };
 
   const fmt = (v: number) =>
     new Intl.NumberFormat("ru-RU", { notation: "compact", compactDisplay: "short", maximumFractionDigits: 1 }).format(Math.max(0, Math.round(v)));
@@ -381,75 +303,67 @@ export default function Landing() {
                 {/* Telemetry corner labels */}
                 <div className="absolute top-2 left-2 hidden md:flex items-center gap-2 text-[11px] font-mono text-[var(--muted)] bg-[var(--bg)]/60 backdrop-blur-sm px-2 py-1 rounded">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  NODES: {fmt(onlineCount)}
+                  STUDENTS: {fmt(landingStats.studentsTotal)}
                 </div>
                 <div className="absolute top-2 right-2 hidden md:flex items-center gap-2 text-[11px] font-mono text-[var(--muted)] bg-[var(--bg)]/60 backdrop-blur-sm px-2 py-1 rounded">
-                  <Wifi size={11} /> 23ms
+                  COURSES: {landingStats.coursesTotal || "—"}
                 </div>
                 <div className="absolute bottom-2 left-2 hidden md:flex items-center gap-2 text-[11px] font-mono text-[var(--muted)] bg-[var(--bg)]/60 backdrop-blur-sm px-2 py-1 rounded">
-                  <MapPin size={11} /> 47 COUNTRIES
+                  RATING: {avgRating}
                 </div>
                 <div className="absolute bottom-2 right-2 hidden md:flex items-center gap-2 text-[11px] font-mono text-[var(--muted)] bg-[var(--bg)]/60 backdrop-blur-sm px-2 py-1 rounded">
-                  STREAM: 0x{(onlineCount % 0xffff).toString(16).toUpperCase().padStart(4, "0")}
+                  COMMUNITY: {fmt(landingStats.communityMembers)}
                 </div>
               </div>
             </div>
 
-            {/* Live activity feed */}
+            {/* Последние достижения */}
             <div
               className="card p-6 md:p-7 backdrop-blur-sm bg-[var(--bg)]/80"
             >
               <div className="flex items-center justify-between mb-5 pb-4 border-b border-[var(--border)]">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary">
-                    <Activity size={18} />
+                    <Trophy size={18} />
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-0.5">Активность</p>
-                    <h3 className="font-display font-semibold text-base leading-none">Прямо сейчас</h3>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-0.5">Платформа</p>
+                    <h3 className="font-display font-semibold text-base leading-none">Последние достижения</h3>
                   </div>
                 </div>
-                <span className="font-mono text-[11px] text-[var(--muted)] flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  LIVE
-                </span>
               </div>
 
-              {/* Fixed-height container so adding/removing items never reflows the page */}
-              <ul className="space-y-2.5 relative h-[376px] overflow-hidden">
-                  {feed.map(item => (
-                    <li
-                      key={item.id}
-                      className="flex items-start gap-3 p-3 rounded-xl bg-[var(--surface)] border border-[var(--border-soft)] h-[68px]"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                        {feedIcon(item.kind)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm leading-snug">
-                          <span className="font-semibold text-[var(--text)]">{item.name}</span>
-                          <span className="text-[var(--muted)]"> из </span>
-                          <span className="font-medium text-[var(--text-2)]">{item.city}</span>
-                          <span className="text-[var(--muted)]"> · {FEED_VERBS[item.kind]}</span>
-                        </p>
-                        <p className="text-xs text-[var(--muted)] mt-0.5 truncate font-mono">{item.subject}</p>
-                      </div>
-                      <span className="text-[10px] font-mono text-[var(--muted)] uppercase shrink-0 mt-1">
-                        сейчас
-                      </span>
-                    </li>
-                  ))}
-              </ul>
+              <div className="space-y-5">
+                {[
+                  { icon: <Code size={18} />, label: "Курсов на платформе", value: landingStats.coursesTotal || "—" },
+                  { icon: <Users size={18} />, label: "Студентов обучается", value: fmt(landingStats.studentsTotal) || "—" },
+                  { icon: <Star size={18} />, label: "Средний рейтинг курсов", value: avgRating },
+                  { icon: <Users size={18} />, label: "Участников сообщества", value: fmt(landingStats.communityMembers) || "—" },
+                ].map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-4 p-4 rounded-xl bg-[var(--surface)] border border-[var(--border-soft)]"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      {item.icon}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-[var(--muted)]">{item.label}</p>
+                    </div>
+                    <p className="font-display font-bold text-2xl text-gradient-red">{item.value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Bottom telemetry tiles */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-14">
             {[
-              { label: "Студентов онлайн", value: fmt(onlineCount), mono: false },
-              { label: "Стран",            value: "47",             mono: true  },
-              { label: "Часовых поясов",   value: "12",             mono: true  },
-              { label: "Время отклика",    value: "23ms",           mono: true  },
+              { label: "Курсов",           value: String(landingStats.coursesTotal || "—"), mono: false },
+              { label: "Студентов",         value: fmt(landingStats.studentsTotal) || "—",  mono: false },
+              { label: "Средний рейтинг",   value: avgRating,                               mono: true  },
+              { label: "Сообщество",        value: fmt(landingStats.communityMembers) || "—", mono: false },
             ].map((tile, i) => (
               <div
                 key={i}
@@ -615,36 +529,9 @@ export default function Landing() {
               ))}
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-5">
-              {[
-                { title: "Python Backend", author: "Сергей Ким", level: "Начальный", duration: "40 часов" },
-                { title: "React + TypeScript", author: "Анна Соколова", level: "Средний", duration: "55 часов" },
-                { title: "DevOps основы", author: "Алексей Морозов", level: "Продвинутый", duration: "65 часов" },
-              ].map((c, i) => (
-                <div
-                  key={i}
-                  className="card p-6 flex flex-col hover:shadow-card-md hover:border-primary/20 transition-all"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary shrink-0">
-                      <Code size={18} />
-                    </div>
-                    <span className="badge-neutral text-xs">{c.level}</span>
-                  </div>
-                  <h3 className="font-display font-semibold text-base mb-1">{c.title}</h3>
-                  <p className="text-sm text-[var(--muted)] mb-4">{c.author}</p>
-                  <div className="mt-auto pt-4 border-t border-[var(--border)] flex items-center gap-4 text-xs text-[var(--muted)]">
-                    <span className="flex items-center gap-1">
-                      <Star size={12} className="text-amber-400 fill-amber-400" />
-                      4.9
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock3 size={12} />
-                      {c.duration}
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="text-center py-12 text-[var(--muted)]">
+              <p className="text-lg">Курсы пока не добавлены</p>
+              <p className="text-sm mt-2">Скоро здесь появятся курсы — следите за обновлениями</p>
             </div>
           )}
         </div>
@@ -756,7 +643,7 @@ export default function Landing() {
             iconClassName="h-7 w-7"
             textClassName="text-lg font-bold font-display text-[var(--text)]"
           />
-          <p className="text-sm text-[var(--muted)]">© 2025 Gradus. Платформа для обучения IT-профессиям.</p>
+          <p className="text-sm text-[var(--muted)]">© {new Date().getFullYear()} Gradus. Платформа для обучения IT-профессиям.</p>
           <div className="flex items-center gap-4 text-sm text-[var(--muted)]">
             <a href="#" className="hover:text-[var(--text)] transition-colors">Политика</a>
             <a href="#" className="hover:text-[var(--text)] transition-colors">Условия</a>

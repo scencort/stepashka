@@ -287,190 +287,237 @@ async function tryRefreshToken() {
   }
 }
 
-/* ── Request router ── */
+/* ── Route mapping table ── */
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const method = (options?.method || "GET").toUpperCase();
-  const rawBody = options?.body ? JSON.parse(String(options.body)) : undefined;
+type RouteMapping = {
+  pattern: string | RegExp;
+  method?: string;
+  transform: <T>(
+    path: string,
+    method: string,
+    rawBody?: unknown,
+  ) => Promise<T>;
+};
 
+/** Helper: forward request to the same or different backend path with body. */
+function passthrough<T>(
+  backendPath: string,
+  method: string,
+  rawBody?: unknown,
+): Promise<T> {
+  const init: RequestInit = { method };
+  if (rawBody !== undefined) {
+    init.body = JSON.stringify(rawBody);
+  }
+  return backendRequest<T>(backendPath, init);
+}
+
+/** Helper: extract a numeric ID segment from a path. */
+function pathId(path: string, index: number): string {
+  return path.split("/")[index];
+}
+
+const routeMappings: RouteMapping[] = [
   // ── Auth ──
-
-  if (path === "/auth/login" && method === "POST") {
-    const payload = rawBody as { email: string; password: string };
-    const auth = await backendRequest<
-      BackendAuthResponse | BackendTwoFactorChallengeResponse
-    >("/auth/login", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-
-    if ((auth as BackendTwoFactorChallengeResponse).requiresTwoFactor) {
-      return auth as T;
-    }
-
-    const success = auth as BackendAuthResponse;
-    setTokens(success.accessToken, success.refreshToken);
-    return toPublicUser(success.user) as T;
-  }
-
-  if (path === "/auth/2fa/verify" && method === "POST") {
-    const payload = rawBody as { challengeId: string; code: string };
-    const auth = await backendRequest<BackendAuthResponse>(
-      "/auth/2fa/verify",
-      { method: "POST", body: JSON.stringify(payload) },
-    );
-    setTokens(auth.accessToken, auth.refreshToken);
-    return toPublicUser(auth.user) as T;
-  }
-
-  if (path === "/auth/register" && method === "POST") {
-    const payload = rawBody as {
-      name: string;
-      email: string;
-      password: string;
-    };
-    const auth = await backendRequest<BackendAuthResponse>("/auth/register", {
-      method: "POST",
-      body: JSON.stringify({
-        fullName: payload.name,
-        email: payload.email,
-        password: payload.password,
-      }),
-    });
-    setTokens(auth.accessToken, auth.refreshToken);
-    return toPublicUser(auth.user) as T;
-  }
-
-  if (path === "/auth/logout" && method === "POST") {
-    const refreshToken = getRefreshToken();
-    const data = await backendRequest<{ success: boolean }>("/auth/logout", {
-      method: "POST",
-      body: JSON.stringify({ refreshToken }),
-    });
-    clearTokens();
-    return data as T;
-  }
-
-  if (path === "/auth/forgot-password" && method === "POST") {
-    return await backendRequest<T>("/auth/forgot-password", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (path === "/auth/reset-password" && method === "POST") {
-    return await backendRequest<T>("/auth/reset-password", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (path === "/auth/me" && method === "GET") {
-    if (!getAccessToken() && !getRefreshToken()) {
-      return null as T;
-    }
-    const user = await backendRequest<BackendUser>("/auth/me");
-    return toPublicUser(user) as T;
-  }
+  {
+    pattern: "/auth/login",
+    method: "POST",
+    transform: async <T>(_p: string, _m: string, rawBody?: unknown) => {
+      const payload = rawBody as { email: string; password: string };
+      const auth = await backendRequest<
+        BackendAuthResponse | BackendTwoFactorChallengeResponse
+      >("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      if ((auth as BackendTwoFactorChallengeResponse).requiresTwoFactor) {
+        return auth as T;
+      }
+      const success = auth as BackendAuthResponse;
+      setTokens(success.accessToken, success.refreshToken);
+      return toPublicUser(success.user) as T;
+    },
+  },
+  {
+    pattern: "/auth/2fa/verify",
+    method: "POST",
+    transform: async <T>(_p: string, _m: string, rawBody?: unknown) => {
+      const payload = rawBody as { challengeId: string; code: string };
+      const auth = await backendRequest<BackendAuthResponse>(
+        "/auth/2fa/verify",
+        { method: "POST", body: JSON.stringify(payload) },
+      );
+      setTokens(auth.accessToken, auth.refreshToken);
+      return toPublicUser(auth.user) as T;
+    },
+  },
+  {
+    pattern: "/auth/register",
+    method: "POST",
+    transform: async <T>(_p: string, _m: string, rawBody?: unknown) => {
+      const payload = rawBody as {
+        name: string;
+        email: string;
+        password: string;
+      };
+      const auth = await backendRequest<BackendAuthResponse>(
+        "/auth/register",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            fullName: payload.name,
+            email: payload.email,
+            password: payload.password,
+          }),
+        },
+      );
+      setTokens(auth.accessToken, auth.refreshToken);
+      return toPublicUser(auth.user) as T;
+    },
+  },
+  {
+    pattern: "/auth/logout",
+    method: "POST",
+    transform: async <T>() => {
+      const refreshToken = getRefreshToken();
+      const data = await backendRequest<{ success: boolean }>("/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken }),
+      });
+      clearTokens();
+      return data as T;
+    },
+  },
+  {
+    pattern: "/auth/forgot-password",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/auth/forgot-password", m, rawBody),
+  },
+  {
+    pattern: "/auth/reset-password",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/auth/reset-password", m, rawBody),
+  },
+  {
+    pattern: "/auth/me",
+    method: "GET",
+    transform: async <T>() => {
+      if (!getAccessToken() && !getRefreshToken()) {
+        return null as T;
+      }
+      const user = await backendRequest<BackendUser>("/auth/me");
+      return toPublicUser(user) as T;
+    },
+  },
 
   // ── Dashboard ──
-
-  if (path === "/dashboard" && method === "GET") {
-    return await backendRequest<T>("/student/dashboard");
-  }
-
-  if (path === "/student/weekly-goal" && method === "PATCH") {
-    return await backendRequest<T>("/student/weekly-goal", {
-      method: "PATCH",
-      body: JSON.stringify(rawBody),
-    });
-  }
+  {
+    pattern: "/dashboard",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/student/dashboard"),
+  },
+  {
+    pattern: "/student/weekly-goal",
+    method: "PATCH",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/student/weekly-goal", m, rawBody),
+  },
 
   // ── Courses / Catalog ──
-
-  if (path === "/courses" && method === "GET") {
-    const data = await backendRequest<
-      Array<{
-        id: number;
-        title: string;
-        category: string;
-        studentsCount: number;
-        rating: string | number;
-        durationHours: number;
-        teacherName: string | null;
-        level: string;
-        priceCents: number;
-        accessType?: string;
-      }>
-    >("/catalog");
-    return data.map(toCourse) as T;
-  }
-
-  if (path === "/my-progress" && method === "GET") {
-    return await backendRequest<T>("/student/my-progress");
-  }
-
-  if (path === "/landing/stats" && method === "GET") {
-    return await backendRequest<T>("/public/stats");
-  }
-
-  if (/^\/courses\/\d+\/enroll$/.test(path) && method === "POST") {
-    const courseId = path.split("/")[2];
-    return await backendRequest<T>(`/student/enroll/${courseId}`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-  }
-
-  if (/^\/courses\/\d+\/steps$/.test(path) && method === "GET") {
-    const courseId = path.split("/")[2];
-    return await backendRequest<T>(`/student/courses/${courseId}/steps`);
-  }
-
-  if (/^\/steps\/\d+\/check$/.test(path) && method === "POST") {
-    const stepId = path.split("/")[2];
-    return await backendRequest<T>(`/student/steps/${stepId}/check`, {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/courses\/\d+\/detail$/.test(path) && method === "GET") {
-    const courseId = path.split("/")[2];
-    return await backendRequest<T>(`/courses/${courseId}`);
-  }
-
-  if (/^\/courses\/\d+\/enrollment-status$/.test(path) && method === "GET") {
-    const courseId = path.split("/")[2];
-    return await backendRequest<T>(
-      `/student/courses/${courseId}/enrollment-status`,
-    );
-  }
-
-  if (/^\/courses\/\d+\/request-enrollment$/.test(path) && method === "POST") {
-    const courseId = path.split("/")[2];
-    return await backendRequest<T>(
-      `/student/courses/${courseId}/request-enrollment`,
-      { method: "POST", body: JSON.stringify(rawBody) },
-    );
-  }
-
-  if (/^\/courses\/\d+$/.test(path) && method === "GET") {
-    const courseId = path.split("/")[2];
-    return await backendRequest<T>(`/courses/${courseId}`);
-  }
+  {
+    pattern: "/courses",
+    method: "GET",
+    transform: async <T>() => {
+      const data = await backendRequest<
+        Array<{
+          id: number;
+          title: string;
+          category: string;
+          studentsCount: number;
+          rating: string | number;
+          durationHours: number;
+          teacherName: string | null;
+          level: string;
+          priceCents: number;
+          accessType?: string;
+        }>
+      >("/catalog");
+      return data.map(toCourse) as T;
+    },
+  },
+  {
+    pattern: "/my-progress",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/student/my-progress"),
+  },
+  {
+    pattern: "/landing/stats",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/public/stats"),
+  },
+  {
+    pattern: /^\/courses\/\d+\/enroll$/,
+    method: "POST",
+    transform: <T>(p: string) =>
+      passthrough<T>(`/student/enroll/${pathId(p, 2)}`, "POST", {}),
+  },
+  {
+    pattern: /^\/courses\/\d+\/steps$/,
+    method: "GET",
+    transform: <T>(p: string) =>
+      backendRequest<T>(`/student/courses/${pathId(p, 2)}/steps`),
+  },
+  {
+    pattern: /^\/steps\/\d+\/check$/,
+    method: "POST",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/student/steps/${pathId(p, 2)}/check`, m, rawBody),
+  },
+  {
+    pattern: /^\/courses\/\d+\/detail$/,
+    method: "GET",
+    transform: <T>(p: string) =>
+      backendRequest<T>(`/courses/${pathId(p, 2)}`),
+  },
+  {
+    pattern: /^\/courses\/\d+\/enrollment-status$/,
+    method: "GET",
+    transform: <T>(p: string) =>
+      backendRequest<T>(
+        `/student/courses/${pathId(p, 2)}/enrollment-status`,
+      ),
+  },
+  {
+    pattern: /^\/courses\/\d+\/request-enrollment$/,
+    method: "POST",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(
+        `/student/courses/${pathId(p, 2)}/request-enrollment`,
+        m,
+        rawBody,
+      ),
+  },
+  {
+    pattern: /^\/courses\/\d+$/,
+    method: "GET",
+    transform: <T>(p: string) =>
+      backendRequest<T>(`/courses/${pathId(p, 2)}`),
+  },
 
   // ── Account ──
-
-  if (path === "/account/profile" && method === "GET") {
-    return await backendRequest<T>("/account/profile");
-  }
-
-  if (path === "/account/profile" && method === "PATCH") {
-    const payload = rawBody as Record<string, unknown>;
-    return await backendRequest<T>("/account/profile", {
-      method: "PATCH",
-      body: JSON.stringify({
+  {
+    pattern: "/account/profile",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/account/profile"),
+  },
+  {
+    pattern: "/account/profile",
+    method: "PATCH",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) => {
+      const payload = rawBody as Record<string, unknown>;
+      return passthrough<T>("/account/profile", m, {
         fullName: payload.name,
         email: payload.email,
         phone: payload.phone,
@@ -480,359 +527,375 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         emailNotifications: payload.emailNotifications,
         marketingNotifications: payload.marketingNotifications,
         avatarUrl: payload.avatarUrl,
-      }),
-    });
-  }
-
-  if (path === "/account/change-password" && method === "POST") {
-    return await backendRequest<T>("/account/change-password", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (path === "/account/confirm-email-change" && method === "POST") {
-    return await backendRequest<T>("/account/confirm-email-change", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (path === "/account/sessions" && method === "GET") {
-    return await backendRequest<T>("/account/sessions");
-  }
-
-  if (path.startsWith("/account/sessions/") && method === "DELETE") {
-    const id = path.split("/")[3];
-    return await backendRequest<T>(`/account/sessions/${id}`, {
-      method: "DELETE",
-    });
-  }
-
-  if (path === "/account/logout-all" && method === "POST") {
-    const refreshToken = getRefreshToken();
-    return await backendRequest<T>("/account/logout-all", {
-      method: "POST",
-      body: JSON.stringify({ keepCurrentRefreshToken: refreshToken }),
-    });
-  }
-
-  if (path === "/account/2fa/request-enable" && method === "POST") {
-    return await backendRequest<T>("/account/2fa/request-enable", {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-  }
-
-  if (path === "/account/2fa/confirm-enable" && method === "POST") {
-    return await backendRequest<T>("/account/2fa/confirm-enable", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (path === "/account/2fa/disable" && method === "POST") {
-    return await backendRequest<T>("/account/2fa/disable", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
+      });
+    },
+  },
+  {
+    pattern: "/account/change-password",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/account/change-password", m, rawBody),
+  },
+  {
+    pattern: "/account/confirm-email-change",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/account/confirm-email-change", m, rawBody),
+  },
+  {
+    pattern: "/account/sessions",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/account/sessions"),
+  },
+  {
+    pattern: /^\/account\/sessions\/\d+$/,
+    method: "DELETE",
+    transform: <T>(p: string) =>
+      passthrough<T>(`/account/sessions/${pathId(p, 3)}`, "DELETE"),
+  },
+  {
+    pattern: "/account/logout-all",
+    method: "POST",
+    transform: <T>() => {
+      const refreshToken = getRefreshToken();
+      return passthrough<T>("/account/logout-all", "POST", {
+        keepCurrentRefreshToken: refreshToken,
+      });
+    },
+  },
+  {
+    pattern: "/account/2fa/request-enable",
+    method: "POST",
+    transform: <T>() => passthrough<T>("/account/2fa/request-enable", "POST", {}),
+  },
+  {
+    pattern: "/account/2fa/confirm-enable",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/account/2fa/confirm-enable", m, rawBody),
+  },
+  {
+    pattern: "/account/2fa/disable",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/account/2fa/disable", m, rawBody),
+  },
 
   // ── AI ──
-
-  if (path === "/ai/chat" && method === "POST") {
-    return await backendRequest<T>("/ai/chat", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (
-    (path === "/ai-review/check" || path === "/ai/review/check") &&
-    method === "POST"
-  ) {
-    return await backendRequest<T>("/ai/review/check", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (
-    (path === "/ai-review/history" || path === "/ai/review/history") &&
-    method === "GET"
-  ) {
-    return await backendRequest<T>("/ai/review/history");
-  }
-
-  if (path === "/ai/insights" && method === "POST") {
-    return await backendRequest<T>("/ai/insights", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (path === "/ai/daily-plan" && method === "POST") {
-    return await backendRequest<T>("/ai/daily-plan", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (path === "/ai/faq" && method === "POST") {
-    return await backendRequest<T>("/ai/faq", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
+  {
+    pattern: "/ai/chat",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/ai/chat", m, rawBody),
+  },
+  {
+    pattern: "/ai-review/check",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/ai/review/check", m, rawBody),
+  },
+  {
+    pattern: "/ai/review/check",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/ai/review/check", m, rawBody),
+  },
+  {
+    pattern: "/ai-review/history",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/ai/review/history"),
+  },
+  {
+    pattern: "/ai/review/history",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/ai/review/history"),
+  },
+  {
+    pattern: "/ai/insights",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/ai/insights", m, rawBody),
+  },
+  {
+    pattern: "/ai/daily-plan",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/ai/daily-plan", m, rawBody),
+  },
+  {
+    pattern: "/ai/faq",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/ai/faq", m, rawBody),
+  },
 
   // ── Teacher ──
-
-  if (path === "/teacher/overview" && method === "GET") {
-    return await backendRequest<T>("/teacher/overview");
-  }
-
-  if (path === "/teacher/courses" && method === "GET") {
-    return await backendRequest<T>("/teacher/courses");
-  }
-
-  if (path === "/teacher/courses" && method === "POST") {
-    return await backendRequest<T>("/teacher/courses", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/teacher\/courses\/\d+$/.test(path) && method === "PATCH") {
-    const courseId = path.split("/")[3];
-    return await backendRequest<T>(`/teacher/courses/${courseId}`, {
-      method: "PATCH",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/teacher\/courses\/\d+\/publish$/.test(path) && method === "PATCH") {
-    const courseId = path.split("/")[3];
-    return await backendRequest<T>(`/teacher/courses/${courseId}/publish`, {
-      method: "PATCH",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/teacher\/courses\/\d+\/structure$/.test(path) && method === "GET") {
-    const courseId = path.split("/")[3];
-    return await backendRequest<T>(`/teacher/courses/${courseId}/structure`);
-  }
-
-  if (
-    /^\/teacher\/courses\/\d+\/enrollment-requests$/.test(path) &&
-    method === "GET"
-  ) {
-    const courseId = path.split("/")[3];
-    return await backendRequest<T>(
-      `/teacher/courses/${courseId}/enrollment-requests`,
-    );
-  }
-
-  if (/^\/teacher\/enrollment-requests\/\d+$/.test(path) && method === "PATCH") {
-    const requestId = path.split("/")[3];
-    return await backendRequest<T>(`/teacher/enrollment-requests/${requestId}`, {
-      method: "PATCH",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/teacher\/courses\/\d+\/modules$/.test(path) && method === "POST") {
-    const courseId = path.split("/")[3];
-    return await backendRequest<T>(`/teacher/courses/${courseId}/modules`, {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/teacher\/courses\/\d+\/lessons$/.test(path) && method === "POST") {
-    const courseId = path.split("/")[3];
-    return await backendRequest<T>(`/teacher/courses/${courseId}/lessons`, {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/teacher\/courses\/\d+\/steps$/.test(path) && method === "POST") {
-    const courseId = path.split("/")[3];
-    return await backendRequest<T>(`/teacher/courses/${courseId}/steps`, {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/teacher\/steps\/\d+$/.test(path) && method === "PATCH") {
-    const stepId = path.split("/")[3];
-    return await backendRequest<T>(`/teacher/steps/${stepId}`, {
-      method: "PATCH",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/teacher\/steps\/\d+$/.test(path) && method === "DELETE") {
-    const stepId = path.split("/")[3];
-    return await backendRequest<T>(`/teacher/steps/${stepId}`, {
-      method: "DELETE",
-    });
-  }
-
-  if (path === "/teacher/assignments" && method === "POST") {
-    return await backendRequest<T>("/teacher/assignments", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (path === "/teacher/analytics" && method === "GET") {
-    return await backendRequest<T>("/teacher/analytics");
-  }
-
-  if (path === "/assignments" && method === "GET") {
-    return await backendRequest<T>("/assignments");
-  }
+  {
+    pattern: "/teacher/overview",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/teacher/overview"),
+  },
+  {
+    pattern: "/teacher/courses",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/teacher/courses"),
+  },
+  {
+    pattern: "/teacher/courses",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/teacher/courses", m, rawBody),
+  },
+  {
+    pattern: /^\/teacher\/courses\/\d+$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/teacher/courses/${pathId(p, 3)}`, m, rawBody),
+  },
+  {
+    pattern: /^\/teacher\/courses\/\d+\/publish$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(
+        `/teacher/courses/${pathId(p, 3)}/publish`,
+        m,
+        rawBody,
+      ),
+  },
+  {
+    pattern: /^\/teacher\/courses\/\d+\/structure$/,
+    method: "GET",
+    transform: <T>(p: string) =>
+      backendRequest<T>(`/teacher/courses/${pathId(p, 3)}/structure`),
+  },
+  {
+    pattern: /^\/teacher\/courses\/\d+\/enrollment-requests$/,
+    method: "GET",
+    transform: <T>(p: string) =>
+      backendRequest<T>(
+        `/teacher/courses/${pathId(p, 3)}/enrollment-requests`,
+      ),
+  },
+  {
+    pattern: /^\/teacher\/enrollment-requests\/\d+$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(
+        `/teacher/enrollment-requests/${pathId(p, 3)}`,
+        m,
+        rawBody,
+      ),
+  },
+  {
+    pattern: /^\/teacher\/courses\/\d+\/modules$/,
+    method: "POST",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(
+        `/teacher/courses/${pathId(p, 3)}/modules`,
+        m,
+        rawBody,
+      ),
+  },
+  {
+    pattern: /^\/teacher\/courses\/\d+\/lessons$/,
+    method: "POST",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(
+        `/teacher/courses/${pathId(p, 3)}/lessons`,
+        m,
+        rawBody,
+      ),
+  },
+  {
+    pattern: /^\/teacher\/courses\/\d+\/steps$/,
+    method: "POST",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(
+        `/teacher/courses/${pathId(p, 3)}/steps`,
+        m,
+        rawBody,
+      ),
+  },
+  {
+    pattern: /^\/teacher\/steps\/\d+$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/teacher/steps/${pathId(p, 3)}`, m, rawBody),
+  },
+  {
+    pattern: /^\/teacher\/steps\/\d+$/,
+    method: "DELETE",
+    transform: <T>(p: string) =>
+      passthrough<T>(`/teacher/steps/${pathId(p, 3)}`, "DELETE"),
+  },
+  {
+    pattern: "/teacher/assignments",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/teacher/assignments", m, rawBody),
+  },
+  {
+    pattern: "/teacher/analytics",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/teacher/analytics"),
+  },
+  {
+    pattern: "/assignments",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/assignments"),
+  },
 
   // ── Admin ──
-
-  if (path === "/admin/overview" && method === "GET") {
-    return await backendRequest<T>("/admin/overview");
-  }
-
-  if (path === "/admin/courses" && method === "GET") {
-    return await backendRequest<T>("/admin/courses");
-  }
-
-  if (/^\/admin\/courses\/\d+$/.test(path) && method === "PATCH") {
-    const courseId = path.split("/")[3];
-    return await backendRequest<T>(`/admin/courses/${courseId}`, {
-      method: "PATCH",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/admin\/courses\/\d+$/.test(path) && method === "DELETE") {
-    const courseId = path.split("/")[3];
-    return await backendRequest<T>(`/admin/courses/${courseId}`, {
-      method: "DELETE",
-    });
-  }
-
-  if (path === "/admin/users" && method === "GET") {
-    return await backendRequest<T>("/admin/users");
-  }
-
-  if (/^\/admin\/users\/\d+\/role$/.test(path) && method === "PATCH") {
-    const userId = path.split("/")[3];
-    return await backendRequest<T>(`/admin/users/${userId}/role`, {
-      method: "PATCH",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/admin\/users\/\d+\/ban$/.test(path) && method === "PATCH") {
-    const userId = path.split("/")[3];
-    return await backendRequest<T>(`/admin/users/${userId}/ban`, {
-      method: "PATCH",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/admin\/users\/\d+$/.test(path) && method === "DELETE") {
-    const userId = path.split("/")[3];
-    return await backendRequest<T>(`/admin/users/${userId}`, {
-      method: "DELETE",
-    });
-  }
-
-  if (path === "/admin/analytics" && method === "GET") {
-    return await backendRequest<T>("/admin/analytics");
-  }
-
-  if (path === "/admin/finance" && method === "GET") {
-    return await backendRequest<T>("/admin/finance");
-  }
-
-  if (path === "/admin/platform" && method === "GET") {
-    return await backendRequest<T>("/admin/platform");
-  }
-
-  if (/^\/admin\/feature-flags\//.test(path) && method === "PATCH") {
-    return await backendRequest<T>(path, {
-      method: "PATCH",
-      body: JSON.stringify(rawBody),
-    });
-  }
+  {
+    pattern: "/admin/overview",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/admin/overview"),
+  },
+  {
+    pattern: "/admin/courses",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/admin/courses"),
+  },
+  {
+    pattern: /^\/admin\/courses\/\d+$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/admin/courses/${pathId(p, 3)}`, m, rawBody),
+  },
+  {
+    pattern: /^\/admin\/courses\/\d+$/,
+    method: "DELETE",
+    transform: <T>(p: string) =>
+      passthrough<T>(`/admin/courses/${pathId(p, 3)}`, "DELETE"),
+  },
+  {
+    pattern: "/admin/users",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/admin/users"),
+  },
+  {
+    pattern: /^\/admin\/users\/\d+\/role$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/admin/users/${pathId(p, 3)}/role`, m, rawBody),
+  },
+  {
+    pattern: /^\/admin\/users\/\d+\/ban$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/admin/users/${pathId(p, 3)}/ban`, m, rawBody),
+  },
+  {
+    pattern: /^\/admin\/users\/\d+$/,
+    method: "DELETE",
+    transform: <T>(p: string) =>
+      passthrough<T>(`/admin/users/${pathId(p, 3)}`, "DELETE"),
+  },
+  {
+    pattern: "/admin/analytics",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/admin/analytics"),
+  },
+  {
+    pattern: "/admin/finance",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/admin/finance"),
+  },
+  {
+    pattern: "/admin/platform",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/admin/platform"),
+  },
+  {
+    pattern: /^\/admin\/feature-flags\//,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(p, m, rawBody),
+  },
 
   // ── Roles ──
+  {
+    pattern: "/roles-members",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/roles-members"),
+  },
+  {
+    pattern: /^\/roles-members\/\d+$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/roles-members/${pathId(p, 2)}`, m, rawBody),
+  },
+  {
+    pattern: /^\/roles-members\/\d+$/,
+    method: "DELETE",
+    transform: <T>(p: string) =>
+      passthrough<T>(`/roles-members/${pathId(p, 2)}`, "DELETE"),
+  },
 
-  if (path === "/roles-members" && method === "GET") {
-    return await backendRequest<T>("/roles-members");
-  }
-
-  if (/^\/roles-members\/\d+$/.test(path) && method === "PATCH") {
-    const userId = path.split("/")[2];
-    return await backendRequest<T>(`/roles-members/${userId}`, {
-      method: "PATCH",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/roles-members\/\d+$/.test(path) && method === "DELETE") {
-    const userId = path.split("/")[2];
-    return await backendRequest<T>(`/roles-members/${userId}`, {
-      method: "DELETE",
-    });
-  }
-
-  // ── Analytics ──
-
-  if (path.startsWith("/analytics") && method === "GET") {
-    return await backendRequest<T>(path);
-  }
+  // ── Analytics (prefix match) ──
+  {
+    pattern: /^\/analytics/,
+    method: "GET",
+    transform: <T>(p: string) => backendRequest<T>(p),
+  },
 
   // ── Feedback ──
-
-  if (path === "/feedback" && method === "GET") {
-    return await backendRequest<T>("/feedback");
-  }
-
-  if (path === "/feedback" && method === "POST") {
-    return await backendRequest<T>("/feedback", {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/feedback\/\d+\/status$/.test(path) && method === "PATCH") {
-    const ticketId = path.split("/")[2];
-    return await backendRequest<T>(`/feedback/${ticketId}/status`, {
-      method: "PATCH",
-      body: JSON.stringify(rawBody || {}),
-    });
-  }
-
-  if (/^\/feedback\/\d+\/reply$/.test(path) && method === "POST") {
-    const ticketId = path.split("/")[2];
-    return await backendRequest<T>(`/feedback/${ticketId}/reply`, {
-      method: "POST",
-      body: JSON.stringify(rawBody),
-    });
-  }
-
-  if (/^\/feedback\/\d+$/.test(path) && method === "DELETE") {
-    const ticketId = path.split("/")[2];
-    return await backendRequest<T>(`/feedback/${ticketId}`, {
-      method: "DELETE",
-    });
-  }
+  {
+    pattern: "/feedback",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/feedback"),
+  },
+  {
+    pattern: "/feedback",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/feedback", m, rawBody),
+  },
+  {
+    pattern: /^\/feedback\/\d+\/status$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/feedback/${pathId(p, 2)}/status`, m, rawBody || {}),
+  },
+  {
+    pattern: /^\/feedback\/\d+\/reply$/,
+    method: "POST",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/feedback/${pathId(p, 2)}/reply`, m, rawBody),
+  },
+  {
+    pattern: /^\/feedback\/\d+$/,
+    method: "DELETE",
+    transform: <T>(p: string) =>
+      passthrough<T>(`/feedback/${pathId(p, 2)}`, "DELETE"),
+  },
 
   // ── Notifications ──
+  {
+    pattern: "/notifications",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/notifications"),
+  },
+];
 
-  if (path === "/notifications" && method === "GET") {
-    return await backendRequest<T>("/notifications");
+/* ── Request router ── */
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const method = (options?.method || "GET").toUpperCase();
+  const rawBody = options?.body ? JSON.parse(String(options.body)) : undefined;
+
+  for (const route of routeMappings) {
+    // Check method constraint
+    if (route.method && route.method !== method) continue;
+
+    // Check pattern match
+    if (typeof route.pattern === "string") {
+      if (route.pattern !== path) continue;
+    } else {
+      if (!route.pattern.test(path)) continue;
+    }
+
+    return route.transform<T>(path, method, rawBody);
   }
 
   // ── Fallback: pass through to backend directly ──

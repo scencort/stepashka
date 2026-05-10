@@ -15,6 +15,7 @@ from app.services import (
     store_refresh_token, revoke_refresh_token,
     write_audit, sanitize_user,
     create_login_challenge, get_login_challenge, delete_login_challenge,
+    increment_challenge_attempts,
     hash_password, verify_password,
 )
 from app.config import settings
@@ -102,7 +103,12 @@ async def verify_2fa(body: TwoFactorVerifyBody, request: Request):
         delete_login_challenge(body.challengeId)
         return {"error": "Код 2FA истек"}
 
+    if challenge.get("attempts", 0) >= 5:
+        delete_login_challenge(body.challengeId)
+        raise HTTPException(status_code=429, detail="Слишком много попыток. Запросите новый код.")
+
     if hash_token(body.code) != challenge["codeHash"]:
+        increment_challenge_attempts(body.challengeId)
         return {"error": "Неверный код 2FA"}
 
     user = await db.fetchrow(

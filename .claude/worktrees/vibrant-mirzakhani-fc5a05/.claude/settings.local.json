@@ -14,7 +14,11 @@
       "PowerShell(Get-ChildItem \"C:\\\\Program Files\" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"postgres|pgsql\" })",
       "PowerShell($env:PGPASSWORD = \"postgres\"; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -t -c \"SELECT datname FROM pg_database WHERE datname='gradus';\" 2>&1)",
       "PowerShell(\\(Invoke-WebRequest -Uri \"http://localhost:4000/api/public/stats\" -Method GET\\).Content)",
-      "PowerShell($env:PGPASSWORD = \"postgres\"; $hash = & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -d gradus -t -A -c \"SELECT password_hash FROM users WHERE email='teacher@gradus.dev';\"; & C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\backend\\\\venv\\\\Scripts\\\\python.exe -c \"import bcrypt; h=b'$hash'; print\\(bcrypt.checkpw\\(b'Teacher@12345', h\\)\\)\")"
+      "PowerShell($env:PGPASSWORD = \"postgres\"; $hash = & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -d gradus -t -A -c \"SELECT password_hash FROM users WHERE email='teacher@gradus.dev';\"; & C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\backend\\\\venv\\\\Scripts\\\\python.exe -c \"import bcrypt; h=b'$hash'; print\\(bcrypt.checkpw\\(b'Teacher@12345', h\\)\\)\")",
+      "Bash(ls -1 \"C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/routes/ai.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\frontend\\\\src\\\\pages\\\\course\")",
+      "Bash(npx tsc *)"
     ]
   }
 }

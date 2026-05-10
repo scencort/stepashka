@@ -89,6 +89,150 @@ def _gemini_url(model: str) -> str:
     return f"{GEMINI_BASE}/{model}:generateContent?key={settings.gemini_api_key}"
 
 
+def _gemini_stream_url(model: str) -> str:
+    return f"{GEMINI_BASE}/{model}:streamGenerateContent?alt=sse&key={settings.gemini_api_key}"
+
+
+async def _openai_compatible_stream(
+    *,
+    base_url: str,
+    api_key: str,
+    model: str,
+    provider_name: str,
+    prompt: str,
+    system: str = "",
+):
+    """Yield SSE chunks from an OpenAI-compatible streaming endpoint."""
+    if not api_key:
+        raise ValueError(
+            f"AI-сервис не настроен. Укажите API key для {provider_name} в .env"
+        )
+
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    url = f"{base_url.rstrip('/')}{OPENAI_CHAT_PATH}"
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        async with client.stream(
+            "POST",
+            url,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+            json={
+                "model": model,
+                "messages": messages,
+                "temperature": 0.3,
+                "max_tokens": 4096,
+                "stream": True,
+            },
+        ) as resp:
+            if resp.status_code != 200:
+                body = await resp.aread()
+                raise ValueError(
+                    f"{provider_name} API error ({resp.status_code}): {body.decode()[:400]}"
+                )
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                payload = line[6:]
+                if payload.strip() == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+                delta = (
+                    chunk.get("choices", [{}])[0]
+                    .get("delta", {})
+                    .get("content")
+                )
+                if delta:
+                    yield delta
+
+
+async def _gemini_stream(prompt: str, system: str = ""):
+    """Yield text chunks from Gemini streaming endpoint."""
+    if not settings.gemini_api_key:
+        raise ValueError("AI-сервис не настроен. Укажите GEMINI_API_KEY в .env")
+
+    contents = []
+    if system:
+        contents.append(
+            {"role": "user", "parts": [{"text": f"[System instruction]: {system}"}]}
+        )
+        contents.append(
+            {
+                "role": "model",
+                "parts": [{"text": "Understood. I will follow these instructions."}],
+            }
+        )
+    contents.append({"role": "user", "parts": [{"text": prompt}]})
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        async with client.stream(
+            "POST",
+            _gemini_stream_url(settings.gemini_model),
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": contents,
+                "generationConfig": {"temperature": 0.3, "maxOutputTokens": 4096},
+            },
+        ) as resp:
+            if resp.status_code != 200:
+                body = await resp.aread()
+                raise ValueError(
+                    f"Gemini API error ({resp.status_code}): {body.decode()[:400]}"
+                )
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                try:
+                    chunk = json.loads(line[6:])
+                except json.JSONDecodeError:
+                    continue
+                candidates = chunk.get("candidates", [])
+                if not candidates:
+                    continue
+                parts = candidates[0].get("content", {}).get("parts", [])
+                for p in parts:
+                    text = p.get("text", "")
+                    if text:
+                        yield text
+
+
+async def _ai_stream(prompt: str, system: str = ""):
+    """Route to the configured AI provider's streaming endpoint."""
+    provider = (settings.ai_provider or "").strip().lower()
+    if provider == "groq":
+        async for chunk in _openai_compatible_stream(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=settings.groq_api_key,
+            model=settings.groq_model,
+            provider_name="Groq",
+            prompt=prompt,
+            system=system,
+        ):
+            yield chunk
+    elif provider == "openai":
+        async for chunk in _openai_compatible_stream(
+            base_url=settings.openai_base_url,
+            api_key=settings.openai_api_key,
+            model=settings.openai_model,
+            provider_name="OpenAI-compatible",
+            prompt=prompt,
+            system=system,
+        ):
+            yield chunk
+    else:
+        async for chunk in _gemini_stream(prompt, system):
+            yield chunk
+
+
 async def _openai_compatible_generate(
     *,
     base_url: str,
@@ -260,18 +404,13 @@ async def ai_chat(body: AiChatBody, user: CurrentUser):
 
 @router.post("/chat/stream", dependencies=[AllRoles])
 async def ai_chat_stream(body: AiChatBody, user: CurrentUser):
-    try:
-        context_text = ""
-        if body.context:
-            for m in body.context[-10:]:
-                context_text += f"{m.role}: {m.content}\n"
+    context_text = ""
+    if body.context:
+        for m in body.context[-10:]:
+            context_text += f"{m.role}: {m.content}\n"
 
-        prompt = f"{context_text}user: {body.message}" if context_text else body.message
-        system = "Ты учебный AI-ассистент платформы Gradus. Отвечай на русском, структурно и практично."
-
-        answer = await _ai_generate(prompt, system)
-    except ValueError:
-        answer = _chat_fallback(body.message)
+    prompt = f"{context_text}user: {body.message}" if context_text else body.message
+    system = "Ты учебный AI-ассистент платформы Gradus. Отвечай на русском, структурно и практично."
 
     await write_audit(
         user["id"],
@@ -285,12 +424,15 @@ async def ai_chat_stream(body: AiChatBody, user: CurrentUser):
     )
 
     async def generate():
-        chunk_size = 28
-        for i in range(0, len(answer), chunk_size):
-            yield answer[i : i + chunk_size]
-            await asyncio.sleep(0.018)
+        try:
+            async for chunk in _ai_stream(prompt, system):
+                yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
+        except ValueError:
+            fallback = _chat_fallback(body.message)
+            yield f"data: {json.dumps({'content': fallback}, ensure_ascii=False)}\n\n"
+        yield "data: [DONE]\n\n"
 
-    return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @router.post("/review/check", dependencies=[AllRoles])

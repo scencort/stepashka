@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app import db
 from app.deps import CurrentUser, require_roles
@@ -300,6 +300,12 @@ async def create_step(course_id: int, body: StepBody, user: CurrentUser):
 
 @router.patch("/teacher/steps/{step_id}", dependencies=[TeacherDep])
 async def update_step(step_id: int, body: StepBody, user: CurrentUser):
+    step = await db.fetchrow("SELECT course_id FROM course_steps WHERE id=$1", step_id)
+    if not step:
+        raise HTTPException(status_code=404, detail="Шаг не найден")
+    course = await db.fetchrow("SELECT teacher_id FROM courses WHERE id=$1", step["course_id"])
+    if user["role"] != "admin" and (not course or course["teacher_id"] != user["id"]):
+        raise HTTPException(status_code=403, detail="Нет доступа к этому курсу")
     row = await db.fetchrow(
         """UPDATE course_steps SET title=$1, step_order=$2, step_type=$3,
                   content=$4::jsonb, xp=$5, lesson_id=$6, updated_at=NOW()
@@ -321,6 +327,12 @@ async def update_step(step_id: int, body: StepBody, user: CurrentUser):
 
 @router.delete("/teacher/steps/{step_id}", dependencies=[TeacherDep])
 async def delete_step(step_id: int, user: CurrentUser):
+    step = await db.fetchrow("SELECT course_id FROM course_steps WHERE id=$1", step_id)
+    if not step:
+        raise HTTPException(status_code=404, detail="Шаг не найден")
+    course = await db.fetchrow("SELECT teacher_id FROM courses WHERE id=$1", step["course_id"])
+    if user["role"] != "admin" and (not course or course["teacher_id"] != user["id"]):
+        raise HTTPException(status_code=403, detail="Нет доступа к этому курсу")
     deleted = await db.fetchrow(
         "DELETE FROM course_steps WHERE id=$1 RETURNING id", step_id
     )

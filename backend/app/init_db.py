@@ -217,6 +217,14 @@ CREATE TABLE IF NOT EXISTS course_steps (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS discussion_messages (
+  id SERIAL PRIMARY KEY,
+  course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS enrollment_requests (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -269,7 +277,8 @@ ALTER TABLE assignments ALTER COLUMN lesson_id DROP NOT NULL;
 ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_level_check;
 ALTER TABLE courses ADD CONSTRAINT courses_level_check CHECK (level IN ('Beginner', 'Intermediate', 'Advanced', 'beginner', 'intermediate', 'advanced'));
 UPDATE courses
-   SET cover_url = '/covers/' || slug || '.svg';
+   SET cover_url = '/covers/' || slug || '.svg'
+ WHERE cover_url = '' OR cover_url IS NULL OR cover_url LIKE 'https://picsum%';
 
 CREATE TABLE IF NOT EXISTS faq_items (
     id SERIAL PRIMARY KEY,

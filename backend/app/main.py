@@ -141,24 +141,6 @@ async def courses_alias():
     return result
 
 
-# ── Alias: /api/landing/stats → /api/public/stats ──
-@app.get("/api/landing/stats")
-async def landing_stats():
-    cat = await database.fetchrow(
-        """SELECT COUNT(*)::int AS "coursesTotal",
-                  COALESCE(SUM(students_count),0)::int AS "studentsTotal",
-                  COALESCE(AVG(rating),0)::numeric(5,2) AS "averageRating"
-           FROM courses WHERE status IN ('published','pending_review')"""
-    )
-    comm = await database.fetchval("SELECT COUNT(*)::int FROM users WHERE status='active'")
-    return {
-        "coursesTotal": cat["coursesTotal"] or 0,
-        "studentsTotal": cat["studentsTotal"] or 0,
-        "averageRating": float(cat["averageRating"] or 0),
-        "communityMembers": comm or 0,
-    }
-
-
 # ── Alias: /api/dashboard → /api/student/dashboard ──
 # (frontend calls /dashboard but student router prefix is /api/student)
 @app.get("/api/dashboard")
@@ -254,6 +236,58 @@ async def help_faq():
            FROM faq_items ORDER BY sort_order ASC, id ASC"""
     )
     return [dict(r) for r in rows]
+
+
+# ── Course Discussions ──
+
+@app.get("/api/courses/{course_id}/discussions")
+async def get_discussions(course_id: int):
+    rows = await database.fetch(
+        """SELECT dm.id, dm.user_id AS "userId", u.full_name AS "userName",
+                  u.avatar_url AS "avatarUrl", dm.message,
+                  dm.created_at AS "createdAt"
+           FROM discussion_messages dm
+           JOIN users u ON u.id = dm.user_id
+           WHERE dm.course_id = $1
+           ORDER BY dm.created_at ASC
+           LIMIT 50""",
+        course_id,
+    )
+    return [
+        {
+            "id": r["id"],
+            "userId": r["userId"],
+            "userName": r["userName"],
+            "avatarUrl": r["avatarUrl"] or "",
+            "message": r["message"],
+            "createdAt": r["createdAt"].isoformat() if r["createdAt"] else None,
+        }
+        for r in rows
+    ]
+
+
+@app.post("/api/courses/{course_id}/discussions")
+async def post_discussion(course_id: int, request: Request, user: CurrentUser):
+    body = await request.json()
+    message = (body.get("message") or "").strip()
+    if not message:
+        return JSONResponse(status_code=400, content={"error": "Сообщение не может быть пустым"})
+    row = await database.fetchrow(
+        """INSERT INTO discussion_messages (course_id, user_id, message)
+           VALUES ($1, $2, $3)
+           RETURNING id, created_at AS "createdAt" """,
+        course_id,
+        user["id"],
+        message,
+    )
+    return {
+        "id": row["id"],
+        "userId": user["id"],
+        "userName": user["full_name"],
+        "avatarUrl": user.get("avatar_url") or "",
+        "message": message,
+        "createdAt": row["createdAt"].isoformat() if row["createdAt"] else None,
+    }
 
 
 app.include_router(auth_router)
