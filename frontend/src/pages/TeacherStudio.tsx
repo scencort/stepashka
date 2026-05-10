@@ -1,11 +1,9 @@
 ﻿import { useEffect, useState } from "react"
-import { motion } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
 import Skeleton from "../components/ui/Skeleton"
 import EmptyState from "../components/ui/EmptyState"
 import Button from "../components/ui/Button"
-import { fadeInUp } from "../lib/animations"
 import { api } from "../lib/api"
 import { useToast } from "../hooks/useToast"
 import { Link } from "react-router-dom"
@@ -97,7 +95,7 @@ export default function TeacherStudio() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+      <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <h2 className="text-2xl md:text-3xl font-bold">Кабинет преподавателя</h2>
           <Link to="/teacher/courses/new">
@@ -229,7 +227,7 @@ export default function TeacherStudio() {
             </Card>
           </>
         )}
-      </motion.div>
+      </div>
     </MainLayout>
   )
 }

@@ -1,9 +1,7 @@
 ﻿import { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import MainLayout from "../layout/MainLayout";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { fadeInUp } from "../lib/animations";
 import { api, getAccessToken, API_BASE_URL } from "../lib/api";
 import { Send, History, Code2, Bot, User } from "lucide-react";
 
@@ -169,16 +167,8 @@ export default function AiReview() {
 
   return (
     <MainLayout>
-      <motion.div
-        variants={fadeInUp}
-        initial="initial"
-        animate="animate"
-        className="space-y-6 lg:space-y-8"
-      >
-        <motion.div
-          variants={fadeInUp}
-          className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2"
-        >
+      <div className="space-y-6 lg:space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2">
           <div>
             <h2 className="text-3xl md:text-5xl font-extrabold mb-2 tracking-tight">
               AI-ассистент
@@ -187,7 +177,7 @@ export default function AiReview() {
               Ваш личный ментор 24/7. Обсуждайте код, архитектуру и задачи.
             </p>
           </div>
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
           {/* Main Chat Area */}
@@ -218,10 +208,8 @@ export default function AiReview() {
               {chatMessages.map((item, index) => {
                 const isAi = item.role === "assistant";
                 return (
-                  <motion.div
+                  <div
                     key={`${item.role}-${index}`}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
                     className={`flex gap-4 max-w-[85%] ${isAi ? "" : "ml-auto flex-row-reverse"}`}
                   >
                     <div className="shrink-0 mt-1">
@@ -254,7 +242,7 @@ export default function AiReview() {
                         {item.content}
                       </p>
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
               {chatLoading && (
@@ -342,36 +330,26 @@ export default function AiReview() {
                 </Button>
               </div>
 
-              <AnimatePresence>
-                {verdict && !isChecking && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    className="pt-2 border-t border-slate-200 dark:border-slate-700/60 mt-4"
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-semibold">Оценка:</span>
-                      <span
-                        className={`text-lg font-black ${verdict.quality >= 80 ? "text-emerald-500" : verdict.quality >= 50 ? "text-amber-500" : "text-rose-500"}`}
-                      >
-                        {verdict.quality}%
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-                      {verdict.summary}
-                    </p>
-                  </motion.div>
-                )}
-                {error && !isChecking && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="pt-2"
-                  >
-                    <p className="text-xs text-rose-500 font-medium">{error}</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {verdict && !isChecking && (
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 mt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-semibold">Оценка:</span>
+                    <span
+                      className={`text-lg font-black ${verdict.quality >= 80 ? "text-emerald-500" : verdict.quality >= 50 ? "text-amber-500" : "text-rose-500"}`}
+                    >
+                      {verdict.quality}%
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                    {verdict.summary}
+                  </p>
+                </div>
+              )}
+              {error && !isChecking && (
+                <div className="pt-2">
+                  <p className="text-xs text-rose-500 font-medium">{error}</p>
+                </div>
+              )}
             </Card>
 
             <Card className="space-y-4 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 bg-white/40 dark:bg-zinc-900/40">
@@ -408,7 +386,7 @@ export default function AiReview() {
             </Card>
           </div>
         </div>
-      </motion.div>
+      </div>
     </MainLayout>
   );
 }

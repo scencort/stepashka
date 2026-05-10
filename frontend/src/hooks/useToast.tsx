@@ -49,15 +49,16 @@ export function ToastProvider({ children }: Props) {
           {toasts.map((toast) => (
             <motion.div
               key={toast.id}
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className={`rounded-xl px-4 py-3 shadow-lg text-sm font-medium ${
+              initial={{ opacity: 0, x: 20, y: -6 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              exit={{ opacity: 0, x: 14, y: -4 }}
+              className={`relative overflow-hidden rounded-2xl border px-4 py-3.5 shadow-[0_10px_24px_rgba(26,10,10,0.18)] text-sm font-semibold ${
                 toast.type === "success"
-                  ? "bg-emerald-600 text-white"
-                  : "bg-red-700 text-white"
+                  ? "bg-gradient-to-r from-[#CD3036] to-[#7A171C] border-red-700/40 text-white"
+                  : "bg-gradient-to-r from-[#8A1D24] to-[#4A1014] border-red-900/40 text-rose-50"
               }`}
             >
+              <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/45" />
               {toast.message}
             </motion.div>
           ))}

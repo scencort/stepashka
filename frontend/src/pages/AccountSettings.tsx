@@ -1,5 +1,4 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { AnimatePresence, motion } from "framer-motion"
 import { useSearchParams } from "react-router-dom"
 import Cropper, { type Area, type Point } from "react-easy-crop"
 import MainLayout from "../layout/MainLayout"
@@ -53,11 +52,6 @@ const TABS = [
 ]
 
 type Tab = typeof TABS[number]["key"]
-
-const fadeUp = (i = 0) => ({
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.35, delay: i * 0.06, ease: "easeOut" as const } },
-})
 
 export default function AccountSettings() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -338,10 +332,10 @@ export default function AccountSettings() {
     <MainLayout>
       <div className="max-w-5xl space-y-6">
         {/* Page heading */}
-        <motion.div {...fadeUp(0)}>
+        <div>
           <h1 className="font-display font-bold text-3xl text-[var(--text)]">Настройки</h1>
           <p className="text-[var(--muted)] text-sm mt-1">Управляйте профилем, безопасностью и сессиями</p>
-        </motion.div>
+        </div>
 
         {loading && (
           <div className="space-y-4">
@@ -358,7 +352,7 @@ export default function AccountSettings() {
         {!loading && profile && (
           <div className="grid lg:grid-cols-[240px_1fr] gap-6">
             {/* ─── Sidebar ──────────────────────────────────────────────── */}
-            <motion.div {...fadeUp(1)} className="space-y-5">
+            <div className="space-y-5">
               {/* User card */}
               <div className="card p-5 flex flex-col items-center text-center">
                 <div className="relative group mb-3">
@@ -392,7 +386,7 @@ export default function AccountSettings() {
                       onClick={() => setTab(tab.key)}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                         isActive
-                          ? "bg-primary text-white shadow-sm"
+                          ? "btn-gradient text-white shadow-none"
                           : "text-[var(--text)] hover:bg-[var(--surface)]"
                       }`}
                     >
@@ -418,10 +412,10 @@ export default function AccountSettings() {
                   <span className="text-xs font-semibold text-[var(--text)]">{sessions.length}</span>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* ─── Content ──────────────────────────────────────────────── */}
-            <motion.div {...fadeUp(2)} className="space-y-5 min-w-0">
+            <div className="space-y-5 min-w-0">
 
               {/* ═════ PROFILE TAB ═════ */}
               {activeTab === "profile" && (
@@ -747,89 +741,79 @@ export default function AccountSettings() {
                   </div>
                 </div>
               )}
-            </motion.div>
+            </div>
           </div>
         )}
       </div>
 
       {/* ─── Avatar crop modal ───────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {pendingAvatarSrc && (
-          <motion.div
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={(e) => { if (e.target === e.currentTarget) closeCropModal() }}
+      {pendingAvatarSrc && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) closeCropModal() }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl overflow-hidden bg-[var(--bg)] border border-[var(--border)] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
           >
-            <motion.div
-              className="w-full max-w-lg rounded-2xl overflow-hidden bg-[var(--bg)] border border-[var(--border)] shadow-2xl"
-              initial={{ y: 20, scale: 0.97, opacity: 0 }}
-              animate={{ y: 0, scale: 1, opacity: 1 }}
-              exit={{ y: 16, scale: 0.97, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal header */}
-              <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
-                <div>
-                  <p className="font-display font-bold text-lg text-[var(--text)]">Обрезка аватара</p>
-                  <p className="text-xs text-[var(--muted)]">Перетащите и масштабируйте</p>
+            {/* Modal header */}
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+              <div>
+                <p className="font-display font-bold text-lg text-[var(--text)]">Обрезка аватара</p>
+                <p className="text-xs text-[var(--muted)]">Перетащите и масштабируйте</p>
+              </div>
+              <button onClick={closeCropModal} className="p-2 rounded-xl hover:bg-[var(--surface)] text-[var(--muted)] transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Cropper */}
+            <div className="relative h-72 sm:h-80 bg-[var(--surface)]">
+              <Cropper
+                image={pendingAvatarSrc}
+                crop={cropPosition}
+                zoom={cropZoom}
+                aspect={1}
+                cropShape="round"
+                showGrid={false}
+                minZoom={1}
+                maxZoom={3.5}
+                onCropChange={setCropPosition}
+                onZoomChange={setCropZoom}
+                onCropComplete={onCropComplete}
+              />
+              {avatarUploading && (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <span className="inline-block w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 </div>
-                <button onClick={closeCropModal} className="p-2 rounded-xl hover:bg-[var(--surface)] text-[var(--muted)] transition-colors">
-                  <X size={18} />
+              )}
+            </div>
+
+            {/* Controls */}
+            <div className="px-5 py-4 border-t border-[var(--border)] space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-[var(--muted)] shrink-0">Масштаб</span>
+                <input
+                  type="range"
+                  min={1} max={3.5} step={0.05}
+                  value={cropZoom}
+                  onChange={(e) => setCropZoom(Number(e.target.value))}
+                  className="flex-1 accent-primary"
+                />
+                <span className="text-xs font-mono text-[var(--text)] w-8 text-right">{cropZoom.toFixed(1)}x</span>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <button onClick={closeCropModal} className="btn-ghost px-4 py-2 text-sm">Отмена</button>
+                <button onClick={resetCrop} className="btn-secondary px-4 py-2 text-sm">Сбросить</button>
+                <button onClick={applyAvatarCrop} disabled={saving || avatarUploading || !croppedAreaPixels} className="btn-primary px-5 py-2 text-sm">
+                  Применить
                 </button>
               </div>
-
-              {/* Cropper */}
-              <div className="relative h-72 sm:h-80 bg-[var(--surface)]">
-                <Cropper
-                  image={pendingAvatarSrc}
-                  crop={cropPosition}
-                  zoom={cropZoom}
-                  aspect={1}
-                  cropShape="round"
-                  showGrid={false}
-                  minZoom={1}
-                  maxZoom={3.5}
-                  onCropChange={setCropPosition}
-                  onZoomChange={setCropZoom}
-                  onCropComplete={onCropComplete}
-                />
-                {avatarUploading && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                    <span className="inline-block w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  </div>
-                )}
-              </div>
-
-              {/* Controls */}
-              <div className="px-5 py-4 border-t border-[var(--border)] space-y-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-[var(--muted)] shrink-0">Масштаб</span>
-                  <input
-                    type="range"
-                    min={1} max={3.5} step={0.05}
-                    value={cropZoom}
-                    onChange={(e) => setCropZoom(Number(e.target.value))}
-                    className="flex-1 accent-primary"
-                  />
-                  <span className="text-xs font-mono text-[var(--text)] w-8 text-right">{cropZoom.toFixed(1)}x</span>
-                </div>
-
-                <div className="flex gap-2 justify-end">
-                  <button onClick={closeCropModal} className="btn-ghost px-4 py-2 text-sm">Отмена</button>
-                  <button onClick={resetCrop} className="btn-secondary px-4 py-2 text-sm">Сбросить</button>
-                  <button onClick={applyAvatarCrop} disabled={saving || avatarUploading || !croppedAreaPixels} className="btn-primary px-5 py-2 text-sm">
-                    Применить
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   )
 }

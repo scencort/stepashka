@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
-import { fadeInUp } from "../lib/animations"
 import { api } from "../lib/api"
 
 type FaqItem = { id: number; question: string; answer: string; category: string }
@@ -63,7 +61,7 @@ export default function HelpCenter() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+      <div className="space-y-6">
         <h2 className="text-2xl md:text-3xl font-bold">Справка</h2>
 
         <Card>
@@ -129,19 +127,13 @@ export default function HelpCenter() {
                   <span className="font-medium flex-1">{item.question}</span>
                   <span className="text-[10px] text-slate-400 shrink-0 hidden sm:block">{item.category}</span>
                 </button>
-                <AnimatePresence>
                   {isOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
+                    <div
                       className="overflow-hidden"
                     >
                       <p className="text-sm mt-2 ml-6 text-slate-600 dark:text-slate-300">{item.answer}</p>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
               </div>
             )
           })}
@@ -150,7 +142,7 @@ export default function HelpCenter() {
             <p className="text-sm py-4 text-center text-slate-500">Ничего не найдено. Попробуйте задать вопрос AI-ассистенту.</p>
           )}
         </Card>
-      </motion.div>
+      </div>
     </MainLayout>
   )
 }

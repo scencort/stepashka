@@ -1,9 +1,9 @@
 ﻿import { useEffect, useMemo, useState } from "react"
-import { motion } from "framer-motion"
+
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
 import Button from "../components/ui/Button"
-import { fadeInUp } from "../lib/animations"
+
 import { api } from "../lib/api"
 
 type Member = {
@@ -76,7 +76,7 @@ export default function RolesAccess() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+      <div className="space-y-6">
         <h2 className="text-2xl md:text-3xl font-bold">Роли и доступ</h2>
 
         <Card className="space-y-3">
@@ -129,7 +129,7 @@ export default function RolesAccess() {
             {filteredMembers.length === 0 && <p className="text-sm text-slate-500">По выбранному фильтру участников нет.</p>}
           </div>
         </Card>
-      </motion.div>
+      </div>
     </MainLayout>
   )
 }

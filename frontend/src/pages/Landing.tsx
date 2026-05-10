@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ArrowRight,
   Sun,
@@ -32,11 +32,7 @@ import BrandLogo from "../components/BrandLogo";
 import BinaryGlobe from "../components/BinaryGlobe";
 import ParticleNetwork from "../components/ParticleNetwork";
 import { useTheme } from "../context/theme";
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  show: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.5, delay: i * 0.08, ease: "easeOut" as const } }),
-};
+import { useAppStore } from "../store/AppStore";
 
 // ── Live community feed data ──
 const FEED_NAMES = [
@@ -88,6 +84,8 @@ const makeFeedItem = (id: number): FeedItem => {
 
 export default function Landing() {
   const { theme, toggleTheme } = useTheme();
+  const { user, loadingUser } = useAppStore();
+
 
   const tracks = [
     { name: "Python Backend", icon: <Terminal size={20} /> },
@@ -211,14 +209,23 @@ export default function Landing() {
             >
               {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <Link to="/login"
-              className="btn-ghost px-4 py-2 text-sm hidden sm:inline-flex">
-              Войти
-            </Link>
-            <Link to="/register"
-              className="btn-primary px-4 py-2 text-sm">
-              Начать бесплатно
-            </Link>
+            {!loadingUser && user ? (
+              <Link to="/dashboard"
+                className="btn-primary px-4 py-2 text-sm">
+                Войти в кабинет
+              </Link>
+            ) : (
+              <>
+                <Link to="/login"
+                  className="btn-ghost px-4 py-2 text-sm hidden sm:inline-flex">
+                  Войти
+                </Link>
+                <Link to="/register"
+                  className="btn-primary px-4 py-2 text-sm">
+                  Начать бесплатно
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -238,32 +245,28 @@ export default function Landing() {
           />
         </div>
 
-        <motion.div
-          variants={fadeUp} initial="hidden" animate="show" custom={0}
+        <div
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/20 bg-primary-50 dark:bg-primary-900/20 text-primary text-xs font-semibold mb-6"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
           Образование нового уровня
-        </motion.div>
+        </div>
 
-        <motion.h1
-          variants={fadeUp} initial="hidden" animate="show" custom={1}
+        <h1
           className="font-display font-bold text-5xl md:text-7xl lg:text-8xl tracking-tight mb-6 max-w-4xl"
         >
           Стань разработчиком{" "}
           <span className="text-gradient-red">через практику</span>
-        </motion.h1>
+        </h1>
 
-        <motion.p
-          variants={fadeUp} initial="hidden" animate="show" custom={2}
+        <p
           className="text-lg md:text-xl text-[var(--muted)] max-w-2xl mb-10 leading-relaxed"
         >
           Интерактивные курсы, мгновенная AI-проверка кода и сильное сообщество.
           Постройте карьеру в IT от нуля до первого оффера.
-        </motion.p>
+        </p>
 
-        <motion.div
-          variants={fadeUp} initial="hidden" animate="show" custom={3}
+        <div
           className="flex flex-col sm:flex-row gap-3"
         >
           <Link to="/register"
@@ -276,7 +279,7 @@ export default function Landing() {
             <Play size={16} className="fill-current" />
             Смотреть курсы
           </a>
-        </motion.div>
+        </div>
 
         {/* Floating cards — 7 around the hero */}
         {[
@@ -289,10 +292,7 @@ export default function Landing() {
           { icon: <CheckCircle2 size={20} />, title: "Курс завершён",   desc: "React + TS",       iconBg: "bg-emerald-500/10", iconColor: "text-emerald-600 dark:text-emerald-400",    pos: "bottom-2 left-1/2 -translate-x-1/2", rotateDeg:  1, fromX:   0, delay: 0.80 },
         ].map((card, i) => (
           <div key={i} className={`absolute ${card.pos} hidden xl:block pointer-events-none`}>
-            <motion.div
-              initial={{ opacity: 0, x: card.fromX, y: 14, rotate: 0 }}
-              animate={{ opacity: 1, x: 0, y: 0, rotate: card.rotateDeg }}
-              transition={{ delay: card.delay, duration: 0.6, ease: "easeOut" }}
+            <div
               className="card p-4 shadow-card-md flex items-center gap-3 whitespace-nowrap"
             >
               <div className={`w-10 h-10 rounded-xl ${card.iconBg} flex items-center justify-center ${card.iconColor} shrink-0`}>
@@ -302,7 +302,7 @@ export default function Landing() {
                 <p className="text-sm font-semibold">{card.title}</p>
                 <p className="text-xs text-[var(--muted)]">{card.desc}</p>
               </div>
-            </motion.div>
+            </div>
           </div>
         ))}
       </section>
@@ -311,14 +311,13 @@ export default function Landing() {
       <section className="border-y border-[var(--border)] bg-[var(--surface)]">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-12 grid grid-cols-2 md:grid-cols-4 gap-8">
           {stats.map((s, i) => (
-            <motion.div
+            <div
               key={i}
-              variants={fadeUp} initial="hidden" whileInView="show" custom={i} viewport={{ once: true }}
               className="text-center"
             >
               <p className="font-display font-bold text-4xl md:text-5xl text-gradient-red mb-1">{s.value}</p>
               <p className="text-sm font-medium text-[var(--muted)]">{s.label}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
@@ -343,8 +342,7 @@ export default function Landing() {
         </div>
 
         <div className="relative w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
-          <motion.div
-            variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
+          <div
             className="text-center mb-16"
           >
             <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-primary/30 bg-primary-50 dark:bg-primary-900/20 text-primary text-xs font-bold uppercase tracking-widest mb-6">
@@ -361,12 +359,11 @@ export default function Landing() {
             <p className="text-[var(--muted)] text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
               Прямо сейчас тысячи студентов решают задачи, проходят курсы и пишут код — со всех уголков мира
             </p>
-          </motion.div>
+          </div>
 
           <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-12 items-center">
             {/* Globe */}
-            <motion.div
-              variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
+            <div
               className="relative flex justify-center"
             >
               <div className="relative">
@@ -396,11 +393,10 @@ export default function Landing() {
                   STREAM: 0x{(onlineCount % 0xffff).toString(16).toUpperCase().padStart(4, "0")}
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* Live activity feed */}
-            <motion.div
-              variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
+            <div
               className="card p-6 md:p-7 backdrop-blur-sm bg-[var(--bg)]/80"
             >
               <div className="flex items-center justify-between mb-5 pb-4 border-b border-[var(--border)]">
@@ -421,20 +417,9 @@ export default function Landing() {
 
               {/* Fixed-height container so adding/removing items never reflows the page */}
               <ul className="space-y-2.5 relative h-[376px] overflow-hidden">
-                <AnimatePresence initial={false} mode="popLayout">
                   {feed.map(item => (
-                    <motion.li
+                    <li
                       key={item.id}
-                      layout
-                      initial={{ opacity: 0, y: -16 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, x: 24 }}
-                      transition={{
-                        layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] },
-                        opacity: { duration: 0.3 },
-                        y: { duration: 0.3 },
-                        x: { duration: 0.3 },
-                      }}
                       className="flex items-start gap-3 p-3 rounded-xl bg-[var(--surface)] border border-[var(--border-soft)] h-[68px]"
                     >
                       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
@@ -452,11 +437,10 @@ export default function Landing() {
                       <span className="text-[10px] font-mono text-[var(--muted)] uppercase shrink-0 mt-1">
                         сейчас
                       </span>
-                    </motion.li>
+                    </li>
                   ))}
-                </AnimatePresence>
               </ul>
-            </motion.div>
+            </div>
           </div>
 
           {/* Bottom telemetry tiles */}
@@ -467,16 +451,15 @@ export default function Landing() {
               { label: "Часовых поясов",   value: "12",             mono: true  },
               { label: "Время отклика",    value: "23ms",           mono: true  },
             ].map((tile, i) => (
-              <motion.div
+              <div
                 key={i}
-                variants={fadeUp} initial="hidden" whileInView="show" custom={i} viewport={{ once: true }}
                 className="card p-5 text-center bg-[var(--bg)]/80 backdrop-blur-sm"
               >
                 <p className={`font-bold text-3xl md:text-4xl text-gradient-red mb-1 ${tile.mono ? "font-mono" : "font-display"}`}>
                   {tile.value}
                 </p>
                 <p className="text-xs font-medium text-[var(--muted)] uppercase tracking-wider">{tile.label}</p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
@@ -484,8 +467,7 @@ export default function Landing() {
 
       {/* ── FEATURES ── */}
       <section id="features" className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
-        <motion.div
-          variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
+        <div
           className="text-center mb-16"
         >
           <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Возможности платформы</p>
@@ -493,13 +475,12 @@ export default function Landing() {
           <p className="text-[var(--muted)] text-lg max-w-xl mx-auto">
             Инструменты, которые превращают обучение в удовольствие
           </p>
-        </motion.div>
+        </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {features.map((f, i) => (
-            <motion.div
+            <div
               key={i}
-              variants={fadeUp} initial="hidden" whileInView="show" custom={i} viewport={{ once: true }}
               className="card p-6 hover:shadow-card-md transition-shadow group"
             >
               <div className="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
@@ -507,7 +488,7 @@ export default function Landing() {
               </div>
               <h3 className="font-display font-semibold text-base mb-2">{f.title}</h3>
               <p className="text-sm text-[var(--muted)] leading-relaxed">{f.desc}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
@@ -515,13 +496,12 @@ export default function Landing() {
       {/* ── HOW IT WORKS ── */}
       <section className="bg-[var(--surface)] border-y border-[var(--border)] py-24">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16">
-          <motion.div
-            variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
+          <div
             className="text-center mb-16"
           >
             <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Как это работает</p>
             <h2 className="font-display font-bold text-4xl md:text-5xl">Три шага до результата</h2>
-          </motion.div>
+          </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
@@ -529,9 +509,8 @@ export default function Landing() {
               { step: "02", title: "Решайте задачи", desc: "Практикуйтесь в браузере с мгновенной проверкой. AI-наставник поможет разобраться со сложными моментами." },
               { step: "03", title: "Получите сертификат", desc: "Завершите все шаги курса и получите сертификат, подтверждающий ваши навыки." },
             ].map((item, i) => (
-              <motion.div
+              <div
                 key={i}
-                variants={fadeUp} initial="hidden" whileInView="show" custom={i} viewport={{ once: true }}
                 className="relative"
               >
                 <div className="text-6xl font-display font-bold text-primary/10 mb-4">{item.step}</div>
@@ -542,7 +521,7 @@ export default function Landing() {
                     <ChevronRight size={32} />
                   </div>
                 )}
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
@@ -550,8 +529,7 @@ export default function Landing() {
 
       {/* ── TRACKS ── */}
       <section id="tracks" className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
-        <motion.div
-          variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
+        <div
           className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12"
         >
           <div>
@@ -561,13 +539,12 @@ export default function Landing() {
           <Link to="/register" className="btn-secondary px-5 py-2.5 text-sm w-fit gap-1.5">
             Все треки <ArrowRight size={15} />
           </Link>
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {tracks.map((track, i) => (
-            <motion.div
+            <div
               key={i}
-              variants={fadeUp} initial="hidden" whileInView="show" custom={i} viewport={{ once: true }}
               className="card p-5 flex items-center gap-4 hover:shadow-card-md hover:border-primary/20 transition-all group cursor-pointer"
             >
               <div className="w-11 h-11 rounded-xl bg-[var(--surface)] flex items-center justify-center text-[var(--muted)] group-hover:bg-primary-50 group-hover:text-primary dark:group-hover:bg-primary-900/20 transition-colors shrink-0">
@@ -575,7 +552,7 @@ export default function Landing() {
               </div>
               <span className="font-semibold text-sm">{track.name}</span>
               <ChevronRight size={16} className="ml-auto text-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
@@ -583,8 +560,7 @@ export default function Landing() {
       {/* ── COURSES ── */}
       <section id="courses" className="bg-[var(--surface)] border-t border-[var(--border)] py-24">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16">
-          <motion.div
-            variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
+          <div
             className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12"
           >
             <div>
@@ -594,7 +570,7 @@ export default function Landing() {
             <Link to="/register" className="btn-primary px-5 py-2.5 text-sm w-fit gap-1.5">
               Все курсы <ArrowRight size={15} />
             </Link>
-          </motion.div>
+          </div>
 
           {coursesLoading ? (
             <div className="grid md:grid-cols-3 gap-5">
@@ -608,10 +584,9 @@ export default function Landing() {
             </div>
           ) : courses.length > 0 ? (
             <div className="grid md:grid-cols-3 gap-5">
-              {courses.map((course, i) => (
-                <motion.div
+              {courses.map((course, _i) => (
+                <div
                   key={course.id}
-                  variants={fadeUp} initial="hidden" whileInView="show" custom={i} viewport={{ once: true }}
                   className="card p-6 flex flex-col hover:shadow-card-md hover:border-primary/20 transition-all"
                 >
                   <div className="flex items-start justify-between gap-2 mb-4">
@@ -636,7 +611,7 @@ export default function Landing() {
                       {course.duration}
                     </span>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
           ) : (
@@ -646,9 +621,8 @@ export default function Landing() {
                 { title: "React + TypeScript", author: "Анна Соколова", level: "Средний", duration: "55 часов" },
                 { title: "DevOps основы", author: "Алексей Морозов", level: "Продвинутый", duration: "65 часов" },
               ].map((c, i) => (
-                <motion.div
+                <div
                   key={i}
-                  variants={fadeUp} initial="hidden" whileInView="show" custom={i} viewport={{ once: true }}
                   className="card p-6 flex flex-col hover:shadow-card-md hover:border-primary/20 transition-all"
                 >
                   <div className="flex items-start justify-between gap-2 mb-4">
@@ -669,7 +643,7 @@ export default function Landing() {
                       {c.duration}
                     </span>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
           )}
@@ -685,8 +659,7 @@ export default function Landing() {
         </div>
 
         <div className="relative w-full px-4 sm:px-6 lg:px-10 xl:px-16">
-          <motion.div
-            variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
+          <div
             className="text-center mb-20"
           >
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/20 bg-primary-50 dark:bg-primary-900/20 text-primary text-xs font-bold uppercase tracking-widest mb-6">
@@ -698,20 +671,19 @@ export default function Landing() {
             <p className="text-[var(--muted)] text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
               Платформу создают увлечённые своим делом разработчики, которые верят в силу качественного образования
             </p>
-          </motion.div>
+          </div>
 
           <div className="grid sm:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {[
               { name: "Радкевич Роман", role: "Разработчик", photo: "/developers/radkevich-roman.jpg", link: "https://t.me/liiiiiliiiiiliiiiiliiiiiliiiiil" },
               { name: "Поляков Ярослав", role: "Разработчик", photo: "/developers/polyakov-yaroslav.jpg", link: "https://t.me/scencort" },
-            ].map((dev, i) => (
+            ].map((dev, _i) => (
               <motion.a
                 key={dev.name}
                 href={dev.link}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`Telegram ${dev.name}`}
-                variants={fadeUp} initial="hidden" whileInView="show" custom={i} viewport={{ once: true }}
                 whileHover={{ y: -6 }}
                 className="group relative card p-8 flex flex-col items-center text-center transition-all duration-300 hover:shadow-card-lg hover:border-primary/30 cursor-pointer no-underline"
               >
@@ -745,8 +717,7 @@ export default function Landing() {
 
       {/* ── CTA ── */}
       <section className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
-        <motion.div
-          variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
+        <div
           className="relative overflow-hidden rounded-3xl bg-primary p-12 md:p-20 text-center text-white"
         >
           {/* Background shapes */}
@@ -773,7 +744,7 @@ export default function Landing() {
               </Link>
             </div>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* ── FOOTER ── */}
