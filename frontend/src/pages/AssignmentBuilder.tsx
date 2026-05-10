@@ -1,9 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react"
-import { motion } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
 import Button from "../components/ui/Button"
-import { fadeInUp } from "../lib/animations"
 import { api } from "../lib/api"
 
 type TestCase = {
@@ -114,7 +112,7 @@ export default function AssignmentBuilder() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+      <div className="space-y-6">
         <h2 className="text-2xl md:text-3xl font-bold">Конструктор заданий</h2>
 
         <Card className="space-y-4">
@@ -242,7 +240,7 @@ export default function AssignmentBuilder() {
             <p className="text-sm text-slate-600 dark:text-slate-300">Пока нет сохраненных заданий.</p>
           )}
         </Card>
-      </motion.div>
+      </div>
     </MainLayout>
   )
 }

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
-import { motion } from "framer-motion"
+
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
 import Button from "../components/ui/Button"
-import { fadeInUp } from "../lib/animations"
+
 import { api } from "../lib/api"
 import { useAppStore } from "../store/AppStore"
 
@@ -123,7 +123,7 @@ export default function Feedback() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+      <div className="space-y-6">
         <h2 className="text-2xl md:text-3xl font-bold">Обратная связь</h2>
 
         <Card className="space-y-3">
@@ -250,7 +250,7 @@ export default function Feedback() {
             )}
           </div>
         </Card>
-      </motion.div>
+      </div>
     </MainLayout>
   )
 }

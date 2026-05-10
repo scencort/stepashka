@@ -1,10 +1,8 @@
 ﻿import { useEffect, useMemo, useState } from "react"
-import { motion } from "framer-motion"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
 import Skeleton from "../components/ui/Skeleton"
 import EmptyState from "../components/ui/EmptyState"
-import { fadeInUp } from "../lib/animations"
 import { api } from "../lib/api"
 import Button from "../components/ui/Button"
 import { useToast } from "../hooks/useToast"
@@ -205,7 +203,7 @@ export default function AdminPanel() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6">
+      <div className="space-y-6">
         <h2 className="text-2xl md:text-3xl font-bold">Админ-панель</h2>
 
         {loading && (
@@ -494,7 +492,7 @@ export default function AdminPanel() {
             </Card>
           </>
         )}
-      </motion.div>
+      </div>
     </MainLayout>
   )
 }

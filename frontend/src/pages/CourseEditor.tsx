@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { motion, AnimatePresence } from "framer-motion"
+
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
 import Button from "../components/ui/Button"
 import Skeleton from "../components/ui/Skeleton"
-import { fadeInUp } from "../lib/animations"
+
 import { api } from "../lib/api"
 import { useToast } from "../hooks/useToast"
 import { ChevronRight, ChevronLeft, Plus, Trash2, GripVertical, BookOpen, FileQuestion, Code2, Check } from "lucide-react"
@@ -182,12 +182,12 @@ function StepEditor({
         </button>
       </div>
 
-      <AnimatePresence>
+
         {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+          <div
+
+
+
             className="overflow-hidden"
           >
             <div className="p-3 space-y-3 border-t border-slate-100 dark:border-slate-700">
@@ -373,9 +373,9 @@ function StepEditor({
                 </div>
               )}
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+
     </div>
   )
 }
@@ -431,12 +431,12 @@ function LessonEditor({
         </button>
       </div>
 
-      <AnimatePresence>
+
         {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+          <div
+
+
+
             className="overflow-hidden"
           >
             <div className="p-3 space-y-2 border-t border-slate-100 dark:border-slate-700">
@@ -463,9 +463,9 @@ function LessonEditor({
                 <Plus size={12} className="mr-1" /> Добавить шаг
               </Button>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+
     </div>
   )
 }
@@ -733,7 +733,7 @@ export default function CourseEditor() {
 
   return (
     <MainLayout>
-      <motion.div variants={fadeInUp} initial="initial" animate="animate" className="space-y-6 max-w-4xl mx-auto">
+      <div className="space-y-6 max-w-4xl mx-auto">
         {/* Header */}
         <div>
           <h2 className="text-2xl md:text-3xl font-bold">
@@ -1024,7 +1024,7 @@ export default function CourseEditor() {
             </Button>
           )}
         </div>
-      </motion.div>
+      </div>
     </MainLayout>
   )
 }

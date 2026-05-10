@@ -18,7 +18,7 @@ export default function Button({
   const base = "inline-flex items-center justify-center gap-2 font-semibold rounded-xl px-5 py-2.5 transition-all duration-200 text-sm";
 
   const variants = {
-    primary: "bg-primary hover:bg-primary-700 active:bg-primary-800 text-white shadow-red hover:shadow-red-lg hover:-translate-y-px active:translate-y-0",
+    primary: "btn-gradient hover:-translate-y-px active:translate-y-0",
     outline: "bg-transparent border border-[var(--border)] text-[var(--text-2)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
     ghost: "bg-transparent text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
   };

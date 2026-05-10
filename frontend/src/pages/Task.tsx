@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import CodeEditor from "../components/ui/CodeEditor";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Code2,
   Sparkles,
@@ -15,8 +14,6 @@ import {
 import { api } from "../lib/api";
 import EmptyState from "../components/ui/EmptyState";
 import { useToast } from "../hooks/useToast";
-
-import { fadeInUp } from "../lib/animations";
 
 const LANGUAGES = [
   { value: "auto", label: "Авто-определение" },
@@ -114,16 +111,8 @@ export default function Task() {
 
   return (
     <MainLayout>
-      <motion.div
-        variants={fadeInUp}
-        initial="initial"
-        animate="animate"
-        className="space-y-6 lg:space-y-8"
-      >
-        <motion.div
-          variants={fadeInUp}
-          className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2"
-        >
+      <div className="space-y-6 lg:space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2">
           <div>
             <h2 className="text-3xl md:text-5xl font-extrabold mb-2 tracking-tight">
               AI Code Review
@@ -143,7 +132,7 @@ export default function Task() {
               </option>
             ))}
           </select>
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
           {/* Editor */}
@@ -188,149 +177,143 @@ export default function Task() {
               </Card>
             )}
 
-            <AnimatePresence>
-              {result && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-6"
-                >
-                  {/* Scores */}
-                  <Card className="space-y-4 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 relative overflow-hidden group">
-                    <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform duration-700" />
-                    <div className="flex items-start justify-between relative z-10">
-                      <p className="font-bold text-slate-500">Общая оценка</p>
-                      <div className="flex flex-col items-end">
-                        <p
-                          className={`text-4xl font-black tracking-tight leading-none ${scoreColor}`}
-                        >
-                          {avgScore}%
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3 relative z-10 mt-4">
-                      {[
-                        { label: "Качество", value: result.quality },
-                        { label: "Логика", value: result.correctness },
-                        { label: "Стиль", value: result.style },
-                      ].map((m) => (
-                        <div
-                          key={m.label}
-                          className="flex flex-col gap-1.5 p-3 rounded-2xl bg-white/50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-700/50 items-center justify-center text-center shadow-sm"
-                        >
-                          <p className="text-xl font-bold">{m.value}%</p>
-                          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
-                            {m.label}
-                          </p>
-                          <div className="w-full h-1.5 rounded-full overflow-hidden bg-slate-200/70 dark:bg-zinc-700/70 mt-1">
-                            <div
-                              className="h-full bg-gradient-to-r from-rose-400 to-red-500"
-                              style={{ width: `${m.value}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-
-                  {/* Summary */}
-                  <Card className="!rounded-[2rem] border border-blue-200/50 dark:border-blue-500/20 bg-blue-50/30 dark:bg-blue-900/10">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
-                        <CheckCircle
-                          size={16}
-                          className="text-blue-600 dark:text-blue-400"
-                        />
-                      </div>
-                      <p className="font-bold text-blue-900 dark:text-blue-200">
-                        Резюме
+            {result && (
+              <div className="space-y-6">
+                {/* Scores */}
+                <Card className="space-y-4 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 relative overflow-hidden group">
+                  <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform duration-700" />
+                  <div className="flex items-start justify-between relative z-10">
+                    <p className="font-bold text-slate-500">Общая оценка</p>
+                    <div className="flex flex-col items-end">
+                      <p
+                        className={`text-4xl font-black tracking-tight leading-none ${scoreColor}`}
+                      >
+                        {avgScore}%
                       </p>
                     </div>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
-                      {result.summary}
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 relative z-10 mt-4">
+                    {[
+                      { label: "Качество", value: result.quality },
+                      { label: "Логика", value: result.correctness },
+                      { label: "Стиль", value: result.style },
+                    ].map((m) => (
+                      <div
+                        key={m.label}
+                        className="flex flex-col gap-1.5 p-3 rounded-2xl bg-white/50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-700/50 items-center justify-center text-center shadow-sm"
+                      >
+                        <p className="text-xl font-bold">{m.value}%</p>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                          {m.label}
+                        </p>
+                        <div className="w-full h-1.5 rounded-full overflow-hidden bg-slate-200/70 dark:bg-zinc-700/70 mt-1">
+                          <div
+                            className="h-full bg-gradient-to-r from-rose-400 to-red-500"
+                            style={{ width: `${m.value}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+
+                {/* Summary */}
+                <Card className="!rounded-[2rem] border border-blue-200/50 dark:border-blue-500/20 bg-blue-50/30 dark:bg-blue-900/10">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+                      <CheckCircle
+                        size={16}
+                        className="text-blue-600 dark:text-blue-400"
+                      />
+                    </div>
+                    <p className="font-bold text-blue-900 dark:text-blue-200">
+                      Резюме
                     </p>
+                  </div>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                    {result.summary}
+                  </p>
+                </Card>
+
+                {/* Issues */}
+                {result.issues && result.issues.length > 0 && (
+                  <Card className="space-y-3 !rounded-[2rem] border border-rose-200/50 dark:border-rose-500/20 bg-rose-50/30 dark:bg-rose-900/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center">
+                        <AlertTriangle
+                          size={16}
+                          className="text-rose-600 dark:text-rose-400"
+                        />
+                      </div>
+                      <p className="font-bold text-rose-900 dark:text-rose-200">
+                        Проблемы ({result.issues.length})
+                      </p>
+                    </div>
+                    {result.issues.map((issue, i) => (
+                      <p
+                        key={i}
+                        className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2"
+                      >
+                        <span className="text-rose-400 mt-0.5">•</span>
+                        <span>{issue}</span>
+                      </p>
+                    ))}
                   </Card>
+                )}
 
-                  {/* Issues */}
-                  {result.issues && result.issues.length > 0 && (
-                    <Card className="space-y-3 !rounded-[2rem] border border-rose-200/50 dark:border-rose-500/20 bg-rose-50/30 dark:bg-rose-900/10">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center">
-                          <AlertTriangle
-                            size={16}
-                            className="text-rose-600 dark:text-rose-400"
-                          />
-                        </div>
-                        <p className="font-bold text-rose-900 dark:text-rose-200">
-                          Проблемы ({result.issues.length})
-                        </p>
+                {/* Improvements */}
+                {result.improvements && result.improvements.length > 0 && (
+                  <Card className="space-y-3 !rounded-[2rem] border border-amber-200/50 dark:border-amber-500/20 bg-amber-50/30 dark:bg-amber-900/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
+                        <Lightbulb
+                          size={16}
+                          className="text-amber-600 dark:text-amber-400"
+                        />
                       </div>
-                      {result.issues.map((issue, i) => (
-                        <p
-                          key={i}
-                          className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2"
-                        >
-                          <span className="text-rose-400 mt-0.5">•</span>
-                          <span>{issue}</span>
-                        </p>
-                      ))}
-                    </Card>
-                  )}
+                      <p className="font-bold text-amber-900 dark:text-amber-200">
+                        Улучшения ({result.improvements.length})
+                      </p>
+                    </div>
+                    {result.improvements.map((item, i) => (
+                      <p
+                        key={i}
+                        className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2"
+                      >
+                        <span className="text-amber-400 mt-0.5">•</span>
+                        <span>{item}</span>
+                      </p>
+                    ))}
+                  </Card>
+                )}
 
-                  {/* Improvements */}
-                  {result.improvements && result.improvements.length > 0 && (
-                    <Card className="space-y-3 !rounded-[2rem] border border-amber-200/50 dark:border-amber-500/20 bg-amber-50/30 dark:bg-amber-900/10">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
-                          <Lightbulb
-                            size={16}
-                            className="text-amber-600 dark:text-amber-400"
-                          />
-                        </div>
-                        <p className="font-bold text-amber-900 dark:text-amber-200">
-                          Улучшения ({result.improvements.length})
-                        </p>
+                {/* Good parts */}
+                {result.goodParts && result.goodParts.length > 0 && (
+                  <Card className="space-y-3 !rounded-[2rem] border border-emerald-200/50 dark:border-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-900/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
+                        <ThumbsUp
+                          size={16}
+                          className="text-emerald-600 dark:text-emerald-400"
+                        />
                       </div>
-                      {result.improvements.map((item, i) => (
-                        <p
-                          key={i}
-                          className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2"
-                        >
-                          <span className="text-amber-400 mt-0.5">•</span>
-                          <span>{item}</span>
-                        </p>
-                      ))}
-                    </Card>
-                  )}
-
-                  {/* Good parts */}
-                  {result.goodParts && result.goodParts.length > 0 && (
-                    <Card className="space-y-3 !rounded-[2rem] border border-emerald-200/50 dark:border-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-900/10">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
-                          <ThumbsUp
-                            size={16}
-                            className="text-emerald-600 dark:text-emerald-400"
-                          />
-                        </div>
-                        <p className="font-bold text-emerald-900 dark:text-emerald-200">
-                          Что хорошо ({result.goodParts.length})
-                        </p>
-                      </div>
-                      {result.goodParts.map((item, i) => (
-                        <p
-                          key={i}
-                          className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2"
-                        >
-                          <span className="text-emerald-400 mt-0.5">•</span>
-                          <span>{item}</span>
-                        </p>
-                      ))}
-                    </Card>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                      <p className="font-bold text-emerald-900 dark:text-emerald-200">
+                        Что хорошо ({result.goodParts.length})
+                      </p>
+                    </div>
+                    {result.goodParts.map((item, i) => (
+                      <p
+                        key={i}
+                        className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2"
+                      >
+                        <span className="text-emerald-400 mt-0.5">•</span>
+                        <span>{item}</span>
+                      </p>
+                    ))}
+                  </Card>
+                )}
+              </div>
+            )}
 
             {!loading && error && (
               <Card className="!rounded-[2rem]">
@@ -412,7 +395,7 @@ export default function Task() {
             </Card>
           </div>
         </div>
-      </motion.div>
+      </div>
     </MainLayout>
   );
 }

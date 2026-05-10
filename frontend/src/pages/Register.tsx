@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { motion } from "framer-motion"
+
 import AuthScreenShell from "../components/auth/AuthScreenShell"
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight, ArrowLeft } from "lucide-react"
 import { useAppStore } from "../store/AppStore"
@@ -47,10 +47,7 @@ export default function Register() {
 
   return (
     <AuthScreenShell>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
+      <div
         className="w-full max-w-[420px] relative z-10"
       >
         <div className="bg-white/95 dark:bg-[#140808]/95 border border-[var(--border)] rounded-3xl shadow-card-lg backdrop-blur-xl overflow-hidden relative">
@@ -134,12 +131,11 @@ export default function Register() {
 
               {/* Error */}
               {error && (
-                <motion.p
-                  initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                <p
                   className="text-xs font-medium text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 px-3 py-2 rounded-lg"
                 >
                   {error}
-                </motion.p>
+                </p>
               )}
 
               {/* Submit */}
@@ -164,7 +160,7 @@ export default function Register() {
             </p>
           </div>
         </div>
-      </motion.div>
+      </div>
     </AuthScreenShell>
   )
 }

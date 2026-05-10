@@ -1,7 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/theme";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { api } from "../lib/api";
@@ -327,10 +326,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] md:flex">
       {/* ── Sidebar ── */}
-      <motion.aside
-        initial={{ x: -16, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.3 }}
+      <aside
         className={`${collapsed ? "w-[68px]" : "w-[260px]"} hidden md:flex flex-col shrink-0
           bg-[var(--bg)] border-r border-[var(--border)] transition-[width] duration-300 ease-in-out
           sticky top-0 h-screen overflow-y-auto overflow-x-hidden`}
@@ -473,25 +469,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
             )}
           </button>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* ── Mobile drawer ── */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
+      {mobileMenuOpen && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div
               className="fixed inset-0 z-40 bg-black/40 md:hidden"
               onClick={() => setMobileMenuOpen(false)}
             />
-            <motion.div
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="fixed inset-y-0 left-0 z-50 w-72 bg-[var(--bg)] border-r border-[var(--border)] flex flex-col md:hidden"
+            <div className="fixed inset-y-0 left-0 z-50 w-72 bg-[var(--bg)] border-r border-[var(--border)] flex flex-col md:hidden"
             >
               <div className="flex items-center justify-between px-4 h-16 border-b border-[var(--border)]">
                 <BrandLogo
@@ -598,10 +585,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   <span>Выйти</span>
                 </button>
               </div>
-            </motion.div>
+            </div>
           </>
         )}
-      </AnimatePresence>
 
       {/* ── Main column ── */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
@@ -691,14 +677,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </button>
 
             {/* Notifications panel */}
-            <AnimatePresence>
-              {showNotifications && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.97 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-12 w-80 card shadow-card-lg z-50 overflow-hidden"
+                          {showNotifications && (
+                <div className="absolute right-0 top-12 w-80 card shadow-card-lg z-50 overflow-hidden"
                 >
                   <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] gap-2">
                     <h3 className="font-semibold text-sm font-display">
@@ -787,19 +767,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         );
                       })}
                   </div>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
+
 
             {/* Profile panel */}
-            <AnimatePresence>
-              {showProfile && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.97 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-12 w-64 card shadow-card-lg z-50 overflow-hidden"
+                          {showProfile && (
+                <div className="absolute right-0 top-12 w-64 card shadow-card-lg z-50 overflow-hidden"
                 >
                   {/* User info */}
                   <div className="px-4 py-4 border-b border-[var(--border)] flex items-center gap-3">
@@ -851,19 +825,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       Выйти
                     </button>
                   </div>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
+
 
             {/* Streak panel */}
-            <AnimatePresence>
-              {showStreakPanel && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.97 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-12 w-[320px] card shadow-card-lg z-50 overflow-hidden"
+                          {showStreakPanel && (
+                <div className="absolute right-0 top-12 w-[320px] card shadow-card-lg z-50 overflow-hidden"
                 >
                   <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] gap-2">
                     <div className="flex items-center gap-2">
@@ -928,7 +896,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                                     d.isFuture
                                       ? "bg-transparent border-dashed border-[var(--border)] text-[var(--muted)]"
                                       : d.isActive
-                                        ? "bg-primary text-white border-primary"
+                                        ? "btn-gradient text-white border-transparent"
                                         : "bg-[var(--surface)] border-[var(--border)] text-[var(--muted)]"
                                   } ${
                                     d.isToday ? "ring-2 ring-primary/40" : ""
@@ -984,9 +952,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       сегодня.
                     </p>
                   </div>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
           </div>
         </header>
 
