@@ -439,53 +439,42 @@ async def get_steps(course_id: int, user: CurrentUser):
     order = 1
     steps = []
     for lesson in lessons:
-        steps.append(
-            {
-                "id": lesson["id"] * 10 + 1,
-                "title": f"{lesson['title']}: теория",
-                "kind": "theory",
-                "taskTypeLabel": "Теория",
-                "theoryText": lesson["contentText"] or "Изучите материал урока.",
-                "options": [],
-                "stepOrder": order,
-                "xp": 10,
-            }
-        )
-        order += 1
-
-        steps.append(
-            {
-                "id": lesson["id"] * 10 + 2,
-                "title": f"{lesson['title']}: мини-тест",
-                "kind": "quiz",
-                "taskTypeLabel": "Тестовое задание",
-                "theoryText": "Выберите вариант ответа и проверьте знание теории.",
-                "options": ["Понял материал", "Нужно повторить", "Нужны примеры"],
-                "stepOrder": order,
-                "xp": 12,
-            }
-        )
-        order += 1
-
         assignment = next(
             (a for a in assignments_rows if a["lessonId"] == lesson["id"]), None
         )
+
+        theory_text = lesson["contentText"] or "Изучите материал урока."
+
         if assignment:
+            # Combined step: theory + code task in one
             steps.append(
                 {
-                    "id": lesson["id"] * 10 + 3,
-                    "title": f"{assignment['title']}: практика",
+                    "id": lesson["id"] * 10 + 1,
+                    "title": lesson["title"],
                     "kind": "code",
-                    "taskTypeLabel": "Кодовое задание",
-                    "theoryText": assignment["description"] or "Решите задание.",
+                    "taskTypeLabel": "Теория + задание",
+                    "theoryText": theory_text + "\n\n---\n\n**Задание:** " + (assignment["description"] or "Решите задание."),
                     "checks": [],
                     "checkCount": 0,
                     "options": [],
                     "stepOrder": order,
-                    "xp": 20,
+                    "xp": 25,
                 }
             )
-            order += 1
+        else:
+            steps.append(
+                {
+                    "id": lesson["id"] * 10 + 1,
+                    "title": lesson["title"],
+                    "kind": "theory",
+                    "taskTypeLabel": "Теория",
+                    "theoryText": theory_text,
+                    "options": [],
+                    "stepOrder": order,
+                    "xp": 10,
+                }
+            )
+        order += 1
 
     progress_rows = await db.fetch(
         """SELECT step_id AS "stepId", status, score, attempts, answer_text AS "answerText", completed_at AS "completedAt"
@@ -548,10 +537,27 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
     check_results = None
 
     if slot == 1:
-        kind = "theory"
-        passed = True
-        score = 10
-        feedback = "Теоретический шаг отмечен как пройденный"
+        # Check if lesson has an assignment — if so, this is a code step
+        assignment = await db.fetchrow(
+            "SELECT id, tests FROM assignments WHERE lesson_id=$1 ORDER BY id ASC LIMIT 1",
+            lesson_id,
+        )
+        if assignment:
+            kind = "code"
+            assignment_id = assignment["id"]
+            tests_data = assignment["tests"] if assignment else []
+            if isinstance(tests_data, str):
+                tests_data = json.loads(tests_data)
+            evaluation = evaluate_code_by_tests(answer, tests_data)
+            passed = evaluation["passed"]
+            score = 25 if passed else max(0, round(evaluation["scorePercent"] / 100 * 25))
+            feedback = evaluation["feedback"]
+            check_results = evaluation["checkResults"]
+        else:
+            kind = "theory"
+            passed = True
+            score = 10
+            feedback = "Теоретический шаг отмечен как пройденный"
     elif slot == 2:
         kind = "quiz"
         passed = len(answer) > 0

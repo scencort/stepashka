@@ -18,7 +18,8 @@
       "Bash(ls -1 \"C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\('app/routes/ai.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
       "Bash(mkdir -p \"C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\frontend\\\\src\\\\pages\\\\course\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(python import_courses.py)"
     ]
   }
 }
