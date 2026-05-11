@@ -119,7 +119,7 @@ export default function Course() {
     Number.isInteger(selectedCourseId) &&
     selectedCourseId > 0;
 
-  const [active, setActive] = useState("Все");
+  const [active] = useState("Все");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [courses, setCourses] = useState<CourseItem[]>([]);
@@ -149,6 +149,7 @@ export default function Course() {
   const [courseDetail, setCourseDetail] = useState<CourseDetailType | null>(null);
   const [enrollRequestMessage, setEnrollRequestMessage] = useState("");
   const [enrollRequestLoading, setEnrollRequestLoading] = useState(false);
+  const [enrollingIds, setEnrollingIds] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<"content" | "discussion">(
     "content",
   );
@@ -319,6 +320,8 @@ export default function Course() {
   };
 
   const enrollCourse = async (cId: number) => {
+    if (enrollingIds.has(cId)) return;
+    setEnrollingIds(prev => new Set(prev).add(cId));
     try {
       const result = await api.post<{ success?: boolean; error?: string }>(
         `/courses/${cId}/enroll`,
@@ -326,7 +329,9 @@ export default function Course() {
       );
       if (result.error) toast.error(result.error);
       else {
-        toast.success("Запись на курс выполнена");
+        const courseName = courses.find(c => c.id === cId)?.title;
+        toast.success(courseName ? `Вы записались на «${courseName}»` : "Запись на курс выполнена");
+        window.dispatchEvent(new Event("gradus:notifications:refresh"));
         await loadCourses();
         if (isCoursePage && selectedCourseId === cId) {
           await loadCourseContent(cId);
@@ -335,6 +340,8 @@ export default function Course() {
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Не удалось записаться");
+    } finally {
+      setEnrollingIds(prev => { const s = new Set(prev); s.delete(cId); return s; });
     }
   };
 
@@ -466,6 +473,7 @@ export default function Course() {
         onCreateModalOpen={() => setCreateModalOpen(true)}
         onNavigateToCourse={(id) => navigate(`/course/${id}`)}
         onEnroll={enrollCourse}
+        enrollingIds={enrollingIds}
         courseCoverUrl={courseCoverUrl}
         createModalOpen={createModalOpen}
         onCreateModalClose={() => setCreateModalOpen(false)}

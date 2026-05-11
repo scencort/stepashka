@@ -64,7 +64,7 @@ export default function Dashboard() {
         {/* Page header */}
         <div>
           <h1 className="font-display font-bold text-3xl md:text-4xl text-[var(--text)] mb-1">
-            Привет, {firstName} 👋
+            Привет, {firstName}
           </h1>
           <p className="text-[var(--muted)]">Вот ваш прогресс на сегодня</p>
         </div>
@@ -134,25 +134,23 @@ export default function Dashboard() {
               </div>
 
               {/* Continue learning */}
-              <div className="lg:col-span-3 card p-6">
-                <p className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)] mb-4">В фокусе</p>
+              <div className="lg:col-span-3 card p-6 flex flex-col">
+                <p className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)] mb-4">Я прохожу</p>
 
                 {continueStep ? (
-                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between h-full">
-                    <div>
-                      <span className="badge-red mb-3">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                        Продолжить
-                      </span>
+                  <div className="flex flex-col flex-1">
+                    <div className="min-w-0">
                       <h3 className="font-display font-bold text-xl text-[var(--text)] mb-1">{continueStep.courseTitle}</h3>
                       <p className="text-sm text-[var(--muted)]">Шаг {continueStep.stepOrder}: {continueStep.stepTitle}</p>
                     </div>
-                    <button
-                      onClick={() => navigate(`/course/${continueStep.courseId}?step=${continueStep.stepId}`)}
-                      className="btn-primary px-5 py-3 text-sm shrink-0 gap-1.5"
-                    >
-                      Перейти <ArrowRight size={15} />
-                    </button>
+                    <div className="flex justify-end mt-4">
+                      <button
+                        onClick={() => navigate(`/course/${continueStep.courseId}?step=${continueStep.stepId}`)}
+                        className="btn-primary px-5 py-2.5 text-sm gap-1.5"
+                      >
+                        Перейти <ArrowRight size={15} />
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-8 text-center">

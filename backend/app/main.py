@@ -283,6 +283,15 @@ async def get_notifications(user: CurrentUser):
     return [{"id": r["id"], "title": r["title"], "time": format_time(r["time"])} for r in rows]
 
 
+@app.delete("/api/notifications")
+async def clear_notifications(user: CurrentUser):
+    await database.execute(
+        "DELETE FROM notifications WHERE user_id=$1",
+        user["id"],
+    )
+    return {"success": True}
+
+
 # ── Help / FAQ ──
 
 @app.get("/api/help/faq")

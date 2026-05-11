@@ -31,6 +31,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 
 type MainLayoutProps = { children: ReactNode };
@@ -162,6 +163,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   useEffect(() => {
     void loadNotifications();
+    const handler = () => void loadNotifications();
+    window.addEventListener("gradus:notifications:refresh", handler);
+    return () => window.removeEventListener("gradus:notifications:refresh", handler);
   }, []);
 
   useEffect(() => {
@@ -679,29 +683,45 @@ export default function MainLayout({ children }: MainLayoutProps) {
                           {showNotifications && (
                 <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] card shadow-card-lg z-50 overflow-hidden"
                 >
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] gap-2">
-                    <h3 className="font-semibold text-sm font-display">
-                      Уведомления
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm font-display text-[var(--text)]">Уведомления</h3>
                       {unreadNotificationsCount > 0 && (
-                        <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold align-middle">
+                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
                           {unreadNotificationsCount}
                         </span>
                       )}
-                    </h3>
-                    <div className="flex items-center gap-1">
+                    </div>
+                    <div className="flex items-center gap-0.5">
                       {unreadNotificationsCount > 0 && (
                         <button
                           onClick={markAllNotificationsRead}
-                          className="text-xs font-medium text-primary hover:underline px-2 py-1 rounded-md"
+                          className="text-xs font-medium text-primary hover:text-primary-700 px-2 py-1 rounded-md hover:bg-primary/5 transition-colors"
                         >
                           Прочитать всё
                         </button>
                       )}
+                      {notifications.length > 0 && (
+                        <button
+                          title="Очистить уведомления"
+                          onClick={async () => {
+                            try {
+                              await api.delete("/notifications");
+                              setNotifications([]);
+                              setReadNotificationIds(new Set());
+                              persistReadIds(new Set());
+                            } catch {}
+                          }}
+                          className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                       <button
                         onClick={() => setShowNotifications(false)}
-                        className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface)]"
+                        className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface)] transition-colors"
                       >
-                        <X size={13} />
+                        <X size={14} />
                       </button>
                     </div>
                   </div>

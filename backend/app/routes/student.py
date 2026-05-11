@@ -143,8 +143,14 @@ async def dashboard(user: CurrentUser):
     )
 
     audits = await db.fetch(
-        """SELECT id, action, target_type AS "targetType", target_id AS "targetId", created_at AS "createdAt"
-           FROM audit_logs WHERE actor_user_id=$1 ORDER BY created_at DESC LIMIT 5""",
+        """SELECT al.id, al.action, al.target_type AS "targetType", al.target_id AS "targetId",
+                  al.created_at AS "createdAt",
+                  CASE WHEN al.target_type='course' THEN c.title ELSE NULL END AS "courseTitle"
+           FROM audit_logs al
+           LEFT JOIN courses c ON al.target_type = 'course'
+               AND al.target_id IS NOT NULL
+               AND c.id = al.target_id::bigint
+           WHERE al.actor_user_id=$1 ORDER BY al.created_at DESC LIMIT 5""",
         uid,
     )
 
@@ -159,8 +165,8 @@ async def dashboard(user: CurrentUser):
         "account.password.changed": "Пароль изменён",
         "account.session.revoked": "Сессия завершена",
         "account.logout_all": "Выход со всех устройств",
-        "enrollment.create": "Запись на курс",
-        "enrollment_request.create": "Заявка на курс",
+        "enrollment.create": "Записался на курс",
+        "enrollment_request.create": "Подал заявку на курс",
         "ai.chat.request": "Вопрос AI-ассистенту",
         "ai.chat.stream.request": "Диалог с AI-ассистентом",
         "ai.review.check": "Проверка кода через AI",
@@ -172,6 +178,9 @@ async def dashboard(user: CurrentUser):
         label = ACTION_LABELS.get(
             r["action"], r["action"].replace(".", " → ").capitalize()
         )
+        course_title = r["courseTitle"]
+        if course_title and r["action"] in ("enrollment.create", "enrollment_request.create"):
+            label = f"{label} «{course_title}»"
         created = r["createdAt"]
         ts = created.strftime("%d.%m %H:%M") if created else ""
         activities.append({"id": r["id"], "text": label, "time": ts})
@@ -297,8 +306,8 @@ async def enroll(course_id: int, user: CurrentUser):
     await db.execute(
         "INSERT INTO notifications (user_id, title, body) VALUES ($1, $2, $3)",
         user["id"],
-        "Вы успешно записаны на курс",
-        course["title"],
+        f"Вы записались на курс «{course['title']}»",
+        "",
     )
     await write_audit(user["id"], "enrollment.create", "course", course_id)
     return {"success": True}

@@ -129,6 +129,7 @@ type Props = {
   onCreateModalOpen: () => void;
   onNavigateToCourse: (id: number) => void;
   onEnroll: (id: number) => void;
+  enrollingIds: Set<number>;
   courseCoverUrl: (course: { id: number; title: string; coverUrl?: string }) => string;
   // Create modal
   createModalOpen: boolean;
@@ -162,6 +163,7 @@ export default function CourseCatalog(props: Props) {
     onCreateModalOpen,
     onNavigateToCourse,
     onEnroll,
+    enrollingIds,
     courseCoverUrl,
     createModalOpen,
     onCreateModalClose,
@@ -297,7 +299,7 @@ export default function CourseCatalog(props: Props) {
       </div>
 
       {/* Category chips */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => setSelectedCategory(null)}
           className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
@@ -338,7 +340,7 @@ export default function CourseCatalog(props: Props) {
 
       {/* Grid */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
@@ -355,7 +357,7 @@ export default function CourseCatalog(props: Props) {
       )}
 
       {!loading && !error && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {catalogFiltered.map((course) => {
             const catMeta = getCatMeta(course.category || "");
             return (
@@ -365,7 +367,7 @@ export default function CourseCatalog(props: Props) {
                 onClick={() => onNavigateToCourse(course.id)}
               >
                 {/* Cover */}
-                <div className="h-32 overflow-hidden relative shrink-0 bg-gradient-to-br from-primary to-burgundy">
+                <div className="h-48 overflow-hidden relative shrink-0 bg-gradient-to-br from-primary to-burgundy">
                   <img
                     src={courseCoverUrl(course)}
                     alt={course.title}
@@ -387,13 +389,13 @@ export default function CourseCatalog(props: Props) {
                 {/* Content */}
                 <div className="p-4 flex-1 flex flex-col">
                   <div
-                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md mb-2 self-start ${catMeta.color}`}
+                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md mb-2 self-start ${catMeta.color}`}
                   >
                     {catMeta.icon}
                     {catMeta.label}
                   </div>
 
-                  <h3 className="font-semibold text-sm text-[var(--text)] line-clamp-2 group-hover:text-primary transition-colors leading-snug">
+                  <h3 className="font-semibold text-base text-[var(--text)] line-clamp-2 group-hover:text-primary transition-colors leading-snug">
                     {course.title}
                   </h3>
                   <p className="text-xs text-[var(--muted)] mt-1">
@@ -402,17 +404,17 @@ export default function CourseCatalog(props: Props) {
 
                   <div className="mt-auto pt-3 space-y-2">
                     {/* Meta */}
-                    <div className="flex items-center gap-3 text-[11px] text-[var(--muted)]">
-                      <span className="flex items-center gap-0.5 text-amber-500 font-semibold">
-                        <Star size={10} fill="currentColor" />
+                    <div className="flex items-center gap-3 text-xs text-[var(--muted)]">
+                      <span className="flex items-center gap-1 text-amber-500 font-semibold">
+                        <Star size={12} fill="currentColor" />
                         {course.rating}
                       </span>
-                      <span className="flex items-center gap-0.5">
-                        <Users size={10} />
+                      <span className="flex items-center gap-1">
+                        <Users size={12} />
                         {course.students}
                       </span>
-                      <span className="flex items-center gap-0.5">
-                        <Clock3 size={10} />
+                      <span className="flex items-center gap-1">
+                        <Clock3 size={12} />
                         {course.duration}
                       </span>
                     </div>
@@ -426,7 +428,7 @@ export default function CourseCatalog(props: Props) {
                             style={{ width: `${course.progress}%` }}
                           />
                         </div>
-                        <p className="text-[10px] text-[var(--muted)] mt-0.5">
+                        <p className="text-xs text-[var(--muted)] mt-0.5">
                           {course.progress}% пройдено
                         </p>
                       </div>
@@ -434,7 +436,7 @@ export default function CourseCatalog(props: Props) {
 
                     <div className="flex items-center justify-between">
                       <span
-                        className={`text-sm font-bold ${course.price === "Бесплатно" ? "text-green-600 dark:text-green-400" : "text-[var(--text)]"}`}
+                        className={`text-base font-bold ${course.price === "Бесплатно" ? "text-green-600 dark:text-green-400" : "text-[var(--text)]"}`}
                       >
                         {course.price}
                       </span>
@@ -444,9 +446,10 @@ export default function CourseCatalog(props: Props) {
                             e.stopPropagation();
                             onEnroll(course.id);
                           }}
-                          className="text-[10px] px-3 py-1.5 rounded-lg btn-gradient text-white transition-colors font-semibold"
+                          disabled={enrollingIds.has(course.id)}
+                          className="text-sm px-4 py-2 rounded-xl btn-gradient text-white transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Записаться
+                          {enrollingIds.has(course.id) ? "Запись..." : "Записаться"}
                         </button>
                       )}
                     </div>

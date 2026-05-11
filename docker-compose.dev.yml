@@ -1,13 +1,4 @@
 services:
-  frontend:
-    build:
-      context: ./frontend
-    container_name: gradus-frontend
-    ports:
-      - "80:80"
-    depends_on:
-      - backend-python
-
   backend-python:
     build:
       context: ./backend

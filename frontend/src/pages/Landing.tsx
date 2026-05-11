@@ -47,18 +47,18 @@ export default function Landing() {
   const globePulseColor = theme === "dark" ? "#FFCECE" : "#F83B3B";
 
   const tracks = [
-    { name: "Python Backend", icon: <Terminal size={20} /> },
-    { name: "Web Development", icon: <Globe size={20} /> },
-    { name: "Data Science", icon: <Cpu size={20} /> },
-    { name: "UI/UX Design", icon: <Layers size={20} /> },
+    { name: "Программирование", icon: <Terminal size={20} /> },
+    { name: "Веб-разработка", icon: <Globe size={20} /> },
+    { name: "Аналитика данных", icon: <Cpu size={20} /> },
+    { name: "UI/UX Дизайн", icon: <Layers size={20} /> },
     { name: "Тестирование", icon: <Code size={20} /> },
     { name: "DevOps", icon: <Zap size={20} /> },
   ];
 
   const features = [
-    { icon: <Code size={22} />, title: "Практика в браузере", desc: "Пишите и запускайте код прямо в браузере без установки инструментов" },
+    { icon: <Code size={22} />, title: "Практика на платформе", desc: "Выполняйте задания прямо на платформе без лишних настроек и установок" },
     { icon: <Brain size={22} />, title: "AI-наставник", desc: "Получайте мгновенную обратную связь и подсказки от искусственного интеллекта" },
-    { icon: <Shield size={22} />, title: "Авто-проверка кода", desc: "Каждое решение проходит автоматическую проверку на тестах и качество" },
+    { icon: <Shield size={22} />, title: "Авто-проверка заданий", desc: "Каждое задание проходит автоматическую проверку — результат сразу" },
     { icon: <Trophy size={22} />, title: "Сертификаты", desc: "Подтвердите свои навыки официальным сертификатом после завершения курса" },
   ];
 
@@ -121,11 +121,11 @@ export default function Landing() {
   useEffect(() => {
     const FEMALE = ["Анна","Мария","Ольга","София","Полина","Елена","Юлия","Алина","Виктория","Дарья","Ксения","Екатерина"];
     const MALE   = ["Дмитрий","Артём","Никита","Иван","Кирилл","Андрей","Денис","Максим","Тимур","Егор","Алексей","Павел"];
-    const COURSE_NAMES = ["React + TS","Python Backend","FastAPI","Алгоритмы","Go Backend","Rust","UI/UX","Data Science","DevOps","SQL","Node.js","Machine Learning"];
+    const COURSE_NAMES = ["Основы Python","Веб-дизайн","Аналитика данных","Тестирование ПО","Управление проектами","UI/UX","DevOps","Machine Learning","SQL","Кибербезопасность","Веб-разработка","Soft Skills"];
     const XP_AMOUNTS = [50, 100, 150, 200, 250, 300, 500];
     const SCORES = ["95/100","98/100","100/100","92/100","100/100","100/100"];
-    const LEVELS = ["до Junior","до Junior+","до Mid","до Mid+","до Senior"];
-    const LANGS = ["FastAPI","React","Go","Rust","TypeScript","Python"];
+    const LEVELS = ["до уровня Базовый","до уровня Средний","до уровня Продвинутый","до уровня Эксперт","до топ-10% платформы"];
+    const LANGS = ["Python","SQL","Figma","Linux","TypeScript","Power BI"];
     const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
 
     type Variant = {
@@ -144,7 +144,7 @@ export default function Landing() {
       { action: f => f ? "получила сертификат" : "получил сертификат", detail: () => null,                   icon: <Trophy size={18} />,        accentBg: "bg-amber-500/10",   accentText: "text-amber-600 dark:text-amber-400" },
       { action: f => f ? "поднялась" : "поднялся",                     detail: () => pick(LEVELS),           icon: <Sparkles size={18} />,      accentBg: "bg-burgundy/10",    accentText: "text-burgundy-600 dark:text-burgundy-400" },
       { action: f => f ? "присоединилась к сообществу" : "присоединился к сообществу", detail: () => null,   icon: <Users size={18} />,         accentBg: "bg-primary/10",     accentText: "text-primary" },
-      { action: f => f ? "написала код на" : "написал код на",         detail: () => pick(LANGS),            icon: <Code size={18} />,          accentBg: "bg-sky-500/10",     accentText: "text-sky-600 dark:text-sky-400" },
+      { action: f => f ? "поработала с" : "поработал с",               detail: () => pick(LANGS),            icon: <Code size={18} />,          accentBg: "bg-sky-500/10",     accentText: "text-sky-600 dark:text-sky-400" },
       { action: f => f ? "вошла в" : "вошёл в",                        detail: () => `топ-${pick(["3","5","10","20","50"])} лидерборда`, icon: <Star size={18} />,        accentBg: "bg-amber-500/10",   accentText: "text-amber-600 dark:text-amber-400" },
     ];
 
@@ -194,10 +194,10 @@ export default function Landing() {
 
 
   const stats = [
-    { label: "Курсов", value: landingStats.coursesTotal || "6+" },
-    { label: "Студентов", value: fmt(landingStats.studentsTotal) || "—" },
-    { label: "Средний рейтинг", value: avgRating },
-    { label: "Сообщество", value: fmt(landingStats.communityMembers) || "—" },
+    { label: "Курсов на платформе", value: landingStats.coursesTotal || "6+", sub: "и постоянно растёт", icon: <Layers size={20} /> },
+    { label: "Студентов обучается", value: fmt(landingStats.studentsTotal) || "—", sub: "со всей страны", icon: <Users size={20} /> },
+    { label: "Средний рейтинг", value: avgRating, sub: "по отзывам студентов", icon: <Star size={20} /> },
+    { label: "Участников сообщества", value: fmt(landingStats.communityMembers) || "—", sub: "в нашем чате", icon: <Globe size={20} /> },
   ];
 
   return (
@@ -251,8 +251,11 @@ export default function Landing() {
         </div>
       </nav>
 
+      {/* ── HERO + MARQUEE wrapper ── */}
+      <div className="flex flex-col min-h-[calc(100vh-64px)]">
+
       {/* ── HERO ── */}
-      <section className="relative w-full px-4 sm:px-6 lg:px-10 xl:px-16 pt-20 pb-24 md:pt-28 md:pb-32 flex flex-col items-center text-center">
+      <section className="relative w-full flex-1 px-4 sm:px-6 lg:px-10 xl:px-16 flex flex-col items-center justify-center text-center py-20">
         {/* Background blob + interactive particle network */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary/5 rounded-full blur-[120px]" />
@@ -266,25 +269,19 @@ export default function Landing() {
           />
         </div>
 
-        <div
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/20 bg-primary-50 dark:bg-primary-900/20 text-primary text-xs font-semibold mb-6"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-          Образование нового уровня
-        </div>
 
         <h1
           className="font-display font-bold text-3xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight mb-6 max-w-4xl"
         >
-          Стань разработчиком{" "}
-          <span className="text-gradient-red">через практику</span>
+          Учись новому{" "}
+          <span className="text-gradient-red">в своём темпе</span>
         </h1>
 
         <p
           className="text-lg md:text-xl text-[var(--muted)] max-w-2xl mb-10 leading-relaxed"
         >
-          Интерактивные курсы, мгновенная AI-проверка кода и сильное сообщество.
-          Постройте карьеру в IT от нуля до первого оффера.
+          Интерактивные курсы, мгновенная AI-проверка заданий и сильное сообщество.
+          Развивайте навыки и достигайте новых высот в выбранном направлении.
         </p>
 
         <div
@@ -305,12 +302,12 @@ export default function Landing() {
         {/* Floating cards — chaotically scattered around the hero */}
         {[
           { icon: <Flame size={20} />,        title: "Стрик 14 дней!",  desc: "Не сдавайся!",     iconBg: "bg-primary/10",     iconColor: "text-primary",                              pos: "top-[4%] left-[3%]",                       rotateDeg: -8, delay: 0.50 },
-          { icon: <Trophy size={20} />,       title: "Сертификат",      desc: "Junior Developer", iconBg: "bg-amber-500/10",   iconColor: "text-amber-600 dark:text-amber-400",        pos: "top-[14%] right-[7%]",                     rotateDeg:  5, delay: 0.55 },
+          { icon: <Trophy size={20} />,       title: "Сертификат",      desc: "Лучший студент",   iconBg: "bg-amber-500/10",   iconColor: "text-amber-600 dark:text-amber-400",        pos: "top-[14%] right-[7%]",                     rotateDeg:  5, delay: 0.55 },
           { icon: <CheckCircle2 size={20} />, title: "Тест пройден!",   desc: "100/100 баллов",   iconBg: "bg-primary/10",     iconColor: "text-primary",                              pos: "top-[44%] left-[9%]",                      rotateDeg: -4, delay: 0.60 },
           { icon: <Brain size={20} />,        title: "AI-ревью готово", desc: "+3 предложения",   iconBg: "bg-burgundy/10",    iconColor: "text-burgundy-600 dark:text-burgundy-400",  pos: "top-[30%] right-[1%]",                     rotateDeg:  7, delay: 0.65 },
           { icon: <Zap size={20} />,          title: "+250 XP",         desc: "Задача решена",    iconBg: "bg-primary/10",     iconColor: "text-primary",                              pos: "top-[74%] left-[2%]",                      rotateDeg:  6, delay: 0.70 },
-          { icon: <Sparkles size={20} />,     title: "Уровень повышен", desc: "Mid-level Dev",    iconBg: "bg-burgundy/10",    iconColor: "text-burgundy-600 dark:text-burgundy-400",  pos: "top-[60%] right-[9%]",                     rotateDeg: -6, delay: 0.75 },
-          { icon: <CheckCircle2 size={20} />, title: "Курс завершён",   desc: "React + TS",       iconBg: "bg-emerald-500/10", iconColor: "text-emerald-600 dark:text-emerald-400",    pos: "bottom-[3%] left-[46%] -translate-x-1/2",  rotateDeg:  3, delay: 0.80 },
+          { icon: <Sparkles size={20} />,     title: "Уровень повышен", desc: "Эксперт курса",   iconBg: "bg-burgundy/10",    iconColor: "text-burgundy-600 dark:text-burgundy-400",  pos: "top-[60%] right-[9%]",                     rotateDeg: -6, delay: 0.75 },
+          { icon: <CheckCircle2 size={20} />, title: "Курс завершён",   desc: "Аналитика данных", iconBg: "bg-emerald-500/10", iconColor: "text-emerald-600 dark:text-emerald-400",    pos: "bottom-[3%] left-[46%] -translate-x-1/2",  rotateDeg:  3, delay: 0.80 },
         ].map((card, i) => (
           <div
             key={i}
@@ -330,20 +327,22 @@ export default function Landing() {
         ))}
       </section>
 
-      {/* ── STATS ── */}
-      <section className="border-y border-[var(--border)] bg-[var(--surface)]">
-        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-12 grid grid-cols-2 md:grid-cols-4 gap-8">
-          {stats.map((s, i) => (
-            <div
-              key={i}
-              className="text-center"
-            >
-              <p className="font-display font-bold text-2xl sm:text-4xl md:text-5xl text-gradient-red mb-1">{s.value}</p>
-              <p className="text-sm font-medium text-[var(--muted)]">{s.label}</p>
+      {/* ── STATS MARQUEE ── */}
+      <section className="border-t border-[var(--border)] bg-[var(--surface)] overflow-hidden py-5 select-none">
+        <div className="flex w-max animate-marquee gap-0">
+          {[...stats, ...stats, ...stats].map((s, i) => (
+            <div key={i} className="flex items-center gap-3 px-8 border-r border-[var(--border)] whitespace-nowrap">
+              <div className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary shrink-0">
+                {s.icon}
+              </div>
+              <span className="font-display font-bold text-2xl text-gradient-red">{s.value}</span>
+              <span className="text-sm font-medium text-[var(--muted)]">{s.label}</span>
             </div>
           ))}
         </div>
       </section>
+
+      </div>{/* конец hero+marquee wrapper */}
 
       {/* ── LIVE COMMUNITY GLOBE ── */}
       <section id="community" className="relative overflow-hidden border-b border-[var(--border)]">
@@ -365,29 +364,30 @@ export default function Landing() {
         </div>
 
         <div className="relative w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
-          <div
+          <motion.div
             className="text-center mb-16"
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-primary/30 bg-primary-50 dark:bg-primary-900/20 text-primary text-xs font-bold uppercase tracking-widest mb-6">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-              </span>
-              LIVE · сообщество онлайн
-            </div>
             <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-6xl tracking-tight mb-5">
               Сообщество в режиме{" "}
               <span className="text-gradient-red">реального времени</span>
             </h2>
             <p className="text-[var(--muted)] text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-              Прямо сейчас тысячи студентов решают задачи, проходят курсы и пишут код — со всех уголков мира
+              Прямо сейчас тысячи студентов решают задачи, проходят курсы и развиваются — со всех уголков мира
             </p>
-          </div>
+          </motion.div>
 
           <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-12 items-center">
             {/* Globe */}
-            <div
+            <motion.div
               className="relative flex justify-center"
+              initial={{ opacity: 0, x: -60 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="relative">
                 <BinaryGlobe
@@ -398,11 +398,15 @@ export default function Landing() {
                   className="max-w-full h-auto"
                 />
               </div>
-            </div>
+            </motion.div>
 
             {/* Последние достижения — live feed */}
-            <div
+            <motion.div
               className="card p-6 md:p-7 backdrop-blur-sm bg-[var(--bg)]/80"
+              initial={{ opacity: 0, x: 60 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.8, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="flex items-center justify-between mb-5 pb-4 border-b border-[var(--border)]">
                 <div className="flex items-center gap-3">
@@ -452,35 +456,44 @@ export default function Landing() {
                   ))}
                 </AnimatePresence>
               </div>
-            </div>
+            </motion.div>
           </div>
+
         </div>
       </section>
 
       {/* ── FEATURES ── */}
       <section id="features" className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
-        <div
+        <motion.div
           className="text-center mb-16"
+          initial={{ opacity: 0, y: 32 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         >
           <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Возможности платформы</p>
           <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl mb-4">Всё для вашего роста</h2>
           <p className="text-[var(--muted)] text-lg max-w-xl mx-auto">
             Инструменты, которые превращают обучение в удовольствие
           </p>
-        </div>
+        </motion.div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {features.map((f, i) => (
-            <div
+            <motion.div
               key={i}
               className="card p-6 hover:shadow-card-md transition-shadow group"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
                 {f.icon}
               </div>
               <h3 className="font-display font-semibold text-base mb-2">{f.title}</h3>
               <p className="text-sm text-[var(--muted)] leading-relaxed">{f.desc}</p>
-            </div>
+            </motion.div>
           ))}
         </div>
       </section>
@@ -488,12 +501,16 @@ export default function Landing() {
       {/* ── HOW IT WORKS ── */}
       <section className="bg-[var(--surface)] border-y border-[var(--border)] py-24">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16">
-          <div
+          <motion.div
             className="text-center mb-16"
+            initial={{ opacity: 0, y: 32 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           >
             <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Как это работает</p>
             <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl">Три шага до результата</h2>
-          </div>
+          </motion.div>
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
@@ -501,9 +518,13 @@ export default function Landing() {
               { step: "02", title: "Решайте задачи", desc: "Практикуйтесь в браузере с мгновенной проверкой. AI-наставник поможет разобраться со сложными моментами." },
               { step: "03", title: "Получите сертификат", desc: "Завершите все шаги курса и получите сертификат, подтверждающий ваши навыки." },
             ].map((item, i) => (
-              <div
+              <motion.div
                 key={i}
                 className="relative"
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5, delay: i * 0.15, ease: [0.22, 1, 0.36, 1] }}
               >
                 <div className="text-6xl font-display font-bold text-primary mb-4">{item.step}</div>
                 <h3 className="font-display font-semibold text-xl mb-3">{item.title}</h3>
@@ -513,7 +534,7 @@ export default function Landing() {
                     <ChevronRight size={32} />
                   </div>
                 )}
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -521,8 +542,12 @@ export default function Landing() {
 
       {/* ── TRACKS ── */}
       <section id="tracks" className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
-        <div
+        <motion.div
           className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12"
+          initial={{ opacity: 0, y: 32 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         >
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Направления</p>
@@ -531,20 +556,24 @@ export default function Landing() {
           <Link to="/register" className="btn-secondary px-5 py-2.5 text-sm w-fit gap-1.5">
             Все треки <ArrowRight size={15} />
           </Link>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {tracks.map((track, i) => (
-            <div
+            <motion.div
               key={i}
               className="card p-5 flex items-center gap-4 hover:shadow-card-md hover:border-primary/20 transition-all group cursor-pointer"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.45, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="w-11 h-11 rounded-xl bg-[var(--surface)] flex items-center justify-center text-[var(--muted)] group-hover:bg-primary-50 group-hover:text-primary dark:group-hover:bg-primary-900/20 transition-colors shrink-0">
                 {track.icon}
               </div>
               <span className="font-semibold text-sm">{track.name}</span>
               <ChevronRight size={16} className="ml-auto text-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
+            </motion.div>
           ))}
         </div>
       </section>
@@ -552,8 +581,12 @@ export default function Landing() {
       {/* ── COURSES ── */}
       <section id="courses" className="bg-[var(--surface)] border-t border-[var(--border)] py-24">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16">
-          <div
+          <motion.div
             className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12"
+            initial={{ opacity: 0, y: 32 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           >
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Каталог</p>
@@ -562,7 +595,7 @@ export default function Landing() {
             <Link to="/register" className="btn-primary px-5 py-2.5 text-sm w-fit gap-1.5">
               Все курсы <ArrowRight size={15} />
             </Link>
-          </div>
+          </motion.div>
 
           {coursesLoading ? (
             <div className="grid md:grid-cols-3 gap-5">
@@ -577,9 +610,13 @@ export default function Landing() {
           ) : courses.length > 0 ? (
             <div className="grid md:grid-cols-3 gap-5">
               {courses.map((course, _i) => (
-                <div
+                <motion.div
                   key={course.id}
                   className="card p-6 flex flex-col hover:shadow-card-md hover:border-primary/20 transition-all"
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.5, delay: _i * 0.1, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="flex items-start justify-between gap-2 mb-4">
                     <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary shrink-0">
@@ -603,7 +640,7 @@ export default function Landing() {
                       {course.duration}
                     </span>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           ) : (
@@ -677,8 +714,12 @@ export default function Landing() {
 
       {/* ── CTA ── */}
       <section className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
-        <div
+        <motion.div
           className="relative overflow-hidden rounded-3xl bg-primary p-12 md:p-20 text-center text-white"
+          initial={{ opacity: 0, y: 40, scale: 0.98 }}
+          whileInView={{ opacity: 1, y: 0, scale: 1 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         >
           {/* Background shapes */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
@@ -687,7 +728,7 @@ export default function Landing() {
           <div className="relative z-10">
             <p className="text-xs font-bold uppercase tracking-widest text-white/60 mb-4">Начните сегодня</p>
             <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl mb-6 text-white">
-              Готовы изменить карьеру?
+              Готовы начать обучение?
             </h2>
             <p className="text-white/80 text-lg mb-10 max-w-xl mx-auto">
               Зарегистрируйтесь бесплатно и начните первый урок прямо сейчас
@@ -704,7 +745,7 @@ export default function Landing() {
               </Link>
             </div>
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* ── FOOTER ── */}
@@ -716,7 +757,7 @@ export default function Landing() {
             iconClassName="h-7 w-7"
             textClassName="text-lg font-bold font-display text-[var(--text)]"
           />
-          <p className="text-sm text-[var(--muted)]">© {new Date().getFullYear()} Gradus. Платформа для обучения IT-профессиям.</p>
+          <p className="text-sm text-[var(--muted)]">© {new Date().getFullYear()} Gradus. Платформа для онлайн-обучения.</p>
           <div className="flex items-center gap-4 text-sm text-[var(--muted)]">
             <Link to="/privacy" className="hover:text-[var(--text)] transition-colors">Политика конфиденциальности</Link>
             <Link to="/terms" className="hover:text-[var(--text)] transition-colors">Условия использования</Link>

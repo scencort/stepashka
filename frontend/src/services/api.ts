@@ -844,6 +844,11 @@ const routeMappings: RouteMapping[] = [
     method: "GET",
     transform: <T>() => backendRequest<T>("/notifications"),
   },
+  {
+    pattern: "/notifications",
+    method: "DELETE",
+    transform: <T>() => passthrough<T>("/notifications", "DELETE"),
+  },
 ];
 
 /* ── Request router ── */
