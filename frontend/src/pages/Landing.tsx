@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   Sun,
@@ -35,6 +35,16 @@ export default function Landing() {
   const { theme, toggleTheme } = useTheme();
   const { user, loadingUser } = useAppStore();
 
+  // Stable references per theme so re-renders (e.g. from the live
+  // achievements ticker) don't tear down the BinaryGlobe animation loop.
+  const globePalette = useMemo<string[]>(
+    () =>
+      theme === "dark"
+        ? ["#FF6B6B", "#F83B3B", "#DC2626", "#7C1D1D", "#FFA3A3"]
+        : ["#DC2626", "#B91C1C", "#7C1D1D", "#9A1B1B", "#F87171"],
+    [theme]
+  );
+  const globePulseColor = theme === "dark" ? "#FFCECE" : "#F83B3B";
 
   const tracks = [
     { name: "Python Backend", icon: <Terminal size={20} /> },
@@ -93,6 +103,95 @@ export default function Landing() {
     () => landingStats.averageRating > 0 ? landingStats.averageRating.toFixed(1) : "—",
     [landingStats.averageRating]
   );
+
+  // ── Live activity feed (mock, decoupled from DB) ──
+  type ActivityItem = {
+    id: number;
+    name: string;
+    action: string;
+    detail: string | null;
+    icon: React.ReactNode;
+    accentBg: string;
+    accentText: string;
+    createdAt: number;
+  };
+  const [feed, setFeed] = useState<ActivityItem[]>([]);
+  const [, setFeedTick] = useState(0);
+
+  useEffect(() => {
+    const FEMALE = ["Анна","Мария","Ольга","София","Полина","Елена","Юлия","Алина","Виктория","Дарья","Ксения","Екатерина"];
+    const MALE   = ["Дмитрий","Артём","Никита","Иван","Кирилл","Андрей","Денис","Максим","Тимур","Егор","Алексей","Павел"];
+    const COURSE_NAMES = ["React + TS","Python Backend","FastAPI","Алгоритмы","Go Backend","Rust","UI/UX","Data Science","DevOps","SQL","Node.js","Machine Learning"];
+    const XP_AMOUNTS = [50, 100, 150, 200, 250, 300, 500];
+    const SCORES = ["95/100","98/100","100/100","92/100","100/100","100/100"];
+    const LEVELS = ["до Junior","до Junior+","до Mid","до Mid+","до Senior"];
+    const LANGS = ["FastAPI","React","Go","Rust","TypeScript","Python"];
+    const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
+
+    type Variant = {
+      action: (isF: boolean) => string;
+      detail: () => string | null;
+      icon: React.ReactNode;
+      accentBg: string;
+      accentText: string;
+    };
+    const VARIANTS: Variant[] = [
+      { action: f => f ? "прошла курс" : "прошёл курс",                detail: () => pick(COURSE_NAMES),     icon: <Trophy size={18} />,        accentBg: "bg-amber-500/10",   accentText: "text-amber-600 dark:text-amber-400" },
+      { action: f => f ? "получила" : "получил",                       detail: () => `+${pick(XP_AMOUNTS)} XP`, icon: <Zap size={18} />,        accentBg: "bg-primary/10",     accentText: "text-primary" },
+      { action: f => f ? "решила задачу" : "решил задачу",             detail: () => null,                   icon: <CheckCircle2 size={18} />,  accentBg: "bg-emerald-500/10", accentText: "text-emerald-600 dark:text-emerald-400" },
+      { action: f => f ? "выполнила задание" : "выполнил задание",     detail: () => null,                   icon: <CheckCircle2 size={18} />,  accentBg: "bg-emerald-500/10", accentText: "text-emerald-600 dark:text-emerald-400" },
+      { action: f => f ? "сдала тест на" : "сдал тест на",             detail: () => pick(SCORES),           icon: <Star size={18} />,          accentBg: "bg-amber-500/10",   accentText: "text-amber-600 dark:text-amber-400" },
+      { action: f => f ? "получила сертификат" : "получил сертификат", detail: () => null,                   icon: <Trophy size={18} />,        accentBg: "bg-amber-500/10",   accentText: "text-amber-600 dark:text-amber-400" },
+      { action: f => f ? "поднялась" : "поднялся",                     detail: () => pick(LEVELS),           icon: <Sparkles size={18} />,      accentBg: "bg-burgundy/10",    accentText: "text-burgundy-600 dark:text-burgundy-400" },
+      { action: f => f ? "присоединилась к сообществу" : "присоединился к сообществу", detail: () => null,   icon: <Users size={18} />,         accentBg: "bg-primary/10",     accentText: "text-primary" },
+      { action: f => f ? "написала код на" : "написал код на",         detail: () => pick(LANGS),            icon: <Code size={18} />,          accentBg: "bg-sky-500/10",     accentText: "text-sky-600 dark:text-sky-400" },
+      { action: f => f ? "вошла в" : "вошёл в",                        detail: () => `топ-${pick(["3","5","10","20","50"])} лидерборда`, icon: <Star size={18} />,        accentBg: "bg-amber-500/10",   accentText: "text-amber-600 dark:text-amber-400" },
+    ];
+
+    let counter = 0;
+    let lastVariant = -1;
+    const makeItem = (ageSec = 0): ActivityItem => {
+      const isF = Math.random() > 0.5;
+      const name = pick(isF ? FEMALE : MALE);
+      let vi = Math.floor(Math.random() * VARIANTS.length);
+      if (VARIANTS.length > 1 && vi === lastVariant) vi = (vi + 1) % VARIANTS.length;
+      lastVariant = vi;
+      const v = VARIANTS[vi];
+      counter += 1;
+      return {
+        id: Date.now() + counter,
+        name,
+        action: v.action(isF),
+        detail: v.detail(),
+        icon: v.icon,
+        accentBg: v.accentBg,
+        accentText: v.accentText,
+        createdAt: Date.now() - ageSec * 1000,
+      };
+    };
+
+    setFeed([makeItem(3), makeItem(38), makeItem(120), makeItem(310)]);
+
+    const addId = window.setInterval(() => {
+      setFeed(prev => [makeItem(0), ...prev].slice(0, 4));
+    }, 3600);
+
+    const tickId = window.setInterval(() => setFeedTick(t => t + 1), 10000);
+
+    return () => {
+      window.clearInterval(addId);
+      window.clearInterval(tickId);
+    };
+  }, []);
+
+  const feedTimeLabel = (createdAt: number) => {
+    const sec = Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
+    if (sec < 5) return "только что";
+    if (sec < 60) return `${sec} с назад`;
+    const min = Math.floor(sec / 60);
+    return `${min} мин назад`;
+  };
+
 
   const stats = [
     { label: "Курсов", value: landingStats.coursesTotal || "6+" },
@@ -203,20 +302,22 @@ export default function Landing() {
           </a>
         </div>
 
-        {/* Floating cards — 7 around the hero */}
+        {/* Floating cards — chaotically scattered around the hero */}
         {[
-          { icon: <Flame size={20} />,        title: "Стрик 14 дней!",  desc: "Не сдавайся!",     iconBg: "bg-primary/10",     iconColor: "text-primary",                              pos: "top-12 left-4",                       rotateDeg: -6, fromX: -40, delay: 0.50 },
-          { icon: <Trophy size={20} />,       title: "Сертификат",      desc: "Junior Developer", iconBg: "bg-amber-500/10",   iconColor: "text-amber-600 dark:text-amber-400",        pos: "top-12 right-4",                      rotateDeg:  6, fromX:  40, delay: 0.55 },
-          { icon: <CheckCircle2 size={20} />, title: "Тест пройден!",   desc: "100/100 баллов",   iconBg: "bg-primary/10",     iconColor: "text-primary",                              pos: "top-1/3 left-2",                      rotateDeg: -3, fromX: -40, delay: 0.60 },
-          { icon: <Brain size={20} />,        title: "AI-ревью готово", desc: "+3 предложения",   iconBg: "bg-burgundy/10",    iconColor: "text-burgundy-600 dark:text-burgundy-400",  pos: "top-1/3 right-2",                     rotateDeg:  3, fromX:  40, delay: 0.65 },
-          { icon: <Zap size={20} />,          title: "+250 XP",         desc: "Задача решена",    iconBg: "bg-primary/10",     iconColor: "text-primary",                              pos: "bottom-12 left-4",                    rotateDeg:  3, fromX: -40, delay: 0.70 },
-          { icon: <Sparkles size={20} />,     title: "Уровень повышен", desc: "Mid-level Dev",    iconBg: "bg-burgundy/10",    iconColor: "text-burgundy-600 dark:text-burgundy-400",  pos: "bottom-12 right-4",                   rotateDeg: -3, fromX:  40, delay: 0.75 },
-          { icon: <CheckCircle2 size={20} />, title: "Курс завершён",   desc: "React + TS",       iconBg: "bg-emerald-500/10", iconColor: "text-emerald-600 dark:text-emerald-400",    pos: "bottom-2 left-1/2 -translate-x-1/2", rotateDeg:  1, fromX:   0, delay: 0.80 },
+          { icon: <Flame size={20} />,        title: "Стрик 14 дней!",  desc: "Не сдавайся!",     iconBg: "bg-primary/10",     iconColor: "text-primary",                              pos: "top-[4%] left-[3%]",                       rotateDeg: -8, delay: 0.50 },
+          { icon: <Trophy size={20} />,       title: "Сертификат",      desc: "Junior Developer", iconBg: "bg-amber-500/10",   iconColor: "text-amber-600 dark:text-amber-400",        pos: "top-[14%] right-[7%]",                     rotateDeg:  5, delay: 0.55 },
+          { icon: <CheckCircle2 size={20} />, title: "Тест пройден!",   desc: "100/100 баллов",   iconBg: "bg-primary/10",     iconColor: "text-primary",                              pos: "top-[44%] left-[9%]",                      rotateDeg: -4, delay: 0.60 },
+          { icon: <Brain size={20} />,        title: "AI-ревью готово", desc: "+3 предложения",   iconBg: "bg-burgundy/10",    iconColor: "text-burgundy-600 dark:text-burgundy-400",  pos: "top-[30%] right-[1%]",                     rotateDeg:  7, delay: 0.65 },
+          { icon: <Zap size={20} />,          title: "+250 XP",         desc: "Задача решена",    iconBg: "bg-primary/10",     iconColor: "text-primary",                              pos: "top-[74%] left-[2%]",                      rotateDeg:  6, delay: 0.70 },
+          { icon: <Sparkles size={20} />,     title: "Уровень повышен", desc: "Mid-level Dev",    iconBg: "bg-burgundy/10",    iconColor: "text-burgundy-600 dark:text-burgundy-400",  pos: "top-[60%] right-[9%]",                     rotateDeg: -6, delay: 0.75 },
+          { icon: <CheckCircle2 size={20} />, title: "Курс завершён",   desc: "React + TS",       iconBg: "bg-emerald-500/10", iconColor: "text-emerald-600 dark:text-emerald-400",    pos: "bottom-[3%] left-[46%] -translate-x-1/2",  rotateDeg:  3, delay: 0.80 },
         ].map((card, i) => (
-          <div key={i} className={`absolute ${card.pos} hidden xl:block pointer-events-none`}>
-            <div
-              className="card p-4 shadow-card-md flex items-center gap-3 whitespace-nowrap"
-            >
+          <div
+            key={i}
+            className={`absolute ${card.pos} hidden xl:block pointer-events-none`}
+            style={{ transform: `rotate(${card.rotateDeg}deg)` }}
+          >
+            <div className="card p-4 shadow-card-md flex items-center gap-3 whitespace-nowrap">
               <div className={`w-10 h-10 rounded-xl ${card.iconBg} flex items-center justify-center ${card.iconColor} shrink-0`}>
                 {card.icon}
               </div>
@@ -292,32 +393,14 @@ export default function Landing() {
                 <BinaryGlobe
                   size={520}
                   pointCount={1200}
-                  palette={
-                    theme === "dark"
-                      ? ["#FF6B6B", "#F83B3B", "#DC2626", "#7C1D1D", "#FFA3A3"]
-                      : ["#DC2626", "#B91C1C", "#7C1D1D", "#9A1B1B", "#F87171"]
-                  }
-                  pulseColor={theme === "dark" ? "#FFCECE" : "#F83B3B"}
+                  palette={globePalette}
+                  pulseColor={globePulseColor}
                   className="max-w-full h-auto"
                 />
-                {/* Telemetry corner labels */}
-                <div className="absolute top-2 left-2 hidden md:flex items-center gap-2 text-[11px] font-mono text-[var(--muted)] bg-[var(--bg)]/60 backdrop-blur-sm px-2 py-1 rounded">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  STUDENTS: {fmt(landingStats.studentsTotal)}
-                </div>
-                <div className="absolute top-2 right-2 hidden md:flex items-center gap-2 text-[11px] font-mono text-[var(--muted)] bg-[var(--bg)]/60 backdrop-blur-sm px-2 py-1 rounded">
-                  COURSES: {landingStats.coursesTotal || "—"}
-                </div>
-                <div className="absolute bottom-2 left-2 hidden md:flex items-center gap-2 text-[11px] font-mono text-[var(--muted)] bg-[var(--bg)]/60 backdrop-blur-sm px-2 py-1 rounded">
-                  RATING: {avgRating}
-                </div>
-                <div className="absolute bottom-2 right-2 hidden md:flex items-center gap-2 text-[11px] font-mono text-[var(--muted)] bg-[var(--bg)]/60 backdrop-blur-sm px-2 py-1 rounded">
-                  COMMUNITY: {fmt(landingStats.communityMembers)}
-                </div>
               </div>
             </div>
 
-            {/* Последние достижения */}
+            {/* Последние достижения — live feed */}
             <div
               className="card p-6 md:p-7 backdrop-blur-sm bg-[var(--bg)]/80"
             >
@@ -331,50 +414,45 @@ export default function Landing() {
                     <h3 className="font-display font-semibold text-base leading-none">Последние достижения</h3>
                   </div>
                 </div>
+                <span className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--muted)]">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inset-0 rounded-full bg-emerald-500 opacity-75 animate-ping" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  LIVE
+                </span>
               </div>
 
-              <div className="space-y-5">
-                {[
-                  { icon: <Code size={18} />, label: "Курсов на платформе", value: landingStats.coursesTotal || "—" },
-                  { icon: <Users size={18} />, label: "Студентов обучается", value: fmt(landingStats.studentsTotal) || "—" },
-                  { icon: <Star size={18} />, label: "Средний рейтинг курсов", value: avgRating },
-                  { icon: <Users size={18} />, label: "Участников сообщества", value: fmt(landingStats.communityMembers) || "—" },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-4 p-4 rounded-xl bg-[var(--surface)] border border-[var(--border-soft)]"
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                      {item.icon}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-[var(--muted)]">{item.label}</p>
-                    </div>
-                    <p className="font-display font-bold text-2xl text-gradient-red">{item.value}</p>
-                  </div>
-                ))}
+              <div className="space-y-3 relative min-h-[19rem]">
+                <AnimatePresence initial={false} mode="popLayout">
+                  {feed.map((item) => (
+                    <motion.div
+                      key={item.id}
+                      layout="position"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-[var(--surface)] border border-[var(--border-soft)]"
+                    >
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${item.accentBg} ${item.accentText}`}>
+                        {item.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm leading-snug truncate">
+                          <span className="font-semibold text-[var(--text)]">{item.name}</span>
+                          <span className="text-[var(--muted)]"> {item.action}</span>
+                          {item.detail && (
+                            <span className="font-semibold text-[var(--text)]"> {item.detail}</span>
+                          )}
+                        </p>
+                        <p className="text-[11px] font-mono text-[var(--muted)] mt-0.5">{feedTimeLabel(item.createdAt)}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
             </div>
-          </div>
-
-          {/* Bottom telemetry tiles */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-14">
-            {[
-              { label: "Курсов",           value: String(landingStats.coursesTotal || "—"), mono: false },
-              { label: "Студентов",         value: fmt(landingStats.studentsTotal) || "—",  mono: false },
-              { label: "Средний рейтинг",   value: avgRating,                               mono: true  },
-              { label: "Сообщество",        value: fmt(landingStats.communityMembers) || "—", mono: false },
-            ].map((tile, i) => (
-              <div
-                key={i}
-                className="card p-5 text-center bg-[var(--bg)]/80 backdrop-blur-sm"
-              >
-                <p className={`font-bold text-3xl md:text-4xl text-gradient-red mb-1 ${tile.mono ? "font-mono" : "font-display"}`}>
-                  {tile.value}
-                </p>
-                <p className="text-xs font-medium text-[var(--muted)] uppercase tracking-wider">{tile.label}</p>
-              </div>
-            ))}
           </div>
         </div>
       </section>
