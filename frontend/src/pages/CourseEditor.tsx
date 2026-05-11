@@ -325,7 +325,7 @@ function StepEditor({
                     <label className="text-xs text-slate-500 mb-1 block">Тест-кейсы</label>
                     <div className="space-y-2">
                       {(step.content.tests || []).map((test, idx) => (
-                        <div key={idx} className="grid grid-cols-2 gap-2">
+                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <input
                             value={test.input}
                             onChange={(e) => {
@@ -604,40 +604,45 @@ export default function CourseEditor() {
   }
 
   const saveStructure = async (cid: number) => {
-    // Save modules and lessons sequentially
     for (const mod of modules) {
       let modId = mod.id
-      if (!modId) {
-        const savedMod = await api.post<{ id: number }>(`/teacher/courses/${cid}/modules`, {
-          title: mod.title,
-          moduleOrder: mod.moduleOrder,
-        })
+      const modPayload = { title: mod.title, moduleOrder: mod.moduleOrder }
+      if (modId) {
+        await api.patch(`/teacher/modules/${modId}`, modPayload)
+      } else {
+        const savedMod = await api.post<{ id: number }>(`/teacher/courses/${cid}/modules`, modPayload)
         modId = savedMod.id
       }
 
       for (const lesson of mod.lessons) {
         let lessonId = lesson.id
-        if (!lessonId) {
-          const savedLesson = await api.post<{ id: number }>(`/teacher/courses/${cid}/lessons`, {
-            moduleId: modId,
-            title: lesson.title,
-            lessonOrder: lesson.lessonOrder,
-            lessonType: lesson.lessonType,
-            contentText: lesson.contentText,
-          })
+        const lessonPayload = {
+          moduleId: modId,
+          title: lesson.title,
+          lessonOrder: lesson.lessonOrder,
+          lessonType: lesson.lessonType,
+          contentText: lesson.contentText,
+        }
+        if (lessonId) {
+          await api.patch(`/teacher/lessons/${lessonId}`, lessonPayload)
+        } else {
+          const savedLesson = await api.post<{ id: number }>(`/teacher/courses/${cid}/lessons`, lessonPayload)
           lessonId = savedLesson.id
         }
 
         for (const step of lesson.steps) {
-          if (!step.id) {
-            await api.post(`/teacher/courses/${cid}/steps`, {
-              lessonId,
-              title: step.title,
-              stepOrder: step.stepOrder,
-              stepType: step.stepType,
-              xp: step.xp,
-              content: step.content,
-            })
+          const stepPayload = {
+            lessonId,
+            title: step.title,
+            stepOrder: step.stepOrder,
+            stepType: step.stepType,
+            xp: step.xp,
+            content: step.content,
+          }
+          if (step.id) {
+            await api.patch(`/teacher/steps/${step.id}`, stepPayload)
+          } else {
+            await api.post(`/teacher/courses/${cid}/steps`, stepPayload)
           }
         }
       }

@@ -13,6 +13,11 @@ import {
   ShieldCheck,
   X,
   BookOpen,
+  Database,
+  Globe,
+  Calculator,
+  Smartphone,
+  Lock,
 } from "lucide-react";
 import Modal from "../../components/ui/Modal";
 
@@ -21,6 +26,7 @@ type CourseItem = {
   title: string;
   lessons: number;
   progress: number;
+  enrolled?: boolean;
   type: string;
   students: string;
   rating: string;
@@ -71,6 +77,31 @@ const CATEGORY_META: Record<
     label: "Аналитика",
     icon: <BarChart3 size={14} />,
     color: "text-cyan-600 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/20",
+  },
+  Databases: {
+    label: "Базы данных",
+    icon: <Database size={14} />,
+    color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20",
+  },
+  Languages: {
+    label: "Языки",
+    icon: <Globe size={14} />,
+    color: "text-teal-600 bg-teal-50 dark:text-teal-400 dark:bg-teal-900/20",
+  },
+  Math: {
+    label: "Математика",
+    icon: <Calculator size={14} />,
+    color: "text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/20",
+  },
+  Mobile: {
+    label: "Мобильная разработка",
+    icon: <Smartphone size={14} />,
+    color: "text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-900/20",
+  },
+  Security: {
+    label: "Безопасность",
+    icon: <Lock size={14} />,
+    color: "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20",
   },
 };
 
@@ -149,7 +180,7 @@ export default function CourseCatalog(props: Props) {
   }, [courses]);
 
   const myCourses = useMemo(
-    () => courses.filter((c) => c.progress > 0),
+    () => courses.filter((c) => c.enrolled),
     [courses],
   );
 

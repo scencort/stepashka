@@ -273,7 +273,7 @@ export default function AuthScreenShell({ children }: Props) {
       <button
         type="button"
         onClick={toggleTheme}
-        className="absolute right-4 top-4 md:right-6 md:top-6 z-20 inline-flex items-center gap-2 rounded-xl border border-slate-300/70 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/85 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm"
+        className="absolute right-4 top-4 md:right-6 md:top-6 z-20 inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)]/90 px-3 py-2 text-xs font-semibold text-[var(--text)] shadow-sm backdrop-blur-sm hover:bg-[var(--border)]/30 transition-colors"
         aria-label="Сменить тему"
       >
         {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}

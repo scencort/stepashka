@@ -92,13 +92,6 @@ type AttemptEntry = {
   createdAt: string;
 };
 
-type DiscussionMessage = {
-  id: number;
-  author: string;
-  text: string;
-  createdAt: string;
-};
-
 type Props = {
   selectedCourseId: number;
   courseContent: CourseContentResponse | null;
@@ -118,9 +111,6 @@ type Props = {
   attemptHistory: AttemptEntry[];
   activeTab: "content" | "discussion";
   setActiveTab: (v: "content" | "discussion") => void;
-  discussionMessages: DiscussionMessage[];
-  discussionText: string;
-  setDiscussionText: (v: string) => void;
   enrollRequestMessage: string;
   setEnrollRequestMessage: (v: string) => void;
   enrollRequestLoading: boolean;
@@ -132,7 +122,6 @@ type Props = {
   onSubmitStep: () => void;
   onSelectStep: (stepId: number, answerText: string) => void;
   onToggleModule: (moduleId: number) => void;
-  onPostDiscussionMessage: () => void;
 };
 
 export default function CourseDetail(props: Props) {
@@ -155,9 +144,6 @@ export default function CourseDetail(props: Props) {
     attemptHistory,
     activeTab,
     setActiveTab,
-    discussionMessages,
-    discussionText,
-    setDiscussionText,
     enrollRequestMessage,
     setEnrollRequestMessage,
     enrollRequestLoading,
@@ -169,7 +155,6 @@ export default function CourseDetail(props: Props) {
     onSubmitStep,
     onSelectStep,
     onToggleModule,
-    onPostDiscussionMessage,
   } = props;
 
   const activeStep =
@@ -424,13 +409,8 @@ export default function CourseDetail(props: Props) {
             />
           )}
 
-          {activeTab === "discussion" && (
-            <CourseDiscussion
-              discussionMessages={discussionMessages}
-              discussionText={discussionText}
-              setDiscussionText={setDiscussionText}
-              onPostMessage={onPostDiscussionMessage}
-            />
+          {activeTab === "discussion" && courseDetail && (
+            <CourseDiscussion courseId={courseDetail.id} />
           )}
         </div>
 

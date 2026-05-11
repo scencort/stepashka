@@ -27,11 +27,6 @@ class ResetPasswordBody(BaseModel):
     password: str = Field(min_length=8, max_length=120)
 
 
-class TwoFactorVerifyBody(BaseModel):
-    challengeId: str = Field(min_length=8, max_length=200)
-    code: str = Field(pattern=r"^\d{6}$")
-
-
 class RefreshBody(BaseModel):
     refreshToken: str = Field(min_length=1)
 
@@ -62,14 +57,6 @@ class ChangePasswordBody(BaseModel):
 
 class ConfirmEmailBody(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")
-
-
-class TwoFactorConfirmBody(BaseModel):
-    code: str = Field(pattern=r"^\d{6}$")
-
-
-class TwoFactorDisableBody(BaseModel):
-    password: str = Field(min_length=1)
 
 
 # ---- Courses / Teacher ----

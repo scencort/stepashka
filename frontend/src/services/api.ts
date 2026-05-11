@@ -109,13 +109,6 @@ type BackendAuthResponse = {
   refreshToken: string;
 };
 
-type BackendTwoFactorChallengeResponse = {
-  requiresTwoFactor: true;
-  challengeId: string;
-  message: string;
-  devCode?: string | null;
-};
-
 function toPublicUser(user: BackendUser): PublicUser {
   return {
     id: user.id,
@@ -324,29 +317,10 @@ const routeMappings: RouteMapping[] = [
     method: "POST",
     transform: async <T>(_p: string, _m: string, rawBody?: unknown) => {
       const payload = rawBody as { email: string; password: string };
-      const auth = await backendRequest<
-        BackendAuthResponse | BackendTwoFactorChallengeResponse
-      >("/auth/login", {
+      const auth = await backendRequest<BackendAuthResponse>("/auth/login", {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      if ((auth as BackendTwoFactorChallengeResponse).requiresTwoFactor) {
-        return auth as T;
-      }
-      const success = auth as BackendAuthResponse;
-      setTokens(success.accessToken, success.refreshToken);
-      return toPublicUser(success.user) as T;
-    },
-  },
-  {
-    pattern: "/auth/2fa/verify",
-    method: "POST",
-    transform: async <T>(_p: string, _m: string, rawBody?: unknown) => {
-      const payload = rawBody as { challengeId: string; code: string };
-      const auth = await backendRequest<BackendAuthResponse>(
-        "/auth/2fa/verify",
-        { method: "POST", body: JSON.stringify(payload) },
-      );
       setTokens(auth.accessToken, auth.refreshToken);
       return toPublicUser(auth.user) as T;
     },
@@ -563,24 +537,6 @@ const routeMappings: RouteMapping[] = [
       });
     },
   },
-  {
-    pattern: "/account/2fa/request-enable",
-    method: "POST",
-    transform: <T>() => passthrough<T>("/account/2fa/request-enable", "POST", {}),
-  },
-  {
-    pattern: "/account/2fa/confirm-enable",
-    method: "POST",
-    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
-      passthrough<T>("/account/2fa/confirm-enable", m, rawBody),
-  },
-  {
-    pattern: "/account/2fa/disable",
-    method: "POST",
-    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
-      passthrough<T>("/account/2fa/disable", m, rawBody),
-  },
-
   // ── AI ──
   {
     pattern: "/ai/chat",
@@ -715,6 +671,18 @@ const routeMappings: RouteMapping[] = [
         m,
         rawBody,
       ),
+  },
+  {
+    pattern: /^\/teacher\/modules\/\d+$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/teacher/modules/${pathId(p, 3)}`, m, rawBody),
+  },
+  {
+    pattern: /^\/teacher\/lessons\/\d+$/,
+    method: "PATCH",
+    transform: <T>(p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>(`/teacher/lessons/${pathId(p, 3)}`, m, rawBody),
   },
   {
     pattern: /^\/teacher\/steps\/\d+$/,

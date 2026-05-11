@@ -65,7 +65,7 @@ export default function HelpCenter() {
         <h2 className="text-2xl md:text-3xl font-bold">Справка</h2>
 
         <Card>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}

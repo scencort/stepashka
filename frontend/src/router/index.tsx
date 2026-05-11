@@ -20,6 +20,8 @@ const TeacherStudio = lazy(() => import("../pages/TeacherStudio"))
 const AccountSettings = lazy(() => import("../pages/AccountSettings"))
 const CourseEditor = lazy(() => import("../pages/CourseEditor"))
 const NotFound = lazy(() => import("../pages/NotFound"))
+const Privacy = lazy(() => import("../pages/Privacy"))
+const Terms = lazy(() => import("../pages/Terms"))
 import ProtectedRoute from "../features/auth/ProtectedRoute"
 
 const pageFallback = (
@@ -55,6 +57,8 @@ export const Router = () => {
       <Route path="/teacher/courses/new" element={withSuspense(<ProtectedRoute allowedRoles={["teacher", "admin"]}><CourseEditor /></ProtectedRoute>)} />
       <Route path="/teacher/courses/:courseId/edit" element={withSuspense(<ProtectedRoute allowedRoles={["teacher", "admin"]}><CourseEditor /></ProtectedRoute>)} />
       <Route path="/admin" element={withSuspense(<ProtectedRoute allowedRoles={["admin"]}><AdminPanel /></ProtectedRoute>)} />
+      <Route path="/privacy" element={withSuspense(<Privacy />)} />
+      <Route path="/terms" element={withSuspense(<Terms />)} />
       <Route path="*" element={withSuspense(<NotFound />)} />
     </Routes>
   )

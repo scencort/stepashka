@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom"
 
 import { Mail, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react"
 import AuthScreenShell from "../components/auth/AuthScreenShell"
-import { api } from "../services/api"
+import { api } from "../lib/api"
 import { useToast } from "../hooks/useToast"
 import BrandLogo from "../components/BrandLogo"
 

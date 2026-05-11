@@ -114,7 +114,7 @@ export default function TeacherStudio() {
 
         {!loading && !error && data && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
               <Card>
                 <p className="text-sm text-slate-500">Заданий в системе</p>
                 <p className="text-2xl font-bold mt-2">{data.stats.assignments}</p>

@@ -7,15 +7,13 @@ from app import db
 from app.deps import CurrentUser, get_request_meta
 from app.schemas import (
     RegisterBody, LoginBody, ForgotPasswordBody, ResetPasswordBody,
-    TwoFactorVerifyBody, RefreshBody, LogoutBody,
+    RefreshBody, LogoutBody,
 )
 from app.services import (
     hash_token, create_reset_code, create_reset_token_in_db,
     sign_access_token, sign_refresh_token, verify_refresh_token,
     store_refresh_token, revoke_refresh_token,
     write_audit, sanitize_user,
-    create_login_challenge, get_login_challenge, delete_login_challenge,
-    increment_challenge_attempts,
     hash_password, verify_password,
 )
 from app.config import settings
@@ -65,66 +63,11 @@ async def login(body: LoginBody, request: Request):
     if not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
 
-    profile = await db.fetchrow(
-        "SELECT two_factor_enabled FROM account_profiles WHERE user_id=$1 LIMIT 1",
-        user["id"],
-    )
-    two_factor = bool(profile and profile["two_factor_enabled"])
-
-    if two_factor:
-        code = create_reset_code()
-        challenge_id = create_login_challenge(user["id"], code)
-
-        dev_code = code if settings.show_dev_reset_code else None
-        return {
-            "requiresTwoFactor": True,
-            "challengeId": challenge_id,
-            "message": "Требуется подтверждение 2FA",
-            "devCode": dev_code,
-        }
-
     ua, ip = get_request_meta(request)
     access = sign_access_token(dict(user))
     refresh = sign_refresh_token(dict(user))
     await store_refresh_token(user["id"], refresh, ua, ip)
     await write_audit(user["id"], "auth.login", "user", user["id"])
-
-    return {"user": sanitize_user(user), "accessToken": access, "refreshToken": refresh}
-
-
-@router.post("/2fa/verify")
-async def verify_2fa(body: TwoFactorVerifyBody, request: Request):
-    challenge = get_login_challenge(body.challengeId)
-    if not challenge:
-        return {"error": "Challenge не найден или истек"}
-
-    from app.services import utcnow
-    if utcnow() > challenge["expiresAt"]:
-        delete_login_challenge(body.challengeId)
-        return {"error": "Код 2FA истек"}
-
-    if challenge.get("attempts", 0) >= 5:
-        delete_login_challenge(body.challengeId)
-        raise HTTPException(status_code=429, detail="Слишком много попыток. Запросите новый код.")
-
-    if hash_token(body.code) != challenge["codeHash"]:
-        increment_challenge_attempts(body.challengeId)
-        return {"error": "Неверный код 2FA"}
-
-    user = await db.fetchrow(
-        "SELECT id, email, full_name, role, status, avatar_url FROM users WHERE id=$1 LIMIT 1",
-        challenge["userId"],
-    )
-    if not user or user["status"] != "active":
-        delete_login_challenge(body.challengeId)
-        return {"error": "Пользователь недоступен"}
-
-    ua, ip = get_request_meta(request)
-    access = sign_access_token(dict(user))
-    refresh = sign_refresh_token(dict(user))
-    await store_refresh_token(user["id"], refresh, ua, ip)
-    await write_audit(user["id"], "auth.login.2fa", "user", user["id"])
-    delete_login_challenge(body.challengeId)
 
     return {"user": sanitize_user(user), "accessToken": access, "refreshToken": refresh}
 

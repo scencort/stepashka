@@ -274,7 +274,7 @@ export default function Landing() {
         </div>
 
         <h1
-          className="font-display font-bold text-5xl md:text-7xl lg:text-8xl tracking-tight mb-6 max-w-4xl"
+          className="font-display font-bold text-3xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight mb-6 max-w-4xl"
         >
           Стань разработчиком{" "}
           <span className="text-gradient-red">через практику</span>
@@ -338,7 +338,7 @@ export default function Landing() {
               key={i}
               className="text-center"
             >
-              <p className="font-display font-bold text-4xl md:text-5xl text-gradient-red mb-1">{s.value}</p>
+              <p className="font-display font-bold text-2xl sm:text-4xl md:text-5xl text-gradient-red mb-1">{s.value}</p>
               <p className="text-sm font-medium text-[var(--muted)]">{s.label}</p>
             </div>
           ))}
@@ -375,7 +375,7 @@ export default function Landing() {
               </span>
               LIVE · сообщество онлайн
             </div>
-            <h2 className="font-display font-bold text-4xl md:text-6xl tracking-tight mb-5">
+            <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-6xl tracking-tight mb-5">
               Сообщество в режиме{" "}
               <span className="text-gradient-red">реального времени</span>
             </h2>
@@ -463,7 +463,7 @@ export default function Landing() {
           className="text-center mb-16"
         >
           <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Возможности платформы</p>
-          <h2 className="font-display font-bold text-4xl md:text-5xl mb-4">Всё для вашего роста</h2>
+          <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl mb-4">Всё для вашего роста</h2>
           <p className="text-[var(--muted)] text-lg max-w-xl mx-auto">
             Инструменты, которые превращают обучение в удовольствие
           </p>
@@ -492,7 +492,7 @@ export default function Landing() {
             className="text-center mb-16"
           >
             <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Как это работает</p>
-            <h2 className="font-display font-bold text-4xl md:text-5xl">Три шага до результата</h2>
+            <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl">Три шага до результата</h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -505,7 +505,7 @@ export default function Landing() {
                 key={i}
                 className="relative"
               >
-                <div className="text-6xl font-display font-bold text-primary/10 mb-4">{item.step}</div>
+                <div className="text-6xl font-display font-bold text-primary mb-4">{item.step}</div>
                 <h3 className="font-display font-semibold text-xl mb-3">{item.title}</h3>
                 <p className="text-[var(--muted)] leading-relaxed">{item.desc}</p>
                 {i < 2 && (
@@ -526,7 +526,7 @@ export default function Landing() {
         >
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Направления</p>
-            <h2 className="font-display font-bold text-4xl md:text-5xl">Выберите свой трек</h2>
+            <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl">Выберите свой трек</h2>
           </div>
           <Link to="/register" className="btn-secondary px-5 py-2.5 text-sm w-fit gap-1.5">
             Все треки <ArrowRight size={15} />
@@ -557,7 +557,7 @@ export default function Landing() {
           >
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Каталог</p>
-              <h2 className="font-display font-bold text-4xl md:text-5xl">Популярные курсы</h2>
+              <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl">Популярные курсы</h2>
             </div>
             <Link to="/register" className="btn-primary px-5 py-2.5 text-sm w-fit gap-1.5">
               Все курсы <ArrowRight size={15} />
@@ -624,13 +624,8 @@ export default function Landing() {
         </div>
 
         <div className="relative w-full px-4 sm:px-6 lg:px-10 xl:px-16">
-          <div
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/20 bg-primary-50 dark:bg-primary-900/20 text-primary text-xs font-bold uppercase tracking-widest mb-6">
-              <Sparkles size={14} /> Команда проекта
-            </div>
-            <h2 className="font-display font-bold text-5xl md:text-6xl lg:text-7xl tracking-tight mb-6">
+          <div className="text-center mb-20">
+            <h2 className="font-display font-bold text-3xl sm:text-5xl md:text-6xl lg:text-7xl tracking-tight mb-6">
               Наша <span className="text-gradient-red">команда</span>
             </h2>
             <p className="text-[var(--muted)] text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
@@ -691,7 +686,7 @@ export default function Landing() {
 
           <div className="relative z-10">
             <p className="text-xs font-bold uppercase tracking-widest text-white/60 mb-4">Начните сегодня</p>
-            <h2 className="font-display font-bold text-4xl md:text-5xl mb-6 text-white">
+            <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl mb-6 text-white">
               Готовы изменить карьеру?
             </h2>
             <p className="text-white/80 text-lg mb-10 max-w-xl mx-auto">
@@ -714,7 +709,7 @@ export default function Landing() {
 
       {/* ── FOOTER ── */}
       <footer className="border-t border-[var(--border)] bg-[var(--surface)]">
-        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-10 flex flex-col items-center gap-4 text-center">
           <BrandLogo
             showText
             text="Gradus"
@@ -723,8 +718,8 @@ export default function Landing() {
           />
           <p className="text-sm text-[var(--muted)]">© {new Date().getFullYear()} Gradus. Платформа для обучения IT-профессиям.</p>
           <div className="flex items-center gap-4 text-sm text-[var(--muted)]">
-            <a href="#" className="hover:text-[var(--text)] transition-colors">Политика</a>
-            <a href="#" className="hover:text-[var(--text)] transition-colors">Условия</a>
+            <Link to="/privacy" className="hover:text-[var(--text)] transition-colors">Политика конфиденциальности</Link>
+            <Link to="/terms" className="hover:text-[var(--text)] transition-colors">Условия использования</Link>
           </div>
         </div>
       </footer>

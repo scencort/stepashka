@@ -13,6 +13,7 @@ type CourseItem = {
   title: string;
   lessons: number;
   progress: number;
+  enrolled?: boolean;
   type: string;
   students: string;
   rating: string;
@@ -108,13 +109,6 @@ type AttemptEntry = {
   createdAt: string;
 };
 
-type DiscussionMessage = {
-  id: number;
-  author: string;
-  text: string;
-  createdAt: string;
-};
-
 export default function Course() {
   const navigate = useNavigate();
   const { courseId } = useParams<{ courseId?: string }>();
@@ -149,7 +143,6 @@ export default function Course() {
   const [newCourseLevel, setNewCourseLevel] = useState("Начальный");
   const [attemptHistory, setAttemptHistory] = useState<AttemptEntry[]>([]);
   const [autoAdvance, setAutoAdvance] = useState(true);
-  const [discussionText, setDiscussionText] = useState("");
   const [openModules, setOpenModules] = useState<Record<number, boolean>>({});
   const [enrollmentStatus, setEnrollmentStatus] =
     useState<EnrollmentStatus | null>(null);
@@ -162,16 +155,6 @@ export default function Course() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [viewTab, setViewTab] = useState<"all" | "my">("all");
-  const [discussionMessages, setDiscussionMessages] = useState<
-    DiscussionMessage[]
-  >([
-    {
-      id: 1,
-      author: "Куратор",
-      text: "Пишите вопросы по шагу: по теории, тесту или коду.",
-      createdAt: new Date().toISOString(),
-    },
-  ]);
   const toast = useToast();
   const { user } = useAppStore();
   const canCreateCourse = user?.role === "teacher" || user?.role === "admin";
@@ -198,8 +181,10 @@ export default function Course() {
         const progressMap =
           await api.get<Record<number, number>>("/my-progress");
         for (const course of data) {
-          if (progressMap[course.id] !== undefined)
+          if (progressMap[course.id] !== undefined) {
             course.progress = progressMap[course.id];
+            course.enrolled = true;
+          }
         }
       } catch {
         /* not logged in */
@@ -422,24 +407,6 @@ export default function Course() {
     setOpenModules((prev) => ({ ...prev, [moduleId]: !prev[moduleId] }));
   };
 
-  const postDiscussionMessage = () => {
-    const text = discussionText.trim();
-    if (!text) {
-      toast.error("Введите текст сообщения");
-      return;
-    }
-    setDiscussionMessages((prev) => [
-      {
-        id: Date.now(),
-        author: "Вы",
-        text,
-        createdAt: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-    setDiscussionText("");
-  };
-
   // ─── Course detail view ───────────────────────────────────────────────────────
   if (isCoursePage) {
     return (
@@ -463,9 +430,6 @@ export default function Course() {
           attemptHistory={attemptHistory}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          discussionMessages={discussionMessages}
-          discussionText={discussionText}
-          setDiscussionText={setDiscussionText}
           enrollRequestMessage={enrollRequestMessage}
           setEnrollRequestMessage={setEnrollRequestMessage}
           enrollRequestLoading={enrollRequestLoading}
@@ -477,7 +441,6 @@ export default function Course() {
           onSubmitStep={submitStep}
           onSelectStep={selectStep}
           onToggleModule={toggleModule}
-          onPostDiscussionMessage={postDiscussionMessage}
         />
       </MainLayout>
     );

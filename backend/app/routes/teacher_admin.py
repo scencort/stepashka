@@ -298,6 +298,46 @@ async def create_step(course_id: int, body: StepBody, user: CurrentUser):
     return dict(row)
 
 
+@router.patch("/teacher/modules/{module_id}", dependencies=[TeacherDep])
+async def update_module(module_id: int, body: CourseModuleBody, user: CurrentUser):
+    mod = await db.fetchrow(
+        """SELECT cm.id, cm.course_id FROM course_modules cm
+           INNER JOIN courses c ON c.id=cm.course_id
+           WHERE cm.id=$1 AND (c.teacher_id=$2 OR $3='admin') LIMIT 1""",
+        module_id, user["id"], user["role"],
+    )
+    if not mod:
+        raise HTTPException(status_code=404, detail="Модуль не найден")
+    row = await db.fetchrow(
+        """UPDATE course_modules SET title=$1, module_order=$2
+           WHERE id=$3
+           RETURNING id, title, module_order AS "moduleOrder" """,
+        body.title, body.moduleOrder, module_id,
+    )
+    return dict(row)
+
+
+@router.patch("/teacher/lessons/{lesson_id}", dependencies=[TeacherDep])
+async def update_lesson(lesson_id: int, body: LessonBody, user: CurrentUser):
+    lesson = await db.fetchrow(
+        """SELECT l.id, cm.course_id FROM lessons l
+           INNER JOIN course_modules cm ON cm.id=l.module_id
+           INNER JOIN courses c ON c.id=cm.course_id
+           WHERE l.id=$1 AND (c.teacher_id=$2 OR $3='admin') LIMIT 1""",
+        lesson_id, user["id"], user["role"],
+    )
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Урок не найден")
+    row = await db.fetchrow(
+        """UPDATE lessons SET title=$1, lesson_order=$2, lesson_type=$3, content_text=$4
+           WHERE id=$5
+           RETURNING id, module_id AS "moduleId", title, lesson_order AS "lessonOrder",
+                     lesson_type AS "lessonType", content_text AS "contentText" """,
+        body.title, body.lessonOrder, body.lessonType, body.contentText, lesson_id,
+    )
+    return dict(row)
+
+
 @router.patch("/teacher/steps/{step_id}", dependencies=[TeacherDep])
 async def update_step(step_id: int, body: StepBody, user: CurrentUser):
     step = await db.fetchrow("SELECT course_id FROM course_steps WHERE id=$1", step_id)

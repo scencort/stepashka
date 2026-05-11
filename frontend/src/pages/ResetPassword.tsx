@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom"
 
 import { Lock, Mail, KeyRound, ArrowLeft, ArrowRight } from "lucide-react"
 import AuthScreenShell from "../components/auth/AuthScreenShell"
-import { api } from "../services/api"
+import { api } from "../lib/api"
 import { useToast } from "../hooks/useToast"
 import BrandLogo from "../components/BrandLogo"
 

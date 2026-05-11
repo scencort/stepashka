@@ -6,7 +6,6 @@ from app import db
 from app.deps import CurrentUser
 from app.schemas import (
     ProfilePatchBody, ChangePasswordBody, ConfirmEmailBody,
-    TwoFactorConfirmBody, TwoFactorDisableBody,
 )
 from app.services import (
     hash_token, create_reset_code, write_audit,
@@ -41,7 +40,6 @@ async def get_profile(user: CurrentUser):
         "language": p["language"] or "ru",
         "emailNotifications": bool(p["email_notifications"]),
         "marketingNotifications": bool(p["marketing_notifications"]),
-        "twoFactorEnabled": bool(p["two_factor_enabled"]),
         "pendingEmail": p["pending_email"] or None,
     }
 
@@ -242,65 +240,3 @@ async def logout_all(user: CurrentUser):
     )
     await write_audit(user["id"], "account.logout_all", "user", user["id"])
     return {"success": True}
-
-
-@router.post("/2fa/request-enable")
-async def request_enable_2fa(user: CurrentUser):
-    u = await db.fetchrow("SELECT email, full_name FROM users WHERE id=$1 LIMIT 1", user["id"])
-    if not u:
-        return {"error": "Пользователь не найден"}
-
-    code = create_reset_code()
-    code_hash = hash_token(code)
-    from datetime import timedelta
-    expires = utcnow() + timedelta(minutes=10)
-    await db.execute(
-        """UPDATE account_profiles
-           SET two_factor_temp_code_hash=$1, two_factor_temp_expires_at=$2, updated_at=NOW()
-           WHERE user_id=$3""",
-        code_hash, expires, user["id"],
-    )
-
-    dev_code = code if settings.show_dev_reset_code else None
-    return {"success": True, "message": "Код подтверждения отправлен", "devCode": dev_code}
-
-
-@router.post("/2fa/confirm-enable")
-async def confirm_enable_2fa(body: TwoFactorConfirmBody, user: CurrentUser):
-    profile = await get_or_create_profile(user["id"])
-    if not profile["two_factor_temp_code_hash"]:
-        return {"error": "Нет активного запроса на включение 2FA"}
-
-    if profile["two_factor_temp_expires_at"] and profile["two_factor_temp_expires_at"].replace(tzinfo=None) < utcnow().replace(tzinfo=None):
-        return {"error": "Код истек"}
-
-    if hash_token(body.code) != profile["two_factor_temp_code_hash"]:
-        return {"error": "Неверный код"}
-
-    await db.execute(
-        """UPDATE account_profiles
-           SET two_factor_enabled=TRUE, two_factor_temp_code_hash=NULL, two_factor_temp_expires_at=NULL, updated_at=NOW()
-           WHERE user_id=$1""",
-        user["id"],
-    )
-    await write_audit(user["id"], "account.2fa.enabled", "user", user["id"])
-    return {"success": True, "message": "2FA включена"}
-
-
-@router.post("/2fa/disable")
-async def disable_2fa(body: TwoFactorDisableBody, user: CurrentUser):
-    u = await db.fetchrow("SELECT password_hash FROM users WHERE id=$1 LIMIT 1", user["id"])
-    if not u:
-        return {"error": "Пользователь не найден"}
-
-    if not verify_password(body.password, u["password_hash"]):
-        return {"error": "Неверный пароль"}
-
-    await db.execute(
-        """UPDATE account_profiles
-           SET two_factor_enabled=FALSE, two_factor_temp_code_hash=NULL, two_factor_temp_expires_at=NULL, updated_at=NOW()
-           WHERE user_id=$1""",
-        user["id"],
-    )
-    await write_audit(user["id"], "account.2fa.disabled", "user", user["id"])
-    return {"success": True, "message": "2FA отключена"}

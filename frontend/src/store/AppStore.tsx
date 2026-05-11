@@ -8,8 +8,7 @@ type AppStoreContextValue = {
   loadingUser: boolean
   loadingCourses: boolean
   refreshUser: () => Promise<void>
-  login: (email: string, password: string) => Promise<{ requiresTwoFactor: boolean; challengeId?: string; devCode?: string | null }>
-  verifyTwoFactorLogin: (challengeId: string, code: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
   register: (name: string, email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   refreshCourses: () => Promise<void>
@@ -53,21 +52,7 @@ export function AppStoreProvider({ children }: Props) {
   }, [])
 
   const login = async (email: string, password: string) => {
-    const auth = await api.post<PublicUser | { requiresTwoFactor: true; challengeId: string; devCode?: string | null }>("/auth/login", { email, password })
-    const isTwoFactorResponse = (value: typeof auth): value is { requiresTwoFactor: true; challengeId: string; devCode?: string | null } =>
-      typeof value === "object" && value !== null && "requiresTwoFactor" in value && Boolean((value as { requiresTwoFactor?: boolean }).requiresTwoFactor)
-
-    if (isTwoFactorResponse(auth)) {
-      return { requiresTwoFactor: true, challengeId: auth.challengeId, devCode: auth.devCode || null }
-    }
-
-    setUser(auth)
-    await refreshCourses()
-    return { requiresTwoFactor: false }
-  }
-
-  const verifyTwoFactorLogin = async (challengeId: string, code: string) => {
-    const auth = await api.post<PublicUser>("/auth/2fa/verify", { challengeId, code })
+    const auth = await api.post<PublicUser>("/auth/login", { email, password })
     setUser(auth)
     await refreshCourses()
   }
@@ -90,7 +75,6 @@ export function AppStoreProvider({ children }: Props) {
     loadingCourses,
     refreshUser,
     login,
-    verifyTwoFactorLogin,
     register,
     logout,
     refreshCourses,

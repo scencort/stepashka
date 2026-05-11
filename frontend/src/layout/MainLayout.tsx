@@ -678,7 +678,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
             {/* Notifications panel */}
                           {showNotifications && (
-                <div className="absolute right-0 top-12 w-80 card shadow-card-lg z-50 overflow-hidden"
+                <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] card shadow-card-lg z-50 overflow-hidden"
                 >
                   <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] gap-2">
                     <h3 className="font-semibold text-sm font-display">
@@ -831,7 +831,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
             {/* Streak panel */}
                           {showStreakPanel && (
-                <div className="absolute right-0 top-12 w-[320px] card shadow-card-lg z-50 overflow-hidden"
+                <div className="absolute right-0 top-12 w-[320px] max-w-[calc(100vw-2rem)] card shadow-card-lg z-50 overflow-hidden"
                 >
                   <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] gap-2">
                     <div className="flex items-center gap-2">

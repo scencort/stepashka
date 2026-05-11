@@ -151,7 +151,6 @@ async def dashboard(user: CurrentUser):
     ACTION_LABELS: dict[str, str] = {
         "user.register": "Регистрация аккаунта",
         "auth.login": "Вход в аккаунт",
-        "auth.login.2fa": "Вход через двухфакторную аутентификацию",
         "auth.logout": "Выход из аккаунта",
         "auth.password_reset_requested": "Запрос сброса пароля",
         "auth.password_reset_completed": "Пароль успешно сброшен",
@@ -160,8 +159,6 @@ async def dashboard(user: CurrentUser):
         "account.password.changed": "Пароль изменён",
         "account.session.revoked": "Сессия завершена",
         "account.logout_all": "Выход со всех устройств",
-        "account.2fa.enabled": "Двухфакторная аутентификация включена",
-        "account.2fa.disabled": "Двухфакторная аутентификация отключена",
         "enrollment.create": "Запись на курс",
         "enrollment_request.create": "Заявка на курс",
         "ai.chat.request": "Вопрос AI-ассистенту",

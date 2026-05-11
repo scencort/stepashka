@@ -23,7 +23,7 @@ export default function AiReview() {
   const [isChecking, setIsChecking] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [history, setHistory] = useState<
-    Array<{ id: number; quality: number; created_at: string }>
+    Array<{ id: number; quality: number; createdAt: string }>
   >([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -40,7 +40,7 @@ export default function AiReview() {
     try {
       const data =
         await api.get<
-          Array<{ id: number; quality: number; created_at: string }>
+          Array<{ id: number; quality: number; createdAt: string }>
         >("/ai/review/history");
       setHistory(data);
     } catch {
@@ -170,7 +170,7 @@ export default function AiReview() {
       <div className="space-y-6 lg:space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2">
           <div>
-            <h2 className="text-3xl md:text-5xl font-extrabold mb-2 tracking-tight">
+            <h2 className="text-2xl md:text-4xl font-extrabold mb-2 tracking-tight">
               AI-ассистент
             </h2>
             <p className="text-slate-500 dark:text-slate-400 font-medium">
@@ -181,7 +181,7 @@ export default function AiReview() {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
           {/* Main Chat Area */}
-          <Card className="xl:col-span-2 flex flex-col h-[700px] !p-0 overflow-hidden border border-white/60 dark:border-slate-700/60 shadow-lg shadow-slate-200/20 dark:shadow-black/20">
+          <Card className="xl:col-span-2 flex flex-col h-[60vh] md:h-[700px] !p-0 overflow-hidden border border-white/60 dark:border-slate-700/60 shadow-lg shadow-slate-200/20 dark:shadow-black/20">
             {/* Chat Header */}
             <div className="px-6 py-4 border-b border-slate-200/50 dark:border-slate-700/60 bg-white/40 dark:bg-zinc-900/40 flex items-center justify-between backdrop-blur-md z-10">
               <div className="flex items-center gap-3">

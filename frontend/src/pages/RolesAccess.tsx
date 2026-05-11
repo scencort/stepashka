@@ -59,7 +59,7 @@ export default function RolesAccess() {
     }
 
     try {
-      const created = await api.post<Member>("/roles-members", { name: invite.trim() })
+      const created = await api.post<Member>("/roles-members", { email: invite.trim() })
       setMembers((prev) => [...prev, created])
       setInvite("")
     } catch (err) {
@@ -86,7 +86,8 @@ export default function RolesAccess() {
             <input
               value={invite}
               onChange={(event) => setInvite(event.target.value)}
-              placeholder="Имя участника"
+              placeholder="Email участника"
+              type="email"
               className="w-full rounded-xl glass-input px-3 py-2"
             />
             <Button onClick={addInvite}>Добавить</Button>
@@ -96,7 +97,7 @@ export default function RolesAccess() {
         <Card className="space-y-3">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
             <p className="font-semibold">Команда проекта</p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {(["all", "student", "instructor", "methodologist", "administrator"] as const).map((item) => (
                 <button
                   key={item}

@@ -114,7 +114,7 @@ export default function Task() {
       <div className="space-y-6 lg:space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2">
           <div>
-            <h2 className="text-3xl md:text-5xl font-extrabold mb-2 tracking-tight">
+            <h2 className="text-2xl md:text-4xl font-extrabold mb-2 tracking-tight">
               AI Code Review
             </h2>
             <p className="text-slate-500 dark:text-slate-400 font-medium">

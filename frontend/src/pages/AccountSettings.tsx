@@ -7,9 +7,9 @@ import { useToast } from "../hooks/useToast"
 import { useAppStore } from "../store/AppStore"
 import {
   User, Mail, Phone, Globe, Languages, Camera, Trash2, Lock,
-  Shield, ShieldCheck, ShieldOff, Monitor, LogOut, Clock,
+  Shield, Monitor, LogOut, Clock,
   ChevronRight, Bell, X, Check, AlertCircle,
-  KeyRound, Eye, EyeOff, Smartphone,
+  KeyRound, Eye, EyeOff,
 } from "lucide-react"
 
 type AccountProfile = {
@@ -24,7 +24,6 @@ type AccountProfile = {
   language: string
   emailNotifications: boolean
   marketingNotifications: boolean
-  twoFactorEnabled?: boolean
   pendingEmail?: string | null
 }
 
@@ -79,8 +78,6 @@ export default function AccountSettings() {
   const [showCurrentPw, setShowCurrentPw] = useState(false)
   const [showNewPw, setShowNewPw] = useState(false)
   const [emailConfirmCode, setEmailConfirmCode] = useState("")
-  const [twoFactorCode, setTwoFactorCode] = useState("")
-  const [disable2faPassword, setDisable2faPassword] = useState("")
   const avatarInputRef = useRef<HTMLInputElement | null>(null)
 
   const onCropComplete = useCallback((_croppedArea: Area, croppedPixels: Area) => {
@@ -114,8 +111,8 @@ export default function AccountSettings() {
     const next: ProfileErrors = {}
     if (value.name.trim().length < 2) next.name = "Минимум 2 символа"
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim())) next.email = "Введите корректный email"
-    if (value.phone.trim() && !/^[+()\d\s-]{7,20}$/.test(value.phone.trim())) next.phone = "Недопустимые символы"
-    if (!value.timezone.trim()) next.timezone = "Укажите timezone"
+    if (value.phone.trim() && !/^[+()\d\s-]{7,20}$/.test(value.phone.trim())) next.phone = "Введите корректный номер"
+    if (!value.timezone.trim()) next.timezone = "Выберите часовой пояс"
     return next
   }
 
@@ -234,7 +231,7 @@ export default function AccountSettings() {
     setSaving(true); setError("")
     try {
       const updated = await api.patch<AccountProfile & { emailChangeRequired?: boolean; devEmailCode?: string | null }>("/account/profile", {
-        name: profile.name, email: profile.email, avatarUrl: profile.avatarUrl,
+        fullName: profile.name, email: profile.email, avatarUrl: profile.avatarUrl,
         phone: profile.phone, bio: profile.bio, timezone: profile.timezone,
         language: profile.language, emailNotifications: profile.emailNotifications,
         marketingNotifications: profile.marketingNotifications,
@@ -271,36 +268,6 @@ export default function AccountSettings() {
       await logout()
       window.location.href = "/login"
     } catch (err) { const msg = err instanceof Error ? err.message : "Ошибка"; setError(msg); toast.error(msg) }
-    finally { setSaving(false) }
-  }
-
-  const requestEnable2fa = async () => {
-    setSaving(true); setError("")
-    try {
-      const res = await api.post<{ success: boolean; message: string; devCode?: string | null }>("/account/2fa/request-enable", {})
-      toast.success(res.message)
-      if (res.devCode) toast.success(`DEV: ${res.devCode}`)
-    } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка") }
-    finally { setSaving(false) }
-  }
-
-  const confirmEnable2fa = async () => {
-    if (!twoFactorCode.trim()) { toast.error("Введите код"); return }
-    setSaving(true); setError("")
-    try {
-      const res = await api.post<{ success: boolean; message: string }>("/account/2fa/confirm-enable", { code: twoFactorCode.trim() })
-      setTwoFactorCode(""); toast.success(res.message); await load()
-    } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка") }
-    finally { setSaving(false) }
-  }
-
-  const disable2fa = async () => {
-    if (!disable2faPassword.trim()) { toast.error("Введите пароль"); return }
-    setSaving(true); setError("")
-    try {
-      const res = await api.post<{ success: boolean; message: string }>("/account/2fa/disable", { password: disable2faPassword })
-      setDisable2faPassword(""); toast.success(res.message); await load()
-    } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка") }
     finally { setSaving(false) }
   }
 
@@ -401,13 +368,6 @@ export default function AccountSettings() {
               {/* Quick status */}
               <div className="card p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-[var(--muted)]">2FA</span>
-                  {profile.twoFactorEnabled
-                    ? <span className="flex items-center gap-1 text-xs font-semibold text-green-600 dark:text-green-400"><ShieldCheck size={12} />Вкл</span>
-                    : <span className="flex items-center gap-1 text-xs font-semibold text-[var(--muted)]"><ShieldOff size={12} />Выкл</span>
-                  }
-                </div>
-                <div className="flex items-center justify-between">
                   <span className="text-xs text-[var(--muted)]">Сессии</span>
                   <span className="text-xs font-semibold text-[var(--text)]">{sessions.length}</span>
                 </div>
@@ -461,8 +421,8 @@ export default function AccountSettings() {
                     <div className="grid md:grid-cols-2 gap-4">
                       <FieldInput icon={User} label="Имя" value={profile.name} onChange={(v) => updateProfileField("name", v)} error={profileErrors.name} />
                       <FieldInput icon={Mail} label="Email" type="email" value={profile.email} onChange={(v) => updateProfileField("email", v)} error={profileErrors.email} />
-                      <FieldInput icon={Phone} label="Телефон" value={profile.phone} onChange={(v) => updateProfileField("phone", v)} error={profileErrors.phone} placeholder="+7 ..." />
-                      <FieldInput icon={Globe} label="Часовой пояс" value={profile.timezone} onChange={(v) => updateProfileField("timezone", v)} error={profileErrors.timezone} placeholder="Europe/Moscow" />
+                      <PhoneInput value={profile.phone} onChange={(v) => updateProfileField("phone", v)} error={profileErrors.phone} />
+                      <TimezoneSelect value={profile.timezone} onChange={(v) => updateProfileField("timezone", v)} />
                     </div>
 
                     <div>
@@ -590,68 +550,6 @@ export default function AccountSettings() {
                     </div>
                   </div>
 
-                  {/* 2FA */}
-                  <div className="card p-5 space-y-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Shield size={16} className="text-[var(--muted)]" />
-                      <p className="font-semibold text-sm text-[var(--text)]">Двухфакторная аутентификация</p>
-                    </div>
-
-                    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
-                      profile.twoFactorEnabled
-                        ? "border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/10"
-                        : "border-[var(--border)] bg-[var(--surface)]"
-                    }`}>
-                      <Smartphone size={18} className={profile.twoFactorEnabled ? "text-green-500" : "text-[var(--muted)]"} />
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-[var(--text)]">
-                          {profile.twoFactorEnabled ? "2FA включена" : "2FA выключена"}
-                        </p>
-                        <p className="text-xs text-[var(--muted)]">
-                          {profile.twoFactorEnabled ? "Код подтверждения требуется при каждом входе" : "Включите для дополнительной защиты аккаунта"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {!profile.twoFactorEnabled && (
-                      <div className="space-y-3">
-                        <button onClick={requestEnable2fa} disabled={saving} className="btn-secondary px-4 py-2 text-sm">
-                          Запросить код включения
-                        </button>
-                        <div className="flex gap-2">
-                          <input
-                            value={twoFactorCode}
-                            onChange={(e) => setTwoFactorCode(e.target.value)}
-                            placeholder="Код 2FA"
-                            maxLength={6}
-                            className="input-field px-3 py-2 text-sm w-36 tracking-widest"
-                          />
-                          <button onClick={confirmEnable2fa} disabled={saving || !twoFactorCode.trim()} className="btn-primary px-4 py-2 text-sm">
-                            Подтвердить
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {profile.twoFactorEnabled && (
-                      <div className="flex gap-2">
-                        <input
-                          type="password"
-                          value={disable2faPassword}
-                          onChange={(e) => setDisable2faPassword(e.target.value)}
-                          placeholder="Пароль для отключения"
-                          className="input-field px-3 py-2 text-sm flex-1 max-w-xs"
-                        />
-                        <button
-                          onClick={disable2fa}
-                          disabled={saving || !disable2faPassword.trim()}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 border border-red-200 dark:border-red-800/30 transition-colors font-medium"
-                        >
-                          <ShieldOff size={14} />Отключить
-                        </button>
-                      </div>
-                    )}
-                  </div>
                 </div>
               )}
 
@@ -730,7 +628,7 @@ export default function AccountSettings() {
                             <button
                               onClick={() => revokeSession(s.id)}
                               disabled={saving}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 text-red-500"
+                              className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 text-red-500"
                             >
                               <X size={14} />
                             </button>
@@ -819,6 +717,91 @@ export default function AccountSettings() {
 }
 
 // ─── Reusable subcomponents ─────────────────────────────────────────────────
+
+const TIMEZONES = [
+  { value: "Europe/Moscow", label: "Москва (UTC+3)" },
+  { value: "Europe/Kaliningrad", label: "Калининград (UTC+2)" },
+  { value: "Europe/Samara", label: "Самара (UTC+4)" },
+  { value: "Asia/Yekaterinburg", label: "Екатеринбург (UTC+5)" },
+  { value: "Asia/Omsk", label: "Омск (UTC+6)" },
+  { value: "Asia/Krasnoyarsk", label: "Красноярск (UTC+7)" },
+  { value: "Asia/Irkutsk", label: "Иркутск (UTC+8)" },
+  { value: "Asia/Yakutsk", label: "Якутск (UTC+9)" },
+  { value: "Asia/Vladivostok", label: "Владивосток (UTC+10)" },
+  { value: "Asia/Magadan", label: "Магадан (UTC+11)" },
+  { value: "Asia/Kamchatka", label: "Камчатка (UTC+12)" },
+  { value: "Europe/London", label: "Лондон (UTC+0)" },
+  { value: "Europe/Berlin", label: "Берлин (UTC+1)" },
+  { value: "Europe/Kiev", label: "Киев (UTC+2)" },
+  { value: "Asia/Almaty", label: "Алматы (UTC+6)" },
+  { value: "Asia/Tashkent", label: "Ташкент (UTC+5)" },
+  { value: "Asia/Tbilisi", label: "Тбилиси (UTC+4)" },
+  { value: "America/New_York", label: "Нью-Йорк (UTC-5)" },
+  { value: "America/Los_Angeles", label: "Лос-Анджелес (UTC-8)" },
+  { value: "Asia/Tokyo", label: "Токио (UTC+9)" },
+  { value: "Asia/Shanghai", label: "Шанхай (UTC+8)" },
+]
+
+function TimezoneSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="text-xs font-medium text-[var(--muted)] mb-1.5 flex items-center gap-1">
+        <Globe size={12} />Часовой пояс
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="input-field w-full px-4 py-2.5 text-sm appearance-none bg-[var(--surface)] cursor-pointer"
+      >
+        {TIMEZONES.map((tz) => (
+          <option key={tz.value} value={tz.value}>{tz.label}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+function formatPhoneValue(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 11)
+  if (!digits) return ""
+  let out = "+"
+  if (digits.length >= 1) out += digits[0]
+  if (digits.length >= 2) out += " (" + digits.slice(1, Math.min(4, digits.length))
+  if (digits.length >= 4) out += ") "
+  if (digits.length >= 5) out += digits.slice(4, Math.min(7, digits.length))
+  if (digits.length >= 7) out += "-"
+  if (digits.length >= 8) out += digits.slice(7, Math.min(9, digits.length))
+  if (digits.length >= 9) out += "-"
+  if (digits.length >= 10) out += digits.slice(9, 11)
+  return out
+}
+
+function PhoneInput({ value, onChange, error }: {
+  value: string
+  onChange: (v: string) => void
+  error?: string
+}) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value
+    onChange(formatPhoneValue(raw))
+  }
+
+  return (
+    <div>
+      <label className="text-xs font-medium text-[var(--muted)] mb-1.5 flex items-center gap-1">
+        <Phone size={12} />Телефон
+      </label>
+      <input
+        type="tel"
+        value={value}
+        onChange={handleChange}
+        placeholder="+7 (999) 123-45-67"
+        className={`input-field w-full px-4 py-2.5 text-sm ${error ? "border-red-300 dark:border-red-700" : ""}`}
+      />
+      {error && <p className="text-[11px] text-red-500 mt-1">{error}</p>}
+    </div>
+  )
+}
 
 function FieldInput({ icon: Icon, label, value, onChange, error, placeholder, type = "text" }: {
   icon: React.FC<{ size?: number; className?: string }>

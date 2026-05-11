@@ -188,6 +188,27 @@ async def update_roles_member(user_id: int, request: Request, user: CurrentUser)
     return {"id": updated["id"], "name": updated["name"], "role": role_map.get(updated["role"], updated["role"])}
 
 
+@app.post("/api/roles-members", dependencies=[_AdminDep], status_code=201)
+async def create_roles_member(request: Request):
+    from app.services import hash_password
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        return JSONResponse(status_code=400, content={"error": "Некорректный email"})
+    exists = await database.fetchrow("SELECT id FROM users WHERE email=$1", email)
+    if exists:
+        return JSONResponse(status_code=409, content={"error": "Пользователь с таким email уже существует"})
+    password_hash = hash_password("Change@Me123")
+    row = await database.fetchrow(
+        """INSERT INTO users (email, password_hash, full_name, role)
+           VALUES ($1, $2, $3, 'student')
+           RETURNING id, full_name AS "name", role""",
+        email, password_hash, email.split("@")[0],
+    )
+    role_map = {"student": "student", "teacher": "instructor", "admin": "administrator"}
+    return {"id": row["id"], "name": row["name"], "role": role_map.get(row["role"], row["role"])}
+
+
 @app.delete("/api/roles-members/{user_id}", dependencies=[_AdminDep])
 async def delete_roles_member(user_id: int, user: CurrentUser):
     if user_id == user["id"]:
@@ -224,7 +245,42 @@ async def get_notifications(user: CurrentUser):
            ORDER BY created_at DESC LIMIT 20""",
         user["id"],
     )
-    return [{"id": r["id"], "title": r["title"], "time": str(r["time"])} for r in rows]
+    def format_time(dt) -> str:
+        from datetime import datetime, timezone
+        if dt is None:
+            return ""
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        dt_naive = dt.replace(tzinfo=None) if dt.tzinfo else dt
+        diff = now - dt_naive
+        seconds = int(diff.total_seconds())
+        if seconds < 60:
+            return "только что"
+        if seconds < 3600:
+            m = seconds // 60
+            if m % 10 == 1 and m != 11:
+                return f"{m} минуту назад"
+            elif m % 10 in (2, 3, 4) and m not in (12, 13, 14):
+                return f"{m} минуты назад"
+            return f"{m} минут назад"
+        if seconds < 86400:
+            h = seconds // 3600
+            if h % 10 == 1 and h != 11:
+                return f"{h} час назад"
+            elif h % 10 in (2, 3, 4) and h not in (12, 13, 14):
+                return f"{h} часа назад"
+            return f"{h} часов назад"
+        days = seconds // 86400
+        if days == 1:
+            return "вчера"
+        if days < 7:
+            if days % 10 == 1 and days != 11:
+                return f"{days} день назад"
+            elif days % 10 in (2, 3, 4) and days not in (12, 13, 14):
+                return f"{days} дня назад"
+            return f"{days} дней назад"
+        return dt_naive.strftime("%d.%m.%Y")
+
+    return [{"id": r["id"], "title": r["title"], "time": format_time(r["time"])} for r in rows]
 
 
 # ── Help / FAQ ──

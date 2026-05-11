@@ -5,7 +5,6 @@ import json
 import random
 import re
 import secrets
-import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -133,54 +132,6 @@ async def create_reset_token_in_db(user_id: int) -> tuple[str, datetime]:
         user_id, token_hash, expires_at,
     )
     return raw_code, expires_at
-
-
-# --------------- login challenges (in-memory, same as Node) ---------------
-
-_login_challenges: dict[str, dict] = {}
-_MAX_CHALLENGES = 10_000
-
-
-def _cleanup_expired_challenges() -> None:
-    now = utcnow()
-    expired = [k for k, v in _login_challenges.items() if v["expiresAt"] <= now]
-    for k in expired:
-        del _login_challenges[k]
-
-
-def create_login_challenge(user_id: int, code: str) -> str:
-    _cleanup_expired_challenges()
-    if len(_login_challenges) >= _MAX_CHALLENGES:
-        oldest = min(_login_challenges, key=lambda k: _login_challenges[k]["expiresAt"])
-        del _login_challenges[oldest]
-    challenge_id = str(uuid.uuid4())
-    _login_challenges[challenge_id] = {
-        "userId": user_id,
-        "codeHash": hash_token(code),
-        "expiresAt": utcnow() + timedelta(minutes=10),
-        "attempts": 0,
-    }
-    return challenge_id
-
-
-def get_login_challenge(challenge_id: str) -> dict | None:
-    ch = _login_challenges.get(challenge_id)
-    if ch and ch["expiresAt"] <= utcnow():
-        del _login_challenges[challenge_id]
-        return None
-    return ch
-
-
-def increment_challenge_attempts(challenge_id: str) -> int:
-    ch = _login_challenges.get(challenge_id)
-    if ch:
-        ch["attempts"] = ch.get("attempts", 0) + 1
-        return ch["attempts"]
-    return 0
-
-
-def delete_login_challenge(challenge_id: str) -> None:
-    _login_challenges.pop(challenge_id, None)
 
 
 # --------------- code evaluation (same heuristics as Node) ---------------

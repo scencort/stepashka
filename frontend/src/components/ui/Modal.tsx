@@ -18,7 +18,7 @@ export default function Modal({ open, title, onClose, children }: Props) {
       />
 
       <div
-        className="absolute left-1/2 top-1/2 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-[24px] p-7"
+        className="absolute left-1/2 top-1/2 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-[24px] p-4 sm:p-7"
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold tracking-tight">{title}</h2>
