@@ -619,19 +619,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
           {/* Right side */}
           <div className="relative flex items-center gap-2 ml-auto">
             {/* Streak badge */}
-            {streakDays > 0 && (
-              <button
-                onClick={toggleStreakPanel}
-                title="Календарь активности"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                bg-primary-50 dark:bg-primary-900/20 border border-primary-200/60 dark:border-primary-800/40
-                text-primary-600 dark:text-primary-400 text-xs font-semibold
-                hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
-              >
-                <Flame size={13} />
-                {streakDays} дней
-              </button>
-            )}
+            <button
+              onClick={toggleStreakPanel}
+              title="Календарь активности"
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                streakDays > 0
+                  ? "bg-primary-50 dark:bg-primary-900/20 border-primary-200/60 dark:border-primary-800/40 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30"
+                  : "bg-[var(--surface)] border-[var(--border)] text-[var(--muted)] hover:bg-[var(--border)]/30"
+              }`}
+            >
+              <Flame size={13} />
+              {streakDays} {streakDays === 1 ? "день" : streakDays >= 2 && streakDays <= 4 ? "дня" : "дней"}
+            </button>
 
             {/* Add course — teachers only */}
             {isTeacherOrAdmin && (
