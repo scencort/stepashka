@@ -670,10 +670,12 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
             {[
               { name: "Радкевич Роман", role: "Разработчик", photo: "/developers/radkevich-roman.jpg", link: "https://t.me/liiiiiliiiiiliiiiiliiiiiliiiiil" },
               { name: "Поляков Ярослав", role: "Разработчик", photo: "/developers/polyakov-yaroslav.jpg", link: "https://t.me/scencort" },
+              { name: "Чех Иван", role: "Разработчик", photo: "/developers/chekh-ivan.jpg", link: "https://t.me/aaaaaqiwi" },
+              { name: "Вартанян Вячеслав", role: "Разработчик", photo: "/developers/vartanyan-vyacheslav.jpg", link: "https://t.me/A597MP97" },
             ].map((dev, _i) => (
               <motion.a
                 key={dev.name}

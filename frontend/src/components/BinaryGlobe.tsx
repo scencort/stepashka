@@ -13,6 +13,24 @@ type Point = {
   tone: number;
   /** subtle per-point twinkle phase */
   phase: number;
+  /** rendered digit: 0 or 1 (mutable so we can flip occasionally) */
+  char: 0 | 1;
+  /** if true, this point uses the bright "highlight" palette[0] color */
+  hot: boolean;
+};
+
+type FloatDigit = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  char: 0 | 1;
+  /** 0..1 base alpha */
+  alpha: number;
+  /** twinkle phase */
+  phase: number;
+  /** if true this floating digit uses palette[0] color (rare "bright" ones) */
+  hot: boolean;
 };
 
 type Pulse = {
@@ -295,8 +313,74 @@ export default function BinaryGlobe({
         z,
         tone: Math.floor(Math.random() * 5),
         phase: Math.random() * Math.PI * 2,
+        char: Math.random() < 0.5 ? 0 : 1,
+        // ~12% of points are bright accent digits (catch the eye like the
+        // pale highlight "1"s in the reference image).
+        hot: Math.random() < 0.12,
       });
     }
+
+    /* ----- Background "data dust" floating digits ----- */
+    // Scattered around the globe in screen space, slow drift, twinkle.
+    // Mostly muted/grey-red, a few in the bright palette[0] color.
+    const floatDigits: FloatDigit[] = [];
+    const FLOAT_COUNT = 130;
+    for (let i = 0; i < FLOAT_COUNT; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      // Distribute mostly outside the globe radius so they read as "space"
+      // around the sphere, but allow a few overlapping in front.
+      const r = size * (0.18 + Math.random() * 0.55);
+      floatDigits.push({
+        x: size / 2 + Math.cos(angle) * r,
+        y: size / 2 + Math.sin(angle) * r,
+        vx: (Math.random() - 0.5) * 6,
+        vy: (Math.random() - 0.5) * 6,
+        char: Math.random() < 0.5 ? 0 : 1,
+        alpha: 0.25 + Math.random() * 0.55,
+        phase: Math.random() * Math.PI * 2,
+        hot: Math.random() < 0.18,
+      });
+    }
+
+    /* ----- Sprite cache: pre-render "0"/"1" at each palette color ----- */
+    // drawImage from a tiny pre-rendered bitmap is ~as cheap as fillRect and
+    // skips the per-frame fillText cost (~10x faster for 1000+ chars/frame).
+    const SPRITE_FONT_PX = 9;
+    const SPRITE_PAD = 2;
+    const spriteCss = SPRITE_FONT_PX + SPRITE_PAD * 2;
+
+    /** Render a single bold monospace char into an offscreen canvas. */
+    const makeCharSprite = (
+      ch: 0 | 1,
+      color: string,
+    ): HTMLCanvasElement => {
+      const c = document.createElement("canvas");
+      c.width = Math.ceil(spriteCss * dpr);
+      c.height = Math.ceil(spriteCss * dpr);
+      const cx = c.getContext("2d");
+      if (!cx) return c;
+      cx.scale(dpr, dpr);
+      cx.font = `700 ${SPRITE_FONT_PX}px "JetBrains Mono", "Fira Code", "Menlo", "Consolas", monospace`;
+      cx.textBaseline = "middle";
+      cx.textAlign = "center";
+      cx.fillStyle = color;
+      cx.fillText(String(ch), spriteCss / 2, spriteCss / 2 + 0.5);
+      return c;
+    };
+
+    // Sprite cache indexed by [paletteIndex][char]. Lazy-rebuilt if the
+    // palette changes (palette is read via ref each frame).
+    let cachedPaletteKey = "";
+    let charSprites: HTMLCanvasElement[][] = [];
+    const ensureSprites = (pal: string[]) => {
+      const key = pal.join("|");
+      if (key === cachedPaletteKey) return;
+      cachedPaletteKey = key;
+      charSprites = pal.map((color) => [
+        makeCharSprite(0, color),
+        makeCharSprite(1, color),
+      ]);
+    };
 
     /* ----- City positions (pre-computed) ----- */
 
@@ -432,7 +516,10 @@ export default function BinaryGlobe({
       // A faint wireframe so the globe always reads as a sphere — and the
       // rotation is visible even when an empty ocean is facing the camera.
 
-      ctx.strokeStyle = withAlpha(palette[3] || palette[0], 0.13);
+      ensureSprites(palette);
+
+      // Slightly fainter wireframe so the digits read as the primary element.
+      ctx.strokeStyle = withAlpha(palette[3] || palette[0], 0.09);
       ctx.lineWidth = 0.6;
 
       const MERIDIANS = 8;
@@ -502,15 +589,54 @@ export default function BinaryGlobe({
       }
 
       // Subtle sphere outline ring at the limb.
-      ctx.strokeStyle = withAlpha(palette[0], 0.14);
+      ctx.strokeStyle = withAlpha(palette[0], 0.12);
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.arc(cx, cy, radius + 0.5, 0, Math.PI * 2);
       ctx.stroke();
 
-      /* ----- Dots ----- */
-      // Use globalAlpha + reused palette strings to avoid 1000+ string allocations/frame.
-      // Use fillRect for the inner dot (faster than ctx.arc at ≤2px).
+      /* ----- Background "data dust" floating digits -----
+         Drawn behind the globe surface digits so the silhouette stays primary.
+         Slow drift + per-digit twinkle. Wraps around the canvas edges. */
+      for (let fi = 0; fi < floatDigits.length; fi++) {
+        const f = floatDigits[fi];
+        f.x += f.vx * dt;
+        f.y += f.vy * dt;
+        // Wrap so digits never disappear permanently — keeps the "space" alive.
+        if (f.x < -spriteCss) f.x = size + spriteCss;
+        else if (f.x > size + spriteCss) f.x = -spriteCss;
+        if (f.y < -spriteCss) f.y = size + spriteCss;
+        else if (f.y > size + spriteCss) f.y = -spriteCss;
+
+        const ftw = 0.5 + 0.5 * Math.sin(nowMs * 0.0019 + f.phase);
+        const a = f.alpha * (0.55 + 0.45 * ftw);
+        // Hot digits use palette[0]; muted ones use a darker palette tone
+        // (reads as grey-red against the bg, like the white-ish stars in the ref).
+        const toneIdx = f.hot ? 0 : palette.length > 3 ? 3 : palette.length - 1;
+        const sprite = charSprites[toneIdx]?.[f.char];
+        if (!sprite) continue;
+        ctx.globalAlpha = f.hot ? Math.min(1, a * 1.3) : a * 0.85;
+        ctx.drawImage(
+          sprite,
+          f.x - spriteCss / 2,
+          f.y - spriteCss / 2,
+          spriteCss,
+          spriteCss,
+        );
+      }
+      ctx.globalAlpha = 1;
+
+      /* ----- Binary surface digits ----- */
+      // Each land point is rendered as a stable "0" or "1" via a pre-rendered
+      // sprite. Size shrinks slightly toward the limb so the sphere reads as 3D.
+
+      // Occasional Matrix-style digit flip — a handful per second, max.
+      // Probabilistic per-frame rather than per-point to keep this O(1).
+      const flipCount = Math.min(4, Math.floor(points.length * dt * 0.6));
+      for (let fi2 = 0; fi2 < flipCount; fi2++) {
+        const idx = (Math.random() * points.length) | 0;
+        points[idx].char = points[idx].char === 0 ? 1 : 0;
+      }
 
       for (let pi = 0; pi < points.length; pi++) {
         const p = points[pi];
@@ -523,24 +649,36 @@ export default function BinaryGlobe({
         if (depth < 0.16) continue;
 
         const fade = depth * depth; // cheaper than Math.pow
-        const twinkle = 0.85 + 0.15 * Math.sin(tw + p.phase);
-        const alpha = (0.18 + fade * 0.82) * twinkle;
+        const twinkle = 0.8 + 0.2 * Math.sin(tw + p.phase);
+        const alpha = (0.22 + fade * 0.78) * twinkle;
 
-        const baseColor =
-          depth > 0.85 ? palette[0] : palette[Math.min(palette.length - 1, p.tone)];
-        const r = 0.7 + fade * 1.7;
+        const toneIdx =
+          p.hot || depth > 0.88 ? 0 : Math.min(palette.length - 1, p.tone);
+        const sprite = charSprites[toneIdx]?.[p.char];
+        if (!sprite) continue;
+
+        // Front digits ~1.0x, far digits ~0.78x — keeps the silhouette readable
+        // while selling the curvature.
+        const scale = 0.78 + fade * 0.22;
+        const drawSize = spriteCss * scale;
         const sx = cx + x1 * radius;
         const sy = cy + y1 * radius;
 
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = baseColor;
-        ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
+        ctx.drawImage(
+          sprite,
+          sx - drawSize / 2,
+          sy - drawSize / 2,
+          drawSize,
+          drawSize,
+        );
 
-        if (depth > 0.92) {
-          ctx.globalAlpha = 0.18 * fade;
+        // Soft glow halo behind the bright front-most/hot digits.
+        if (depth > 0.9 || (p.hot && depth > 0.7)) {
+          ctx.globalAlpha = 0.16 * fade;
           ctx.fillStyle = palette[0];
           ctx.beginPath();
-          ctx.arc(sx, sy, r * 2.4, 0, Math.PI * 2);
+          ctx.arc(sx, sy, drawSize * 0.95, 0, Math.PI * 2);
           ctx.fill();
         }
       }
