@@ -27,7 +27,7 @@
    .\start.ps1
    ```
 4. Откройте:
-   - Сайт: http://localhost:5173
+   - Сайт: http://localhost:80
    - API Docs: http://localhost:4000/api/docs
 
 ### Docker
