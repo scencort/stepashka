@@ -108,6 +108,7 @@ export default function AiReview() {
       if (streamResponse && streamResponse.ok && streamResponse.body) {
         const reader = streamResponse.body.getReader();
         const decoder = new TextDecoder();
+        let buffer = "";
         let streamed = "";
 
         setChatMessages((prev) => [
@@ -117,10 +118,22 @@ export default function AiReview() {
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) {
-            break;
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const raw = line.slice(6);
+              if (raw === "[DONE]") continue;
+              try {
+                const parsed = JSON.parse(raw) as { content?: string };
+                streamed += parsed.content ?? "";
+              } catch {
+                streamed += raw;
+              }
+            }
           }
-          streamed += decoder.decode(value, { stream: true });
           setChatMessages((prev) => {
             const next = [...prev];
             next[next.length - 1] = { role: "assistant", content: streamed };
@@ -142,7 +155,7 @@ export default function AiReview() {
           ...prev,
           {
             role: "assistant",
-            content: `${response.reply}\n\nmodel: ${response.model}`,
+            content: response.reply,
           },
         ]);
       }

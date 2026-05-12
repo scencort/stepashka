@@ -697,12 +697,6 @@ const routeMappings: RouteMapping[] = [
       passthrough<T>(`/teacher/steps/${pathId(p, 3)}`, "DELETE"),
   },
   {
-    pattern: "/teacher/assignments",
-    method: "POST",
-    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
-      passthrough<T>("/teacher/assignments", m, rawBody),
-  },
-  {
     pattern: "/teacher/analytics",
     method: "GET",
     transform: <T>() => backendRequest<T>("/teacher/analytics"),

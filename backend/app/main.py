@@ -45,6 +45,23 @@ async def startup():
     try:
         await database.get_pool()
         await init_db()
+        # migration: add step_id to discussion_messages if missing (no FK constraint)
+        await database.execute(
+            "ALTER TABLE discussion_messages ADD COLUMN IF NOT EXISTS step_id INTEGER"
+        )
+        # drop FK constraint if it was previously added with reference
+        await database.execute(
+            """DO $$
+               BEGIN
+                 IF EXISTS (
+                   SELECT 1 FROM information_schema.table_constraints
+                   WHERE constraint_name = 'discussion_messages_step_id_fkey'
+                     AND table_name = 'discussion_messages'
+                 ) THEN
+                   ALTER TABLE discussion_messages DROP CONSTRAINT discussion_messages_step_id_fkey;
+                 END IF;
+               END$$"""
+        )
         logger.info("PostgreSQL connected and initialized")
     except Exception as e:
         logger.error(f"PostgreSQL unavailable: {e}")
@@ -306,18 +323,34 @@ async def help_faq():
 # ── Course Discussions ──
 
 @app.get("/api/courses/{course_id}/discussions")
-async def get_discussions(course_id: int):
-    rows = await database.fetch(
-        """SELECT dm.id, dm.user_id AS "userId", u.full_name AS "userName",
-                  u.avatar_url AS "avatarUrl", dm.message,
-                  dm.created_at AS "createdAt"
-           FROM discussion_messages dm
-           JOIN users u ON u.id = dm.user_id
-           WHERE dm.course_id = $1
-           ORDER BY dm.created_at ASC
-           LIMIT 50""",
-        course_id,
-    )
+async def get_discussions(course_id: int, request: Request):
+    step_id_raw = request.query_params.get("step_id")
+    step_id = int(step_id_raw) if step_id_raw and step_id_raw.isdigit() else None
+
+    if step_id is not None:
+        rows = await database.fetch(
+            """SELECT dm.id, dm.user_id AS "userId", u.full_name AS "userName",
+                      u.avatar_url AS "avatarUrl", dm.message,
+                      dm.created_at AS "createdAt"
+               FROM discussion_messages dm
+               JOIN users u ON u.id = dm.user_id
+               WHERE dm.course_id = $1 AND dm.step_id = $2
+               ORDER BY dm.created_at ASC
+               LIMIT 100""",
+            course_id, step_id,
+        )
+    else:
+        rows = await database.fetch(
+            """SELECT dm.id, dm.user_id AS "userId", u.full_name AS "userName",
+                      u.avatar_url AS "avatarUrl", dm.message,
+                      dm.created_at AS "createdAt"
+               FROM discussion_messages dm
+               JOIN users u ON u.id = dm.user_id
+               WHERE dm.course_id = $1 AND dm.step_id IS NULL
+               ORDER BY dm.created_at ASC
+               LIMIT 100""",
+            course_id,
+        )
     return [
         {
             "id": r["id"],
@@ -335,21 +368,32 @@ async def get_discussions(course_id: int):
 async def post_discussion(course_id: int, request: Request, user: CurrentUser):
     body = await request.json()
     message = (body.get("message") or "").strip()
+    step_id = body.get("step_id") or None
+    if step_id is not None:
+        try:
+            step_id = int(step_id)
+        except (ValueError, TypeError):
+            step_id = None
     if not message:
         return JSONResponse(status_code=400, content={"error": "Сообщение не может быть пустым"})
     row = await database.fetchrow(
-        """INSERT INTO discussion_messages (course_id, user_id, message)
-           VALUES ($1, $2, $3)
+        """INSERT INTO discussion_messages (course_id, step_id, user_id, message)
+           VALUES ($1, $2, $3, $4)
            RETURNING id, created_at AS "createdAt" """,
         course_id,
+        step_id,
         user["id"],
         message,
+    )
+    profile = await database.fetchrow(
+        "SELECT full_name, avatar_url FROM users WHERE id=$1 LIMIT 1",
+        user["id"],
     )
     return {
         "id": row["id"],
         "userId": user["id"],
-        "userName": user["full_name"],
-        "avatarUrl": user.get("avatar_url") or "",
+        "userName": (profile["full_name"] if profile else "") or user.get("fullName", ""),
+        "avatarUrl": (profile["avatar_url"] if profile else "") or "",
         "message": message,
         "createdAt": row["createdAt"].isoformat() if row["createdAt"] else None,
     }

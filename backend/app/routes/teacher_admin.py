@@ -20,6 +20,7 @@ from app.schemas import (
 from app.services import (
     estimate_code_quality,
     estimate_essay,
+    evaluate_code_by_tests,
     write_audit,
 )
 
@@ -156,7 +157,12 @@ async def update_course(course_id: int, body: CourseBody, user: CurrentUser):
 @router.patch("/teacher/courses/{course_id}/publish", dependencies=[TeacherDep])
 async def publish_course(course_id: int, request: Request, user: CurrentUser):
     body = await request.json()
-    new_status = body.get("status", "published")
+    new_status = body.get("status", "pending_review")
+    if new_status not in ("draft", "pending_review", "published", "archived"):
+        new_status = "pending_review"
+    # Teachers cannot publish directly — always goes to moderation
+    if user["role"] == "teacher" and new_status == "published":
+        new_status = "pending_review"
     if new_status not in ("draft", "pending_review", "published", "archived"):
         return {"error": "Некорректный статус"}
     row = await db.fetchrow(
@@ -202,17 +208,129 @@ async def course_structure(course_id: int, user: CurrentUser):
            WHERE cm.course_id=$1 ORDER BY cm.module_order ASC, l.lesson_order ASC""",
         course_id,
     )
-    steps = await db.fetch(
-        """SELECT id, lesson_id AS "lessonId", title, step_order AS "stepOrder",
-                  step_type AS "stepType", content, xp
-           FROM course_steps WHERE course_id=$1 ORDER BY step_order ASC""",
-        course_id,
-    )
+    # Load assignments indexed by lesson_id
+    lesson_ids = [l["id"] for l in lessons]
+    assignments = []
+    if lesson_ids:
+        assignments = await db.fetch(
+            """SELECT id AS "assignmentId", lesson_id AS "lessonId",
+                      assignment_type AS "assignmentType", title, description, tests, rubric
+               FROM assignments WHERE lesson_id = ANY($1::int[]) ORDER BY id ASC""",
+            lesson_ids,
+        )
+    assign_by_lesson = {a["lessonId"]: dict(a) for a in assignments}
+
+    modules_list = [dict(m) for m in modules]
+
+    # Build one virtual editor-lesson per module; each DB-lesson becomes a step
+    editor_lessons = []
+    editor_steps = []
+    step_order = 1
+
+    for mod in modules_list:
+        mod_id = mod["id"]
+        virtual_lesson_id = mod_id * -1000  # negative synthetic ID
+
+        editor_lessons.append({
+            "id": virtual_lesson_id,
+            "moduleId": mod_id,
+            "title": "Шаги",
+            "lessonOrder": 1,
+            "lessonType": "text",
+            "contentText": "",
+        })
+
+        for lesson in lessons:
+            if lesson["moduleId"] != mod_id:
+                continue
+            lesson_id = lesson["id"]
+            assign = assign_by_lesson.get(lesson_id)
+
+            if assign:
+                atype = assign["assignmentType"] or "code"
+                tests_raw = assign["tests"] or []
+                if isinstance(tests_raw, str):
+                    try:
+                        tests_raw = json.loads(tests_raw)
+                    except Exception:
+                        tests_raw = []
+
+                if atype == "quiz":
+                    raw_opts = []
+                    correct_text = None
+                    if tests_raw and isinstance(tests_raw, list):
+                        first = tests_raw[0] if tests_raw else {}
+                        if isinstance(first, dict):
+                            raw_opts = first.get("options", [])
+                            correct_text = first.get("correct")  # text of correct answer (new format)
+                    # Normalize to [{text, correct}] objects for the editor
+                    options = []
+                    for opt in raw_opts:
+                        if isinstance(opt, str):
+                            opt_text = opt
+                            is_correct = (opt_text == correct_text) if correct_text else False
+                        elif isinstance(opt, dict):
+                            opt_text = str(opt.get("text", ""))
+                            # If the option already has a bool 'correct' field — trust it directly
+                            if isinstance(opt.get("correct"), bool):
+                                is_correct = bool(opt["correct"])
+                            else:
+                                # Fallback: compare text to correct_text
+                                is_correct = (opt_text == correct_text) if correct_text else False
+                        else:
+                            continue
+                        options.append({"text": opt_text, "correct": is_correct})
+                    content = {
+                        "text": assign["description"] or "",
+                        "options": options,
+                    }
+                    step_type = "quiz"
+                elif atype == "essay":
+                    rubric_raw = assign.get("rubric") or {}
+                    if isinstance(rubric_raw, str):
+                        try:
+                            rubric_raw = json.loads(rubric_raw)
+                        except Exception:
+                            rubric_raw = {}
+                    content = {
+                        "taskDescription": assign["description"] or "",
+                        "essayKeywords": rubric_raw.get("keywords", ""),
+                    }
+                    step_type = "essay"
+                else:
+                    content = {
+                        "taskDescription": assign["description"] or "",
+                        "starterCode": "",
+                        "tests": tests_raw if isinstance(tests_raw, list) else [],
+                    }
+                    step_type = "code"
+            else:
+                content = {"text": lesson["contentText"] or ""}
+                step_type = "theory"
+
+            editor_steps.append({
+                "id": lesson_id,                  # step.id = DB lesson id
+                "lessonId": virtual_lesson_id,
+                "assignmentId": assign["assignmentId"] if assign else None,
+                "title": lesson["title"],
+                "stepOrder": step_order,
+                "stepType": step_type,
+                "xp": 10,
+                "content": content,
+            })
+            step_order += 1
+
+    # Fallback: if no modules at all, return empty but valid structure
+    if not modules_list:
+        modules_list = []
+        editor_lessons = []
+        editor_steps = []
+
     return {
         "course": dict(course),
-        "modules": [dict(m) for m in modules],
-        "lessons": [dict(l) for l in lessons],
-        "steps": [dict(s) for s in steps],
+        "modules": modules_list,
+        "lessons": editor_lessons,
+        "steps": editor_steps,
     }
 
 
@@ -274,28 +392,83 @@ async def create_lesson(course_id: int, body: LessonBody, user: CurrentUser):
     "/teacher/courses/{course_id}/steps", status_code=201, dependencies=[TeacherDep]
 )
 async def create_step(course_id: int, body: StepBody, user: CurrentUser):
+    """Create step = create DB lesson + optional assignment.
+    body.lessonId is the virtual lesson id (module_id * -1000); we resolve the real module from it.
+    """
     course = await db.fetchrow(
         "SELECT id FROM courses WHERE id=$1 AND (teacher_id=$2 OR $3='admin') LIMIT 1",
-        course_id,
-        user["id"],
-        user["role"],
+        course_id, user["id"], user["role"],
     )
     if not course:
         return {"error": "Курс не найден"}
-    row = await db.fetchrow(
-        """INSERT INTO course_steps (course_id, lesson_id, title, step_order, step_type, content, xp)
-           VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
-           RETURNING id, lesson_id AS "lessonId", title, step_order AS "stepOrder",
-                     step_type AS "stepType", content, xp""",
-        course_id,
-        body.lessonId,
-        body.title,
-        body.stepOrder,
-        body.stepType,
-        json.dumps(body.content),
-        body.xp,
+
+    step_type = body.stepType or "theory"
+    content = body.content or {}
+
+    # Resolve module_id from virtual lesson id (virtual_lesson_id = module_id * -1000)
+    virtual_lesson_id = body.lessonId or 0
+    module_id: int | None = None
+    if virtual_lesson_id and virtual_lesson_id < 0:
+        module_id = abs(virtual_lesson_id) // 1000
+    elif virtual_lesson_id and virtual_lesson_id > 0:
+        # Could be real module id passed directly
+        module_id = virtual_lesson_id
+
+    if not module_id:
+        # fallback: pick first module
+        first_mod = await db.fetchrow(
+            "SELECT id FROM course_modules WHERE course_id=$1 ORDER BY module_order ASC LIMIT 1", course_id
+        )
+        module_id = first_mod["id"] if first_mod else None
+
+    if not module_id:
+        return {"error": "Модуль не найден"}
+
+    theory_text = content.get("text") or "" if step_type == "theory" else ""
+
+    # Count existing lessons in this module to set lesson_order
+    lesson_count = await db.fetchval(
+        "SELECT COUNT(*)::int FROM lessons WHERE module_id=$1", module_id
     )
-    return dict(row)
+
+    lesson_row = await db.fetchrow(
+        """INSERT INTO lessons (module_id, title, lesson_order, lesson_type, content_text)
+           VALUES ($1, $2, $3, 'text', $4)
+           RETURNING id""",
+        module_id, body.title, (lesson_count or 0) + 1, theory_text,
+    )
+    lesson_id = lesson_row["id"]
+
+    if step_type == "quiz":
+        options = content.get("options") or []
+        question = content.get("text") or ""
+        correct_text = next((str(o.get("text", "")) for o in options if isinstance(o, dict) and o.get("correct")), None)
+        tests_json = json.dumps([{"options": options, "correct": correct_text}])
+        await db.execute(
+            """INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
+               VALUES ($1,'quiz',$2,$3,$4::jsonb,'{}'::jsonb,100)""",
+            lesson_id, body.title, question, tests_json,
+        )
+    elif step_type == "code":
+        desc = content.get("taskDescription") or ""
+        tests_list = content.get("tests") or []
+        tests_json = json.dumps(tests_list)
+        await db.execute(
+            """INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
+               VALUES ($1,'code',$2,$3,$4::jsonb,'{}'::jsonb,100)""",
+            lesson_id, body.title, desc, tests_json,
+        )
+    elif step_type == "essay":
+        desc = content.get("taskDescription") or ""
+        keywords = content.get("essayKeywords") or ""
+        rubric_json = json.dumps({"keywords": keywords})
+        await db.execute(
+            """INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
+               VALUES ($1,'essay',$2,$3,'[]'::jsonb,$4::jsonb,100)""",
+            lesson_id, body.title, desc, rubric_json,
+        )
+
+    return {"id": lesson_id, "title": body.title, "stepType": step_type}
 
 
 @router.patch("/teacher/modules/{module_id}", dependencies=[TeacherDep])
@@ -340,44 +513,100 @@ async def update_lesson(lesson_id: int, body: LessonBody, user: CurrentUser):
 
 @router.patch("/teacher/steps/{step_id}", dependencies=[TeacherDep])
 async def update_step(step_id: int, body: StepBody, user: CurrentUser):
-    step = await db.fetchrow("SELECT course_id FROM course_steps WHERE id=$1", step_id)
-    if not step:
-        raise HTTPException(status_code=404, detail="Шаг не найден")
-    course = await db.fetchrow("SELECT teacher_id FROM courses WHERE id=$1", step["course_id"])
-    if user["role"] != "admin" and (not course or course["teacher_id"] != user["id"]):
-        raise HTTPException(status_code=403, detail="Нет доступа к этому курсу")
-    row = await db.fetchrow(
-        """UPDATE course_steps SET title=$1, step_order=$2, step_type=$3,
-                  content=$4::jsonb, xp=$5, lesson_id=$6, updated_at=NOW()
-           WHERE id=$7
-           RETURNING id, lesson_id AS "lessonId", title, step_order AS "stepOrder",
-                     step_type AS "stepType", content, xp""",
-        body.title,
-        body.stepOrder,
-        body.stepType,
-        json.dumps(body.content),
-        body.xp,
-        body.lessonId,
-        step_id,
+    """Update a step = update DB lesson + upsert/delete assignment."""
+    # step_id here is the DB lesson id
+    lesson = await db.fetchrow(
+        """SELECT l.id, cm.course_id FROM lessons l
+           INNER JOIN course_modules cm ON cm.id=l.module_id
+           INNER JOIN courses c ON c.id=cm.course_id
+           WHERE l.id=$1 AND (c.teacher_id=$2 OR $3='admin') LIMIT 1""",
+        step_id, user["id"], user["role"],
     )
-    if not row:
-        return {"error": "Шаг не найден"}
-    return dict(row)
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Шаг не найден")
+
+    step_type = body.stepType or "theory"
+    content = body.content or {}
+
+    # Update lesson title and contentText (theory text)
+    theory_text = content.get("text") or "" if step_type == "theory" else ""
+    await db.execute(
+        "UPDATE lessons SET title=$1, content_text=$2 WHERE id=$3",
+        body.title, theory_text, step_id,
+    )
+
+    if step_type == "theory":
+        # Remove assignment if exists
+        await db.execute("DELETE FROM assignments WHERE lesson_id=$1", step_id)
+    elif step_type == "quiz":
+        options = content.get("options") or []
+        question = content.get("text") or ""
+        correct_text = next((str(o.get("text", "")) for o in options if isinstance(o, dict) and o.get("correct")), None)
+        tests_json = json.dumps([{"options": options, "correct": correct_text}])
+        existing = await db.fetchrow("SELECT id FROM assignments WHERE lesson_id=$1 LIMIT 1", step_id)
+        if existing:
+            await db.execute(
+                """UPDATE assignments SET title=$1, description=$2, assignment_type='quiz', tests=$3::jsonb
+                   WHERE lesson_id=$4""",
+                body.title, question, tests_json, step_id,
+            )
+        else:
+            await db.execute(
+                """INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
+                   VALUES ($1,'quiz',$2,$3,$4::jsonb,'{}'::jsonb,100)""",
+                step_id, body.title, question, tests_json,
+            )
+    elif step_type == "code":
+        desc = content.get("taskDescription") or ""
+        tests_list = content.get("tests") or []
+        tests_json = json.dumps(tests_list)
+        existing = await db.fetchrow("SELECT id FROM assignments WHERE lesson_id=$1 LIMIT 1", step_id)
+        if existing:
+            await db.execute(
+                """UPDATE assignments SET title=$1, description=$2, assignment_type='code', tests=$3::jsonb
+                   WHERE lesson_id=$4""",
+                body.title, desc, tests_json, step_id,
+            )
+        else:
+            await db.execute(
+                """INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
+                   VALUES ($1,'code',$2,$3,$4::jsonb,'{}'::jsonb,100)""",
+                step_id, body.title, desc, tests_json,
+            )
+    else:  # essay
+        desc = content.get("taskDescription") or ""
+        keywords = content.get("essayKeywords") or ""
+        rubric_json = json.dumps({"keywords": keywords})
+        existing = await db.fetchrow("SELECT id FROM assignments WHERE lesson_id=$1 LIMIT 1", step_id)
+        if existing:
+            await db.execute(
+                """UPDATE assignments SET title=$1, description=$2, assignment_type='essay', rubric=$3::jsonb
+                   WHERE lesson_id=$4""",
+                body.title, desc, rubric_json, step_id,
+            )
+        else:
+            await db.execute(
+                """INSERT INTO assignments (lesson_id, assignment_type, title, description, tests, rubric, max_score)
+                   VALUES ($1,'essay',$2,$3,'[]'::jsonb,$4::jsonb,100)""",
+                step_id, body.title, desc, rubric_json,
+            )
+
+    return {"id": step_id, "title": body.title, "stepType": step_type}
 
 
 @router.delete("/teacher/steps/{step_id}", dependencies=[TeacherDep])
 async def delete_step(step_id: int, user: CurrentUser):
-    step = await db.fetchrow("SELECT course_id FROM course_steps WHERE id=$1", step_id)
-    if not step:
-        raise HTTPException(status_code=404, detail="Шаг не найден")
-    course = await db.fetchrow("SELECT teacher_id FROM courses WHERE id=$1", step["course_id"])
-    if user["role"] != "admin" and (not course or course["teacher_id"] != user["id"]):
-        raise HTTPException(status_code=403, detail="Нет доступа к этому курсу")
-    deleted = await db.fetchrow(
-        "DELETE FROM course_steps WHERE id=$1 RETURNING id", step_id
+    """Delete step = delete DB lesson (cascades to assignments)."""
+    lesson = await db.fetchrow(
+        """SELECT l.id FROM lessons l
+           INNER JOIN course_modules cm ON cm.id=l.module_id
+           INNER JOIN courses c ON c.id=cm.course_id
+           WHERE l.id=$1 AND (c.teacher_id=$2 OR $3='admin') LIMIT 1""",
+        step_id, user["id"], user["role"],
     )
-    if not deleted:
-        return {"error": "Шаг не найден"}
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Шаг не найден")
+    await db.execute("DELETE FROM lessons WHERE id=$1", step_id)
     return {"success": True}
 
 
@@ -624,14 +853,30 @@ async def submit(assignment_id: int, body: SubmitBody, user: CurrentUser):
     if at == "code":
         tests = assignment["tests"]
         if isinstance(tests, str):
-            tests = json.loads(tests)
-        base_tests = min(65, len(tests) * 15) if isinstance(tests, list) else 40
-        result = estimate_code_quality(body.codeText or "", base_tests)
+            try:
+                tests = json.loads(tests)
+            except Exception:
+                tests = []
+        # Use real test execution
+        eval_result = evaluate_code_by_tests(body.codeText or "", tests if isinstance(tests, list) else [])
+        score = eval_result["scorePercent"]
+        result = {
+            "score": score,
+            "metrics": {
+                "passedCount": eval_result["passedCount"],
+                "totalChecks": eval_result["totalChecks"],
+                "scorePercent": score,
+            },
+            "status": "passed" if eval_result["passed"] else "failed",
+            "feedback": eval_result["feedback"],
+            "hints": [],
+            "checkResults": eval_result.get("checkResults", []),
+        }
     elif at == "essay":
         rubric = assignment["rubric"]
         if isinstance(rubric, str):
             rubric = json.loads(rubric)
-        result = estimate_essay(body.answerText or "", rubric)
+        result = await estimate_essay(body.answerText or "", rubric)
     else:
         sc = min(100, 80 if body.answerText else 40)
         result = {
@@ -654,7 +899,7 @@ async def submit(assignment_id: int, body: SubmitBody, user: CurrentUser):
         result["score"],
         result["status"],
         result["feedback"],
-        result["metrics"].get("plagiarismScore", 0),
+        result.get("metrics", {}).get("plagiarismScore", 0),
         json.dumps(result.get("hints", [])),
     )
     await write_audit(user["id"], "submission.create", "submission", saved["id"])
@@ -864,6 +1109,7 @@ async def admin_courses():
     result = []
     for r in rows:
         row = dict(r)
+        status = row.get("status") or "draft"
         result.append(
             {
                 "id": row["id"],
@@ -875,10 +1121,29 @@ async def admin_courses():
                 "price": f"{(row.get('priceCents') or 0) // 100} ₽"
                 if (row.get("priceCents") or 0) > 0
                 else "Бесплатно",
-                "published": row.get("status") == "published",
+                "published": status == "published",
+                "status": status,
             }
         )
     return result
+
+
+@router.patch("/admin/courses/{course_id}/moderate", dependencies=[AdminDep])
+async def admin_moderate_course(course_id: int, request: Request, user: CurrentUser):
+    """Approve (publish) or reject (draft) a course from moderation queue."""
+    body = await request.json()
+    action = body.get("action")  # "approve" | "reject"
+    if action not in ("approve", "reject"):
+        return {"error": "action must be approve or reject"}
+    new_status = "published" if action == "approve" else "draft"
+    row = await db.fetchrow(
+        "UPDATE courses SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING id, status",
+        new_status, course_id,
+    )
+    if not row:
+        return {"error": "Курс не найден"}
+    await write_audit(user["id"], f"admin.course.{action}", "course", course_id, {"status": new_status})
+    return {"id": row["id"], "status": new_status}
 
 
 @router.patch("/admin/courses/{course_id}", dependencies=[AdminDep])

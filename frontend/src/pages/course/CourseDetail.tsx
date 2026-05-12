@@ -14,7 +14,7 @@ import CourseDiscussion from "./CourseDiscussion";
 type CourseStepType = {
   id: number;
   title: string;
-  kind: "theory" | "quiz" | "code";
+  kind: "theory" | "quiz" | "code" | "essay";
   taskTypeLabel?: string;
   theoryText: string;
   checks?: string[];
@@ -179,7 +179,9 @@ export default function CourseDetail(props: Props) {
       ? "Отметить как изученный"
       : activeStep.kind === "quiz"
         ? "Проверить ответ"
-        : "Отправить код"
+        : activeStep.kind === "essay"
+          ? "Отправить эссе на проверку"
+          : "Отправить код"
     : "Проверить";
 
   const syllabusModules = useMemo(() => {
@@ -410,7 +412,11 @@ export default function CourseDetail(props: Props) {
           )}
 
           {activeTab === "discussion" && courseDetail && (
-            <CourseDiscussion courseId={courseDetail.id} />
+            <CourseDiscussion
+              courseId={courseDetail.id}
+              stepId={selectedStepId}
+              stepTitle={activeStep?.title}
+            />
           )}
         </div>
 

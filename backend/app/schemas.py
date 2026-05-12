@@ -98,7 +98,7 @@ class StepBody(BaseModel):
     lessonId: int | None = None
     title: str = Field(min_length=2, max_length=300)
     stepOrder: int = Field(ge=1)
-    stepType: Literal["theory", "quiz", "code", "text_input", "matching", "sorting", "fill_blanks"]
+    stepType: Literal["theory", "quiz", "code", "essay", "text_input", "matching", "sorting", "fill_blanks"]
     content: dict = Field(default_factory=dict)
     xp: int = Field(default=10, ge=0, le=1000)
 

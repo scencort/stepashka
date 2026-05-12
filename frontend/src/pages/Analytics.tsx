@@ -1,19 +1,14 @@
 import { useEffect, useState } from "react"
 import MainLayout from "../layout/MainLayout"
-import Card from "../components/ui/Card"
-import { api } from "../lib/api"
 import Skeleton from "../components/ui/Skeleton"
-import EmptyState from "../components/ui/EmptyState"
+import { api } from "../lib/api"
+import { TrendingUp, TrendingDown, BookOpen, CheckSquare, Star, Sparkles } from "lucide-react"
 
 export default function Analytics() {
   const [period, setPeriod] = useState<"week" | "month">("week")
   const [values, setValues] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
-    averageScore: "0%",
-    solvedTasks: 0,
-    completedCourses: 0,
-  })
+  const [stats, setStats] = useState({ averageScore: "0%", solvedTasks: 0, completedCourses: 0 })
   const [error, setError] = useState("")
   const [insights, setInsights] = useState<Array<{ label: string; text: string }>>([])
   const [insightsLoading, setInsightsLoading] = useState(false)
@@ -25,160 +20,204 @@ export default function Analytics() {
       try {
         const data = await api.get<{
           values: number[]
-          stats: {
-            averageScore: string
-            solvedTasks: number
-            completedCourses: number
-          }
+          stats: { averageScore: string; solvedTasks: number; completedCourses: number }
         }>(`/analytics?period=${period}`)
         setValues(data.values)
         setStats(data.stats)
 
-        // Fetch AI insights
         setInsightsLoading(true)
         try {
-          const insightsData = await api.post<{
-            insights: Array<{ label: string; text: string }>
-          }>("/ai/insights", {
-            period,
-            values: data.values,
-            averageScore: data.stats.averageScore,
-            solvedTasks: data.stats.solvedTasks,
-            completedCourses: data.stats.completedCourses,
+          const ins = await api.post<{ insights: Array<{ label: string; text: string }> }>("/ai/insights", {
+            period, values: data.values, ...data.stats,
           })
-          setInsights(insightsData.insights || [])
-        } catch {
-          setInsights([])
-        } finally {
-          setInsightsLoading(false)
-        }
+          setInsights(ins.insights || [])
+        } catch { setInsights([]) } finally { setInsightsLoading(false) }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Не удалось загрузить аналитику")
-      } finally {
-        setLoading(false)
-      }
+        setError(err instanceof Error ? err.message : "Ошибка загрузки")
+      } finally { setLoading(false) }
     }
-
-    load()
+    void load()
   }, [period])
 
-  const lastValue = values[values.length - 1] ?? 0
-  const firstValue = values[0] ?? 0
-  const delta = lastValue - firstValue
-  const goal = 80
-  const goalStatus = lastValue >= goal ? "goal-reached" : "in-progress"
+  const last = values[values.length - 1] ?? 0
+  const first = values[0] ?? 0
+  const delta = last - first
+  const max = Math.max(...values, 1)
+
+  const statCards = [
+    {
+      label: "Средний балл",
+      value: stats.averageScore,
+      icon: Star,
+      color: "text-amber-500",
+      bg: "bg-amber-50 dark:bg-amber-900/20",
+      border: "border-amber-200/60 dark:border-amber-800/40",
+    },
+    {
+      label: "Решено задач",
+      value: stats.solvedTasks,
+      icon: CheckSquare,
+      color: "text-emerald-500",
+      bg: "bg-emerald-50 dark:bg-emerald-900/20",
+      border: "border-emerald-200/60 dark:border-emerald-800/40",
+    },
+    {
+      label: "Пройдено курсов",
+      value: stats.completedCourses,
+      icon: BookOpen,
+      color: "text-primary",
+      bg: "bg-[var(--bg-tint)]",
+      border: "border-primary/20",
+    },
+  ]
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <h2 className="text-2xl md:text-3xl font-bold">Аналитика и успеваемость</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPeriod("week")}
-              className={`px-4 py-2 rounded-xl ${period === "week" ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900" : "glass-panel"}`}
-            >
-              Неделя
-            </button>
-            <button
-              onClick={() => setPeriod("month")}
-              className={`px-4 py-2 rounded-xl ${period === "month" ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900" : "glass-panel"}`}
-            >
-              Месяц
-            </button>
+      <div className="space-y-6 lg:space-y-8">
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight font-display">Аналитика</h1>
+            <p className="text-[var(--muted)] mt-1">Ваш прогресс и успеваемость</p>
+          </div>
+          <div className="flex gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] self-start sm:self-auto">
+            {(["week", "month"] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  period === p
+                    ? "btn-gradient shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--text)]"
+                }`}
+              >
+                {p === "week" ? "Неделя" : "Месяц"}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card><p className="text-sm text-slate-500">Средний балл</p><p className="text-2xl font-bold mt-2">{stats.averageScore}</p></Card>
-          <Card><p className="text-sm text-slate-500">Решено задач</p><p className="text-2xl font-bold mt-2">{stats.solvedTasks}</p></Card>
-          <Card><p className="text-sm text-slate-500">Пройдено курсов</p><p className="text-2xl font-bold mt-2">{stats.completedCourses}</p></Card>
-        </div>
+        {/* Stat cards */}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[1,2,3].map(i => <Skeleton key={i} className="h-28 rounded-2xl" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {statCards.map(s => (
+              <div key={s.label} className="card p-5 flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-2xl ${s.bg} border ${s.border} flex items-center justify-center shrink-0`}>
+                  <s.icon size={22} className={s.color} />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">{s.label}</p>
+                  <p className="text-3xl font-bold tracking-tight font-display mt-0.5">{s.value}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <p className="text-sm text-slate-500">Тренд периода</p>
-            <p className={`text-2xl font-bold mt-2 ${delta >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-              {delta >= 0 ? "+" : ""}{delta}%
-            </p>
-            <p className="text-xs text-slate-500 mt-1">Сравнение начала и конца периода</p>
-          </Card>
-          <Card>
-            <p className="text-sm text-slate-500">Текущий sprint score</p>
-            <p className="text-2xl font-bold mt-2">{lastValue}%</p>
-            <p className="text-xs text-slate-500 mt-1">Последняя точка в выбранном интервале</p>
-          </Card>
-          <Card>
-            <p className="text-sm text-slate-500">Цель обучения</p>
-            <p className="text-2xl font-bold mt-2">{goal}%</p>
-            <p className={`text-xs mt-1 ${goalStatus === "goal-reached" ? "text-emerald-600" : "text-amber-600"}`}>
-              {goalStatus === "goal-reached" ? "Цель достигнута" : "Продолжайте практику до цели"}
-            </p>
-          </Card>
-        </div>
-
-        <Card>
-          <h3 className="font-semibold mb-4">Динамика прогресса</h3>
-          {error && <p className="text-sm text-red-700 dark:text-red-300 mb-3">{error}</p>}
+        {/* Chart */}
+        <div className="card p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <div>
+              <p className="text-base font-bold font-display">Динамика прогресса</p>
+              <p className="text-xs text-[var(--muted)] mt-0.5">
+                {period === "week" ? "По дням за последние 7 дней" : "По неделям за последний месяц"}
+              </p>
+            </div>
+            {!loading && values.length > 0 && (
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm font-semibold ${
+                delta >= 0
+                  ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200/60 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400"
+                  : "bg-red-50 dark:bg-red-900/20 border-red-200/60 dark:border-red-800/40 text-red-600 dark:text-red-400"
+              }`}>
+                {delta >= 0 ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
+                {delta >= 0 ? "+" : ""}{delta}% за период
+              </div>
+            )}
+          </div>
 
           {loading && (
-            <div className="space-y-2">
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-8 w-full rounded-xl" />)}
             </div>
           )}
 
-          {!loading && values.length === 0 && (
-            <EmptyState
-              title="Пока недостаточно данных"
-              description="Пройдите несколько шагов курса, чтобы построить динамику."
-            />
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40 rounded-xl px-4 py-3">
+              <p className="text-sm text-red-600 dark:text-red-400 font-medium">{error}</p>
+            </div>
+          )}
+
+          {!loading && values.length === 0 && !error && (
+            <div className="py-12 flex flex-col items-center gap-3 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-[var(--bg-tint)] border border-primary/20 flex items-center justify-center">
+                <TrendingUp size={24} className="text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold text-[var(--text)]">Данных пока нет</p>
+                <p className="text-sm text-[var(--muted)] mt-1">Пройдите несколько шагов курса, чтобы увидеть динамику</p>
+              </div>
+            </div>
           )}
 
           {!loading && values.length > 0 && (
             <div className="space-y-3">
-              {values.map((value, idx) => (
-                <div key={idx}>
-                  <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                    <span>{period === "week" ? `День ${idx + 1}` : `Неделя ${idx + 1}`}</span>
-                    <span>{value}%</span>
+              {values.map((v, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-[var(--muted)] w-16 shrink-0 text-right">
+                    {period === "week" ? `День ${i + 1}` : `Нед. ${i + 1}`}
+                  </span>
+                  <div className="flex-1 h-2.5 rounded-full bg-[var(--surface)] border border-[var(--border)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${(v / max) * 100}%`,
+                        background: "linear-gradient(135deg, var(--btn-grad-from) 0%, var(--btn-grad-to) 100%)",
+                      }}
+                    />
                   </div>
-                  <progress
-                    value={value}
-                    max={100}
-                    className="w-full h-2 rounded-full overflow-hidden [&::-webkit-progress-bar]:bg-slate-200/70 dark:[&::-webkit-progress-bar]:bg-slate-700/70 [&::-webkit-progress-value]:bg-red-600 dark:[&::-webkit-progress-value]:bg-rose-600"
-                  />
+                  <span className="text-sm font-bold text-[var(--text)] w-10 shrink-0 text-right">{v}%</span>
                 </div>
               ))}
             </div>
           )}
-        </Card>
+        </div>
 
+        {/* AI insights */}
         {!loading && values.length > 0 && (
-          <Card className="space-y-3">
-            <h3 className="font-semibold">AI insights</h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-primary" />
+              <p className="text-sm font-bold font-display text-[var(--text)]">AI-рекомендации</p>
+            </div>
+
             {insightsLoading && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
               </div>
             )}
+
             {!insightsLoading && insights.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {insights.map((item, idx) => (
-                  <div key={idx} className="rounded-xl glass-panel p-3">
-                    <p className="text-xs uppercase tracking-wide text-slate-500">{item.label}</p>
-                    <p className="font-medium mt-1">{item.text}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {insights.map((item, i) => (
+                  <div key={i} className="card p-4 border-l-4 border-l-primary/40">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted)] mb-2">{item.label}</p>
+                    <p className="text-sm text-[var(--text-2)] leading-relaxed">{item.text}</p>
                   </div>
                 ))}
               </div>
             )}
+
             {!insightsLoading && insights.length === 0 && (
-              <p className="text-sm text-slate-500">Не удалось загрузить AI-инсайты. Попробуйте позже.</p>
+              <div className="card p-4 text-sm text-[var(--muted)]">
+                AI-инсайты недоступны — попробуйте позже
+              </div>
             )}
-          </Card>
+          </div>
         )}
       </div>
     </MainLayout>

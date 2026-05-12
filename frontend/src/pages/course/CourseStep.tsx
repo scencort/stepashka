@@ -116,7 +116,7 @@ function TheoryRenderer({ text }: { text: string }) {
 type CourseStepType = {
   id: number;
   title: string;
-  kind: "theory" | "quiz" | "code";
+  kind: "theory" | "quiz" | "code" | "essay";
   taskTypeLabel?: string;
   theoryText: string;
   quizQuestion?: string;
@@ -218,14 +218,18 @@ export default function CourseStep(props: Props) {
                       ? "badge-neutral"
                       : activeStep.kind === "quiz"
                         ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                        : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        : activeStep.kind === "essay"
+                          ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                          : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                   } text-[11px] px-2 py-0.5 rounded-md font-semibold`}
                 >
                   {activeStep.kind === "theory"
                     ? "Теория"
                     : activeStep.kind === "quiz"
                       ? "Тест"
-                      : "Практика"}
+                      : activeStep.kind === "essay"
+                        ? "Эссе"
+                        : "Практика"}
                 </span>
                 <span className="text-xs text-[var(--muted)]">
                   Шаг {activeStep.stepOrder}
@@ -303,6 +307,24 @@ export default function CourseStep(props: Props) {
                 </button>
               ))}
               </div>
+            </div>
+          )}
+
+          {/* Essay */}
+          {activeStep.kind === "essay" && (
+            <div className="space-y-3">
+              {activeStep.theoryText && (
+                <TheoryRenderer text={activeStep.theoryText} />
+              )}
+              <p className="text-xs text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl px-3 py-2">
+                🤖 Ваш ответ будет оценён нейросетью по критериям: содержание, творчество, ясность, глубина анализа
+              </p>
+              <textarea
+                value={stepAnswer}
+                onChange={(e) => setStepAnswer(e.target.value)}
+                placeholder="Напишите ваше эссе здесь..."
+                className="w-full h-64 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] p-4 text-sm outline-none focus:border-primary/50 transition-colors resize-none"
+              />
             </div>
           )}
 
@@ -400,7 +422,8 @@ export default function CourseStep(props: Props) {
                 onClick={onSubmitStep}
                 disabled={
                   stepLoading ||
-                  (activeStep.kind !== "theory" && !stepAnswer.trim())
+                  (activeStep.kind !== "theory" && activeStep.kind !== "essay" && !stepAnswer.trim()) ||
+                  (activeStep.kind === "essay" && !stepAnswer.trim())
                 }
                 className="btn-primary px-5 py-2.5 text-sm gap-2"
               >

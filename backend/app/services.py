@@ -5,6 +5,10 @@ import json
 import random
 import re
 import secrets
+import subprocess
+import sys
+import tempfile
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -150,66 +154,99 @@ def evaluate_tree_pattern(code: str, levels: list[int] | None = None) -> bool:
     return has_loop and has_print and has_star and (has_star_mult or has_literal)
 
 
+def _run_code_with_input(code: str, stdin_data: str, timeout: float = 5.0) -> tuple[str, str, int]:
+    """Run Python code in a subprocess with given stdin. Returns (stdout, stderr, returncode)."""
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
+            f.write(code)
+            tmp_path = f.name
+        try:
+            result = subprocess.run(
+                [sys.executable, tmp_path],
+                input=stdin_data,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            )
+            return result.stdout, result.stderr, result.returncode
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+    except subprocess.TimeoutExpired:
+        return "", "Превышено время выполнения (5 сек)", 1
+    except Exception as exc:
+        return "", str(exc), 1
+
+
 def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
     answer = str(answer or "")
-    lowered = answer.lower()
     tests = tests_raw if isinstance(tests_raw, list) else []
 
     if not tests:
-        passed = len(answer.strip()) >= 20
+        # No test cases defined — just check the code runs without error
+        stdout, stderr, rc = _run_code_with_input(answer, "")
+        passed = rc == 0
         return {
             "passed": passed,
             "scorePercent": 100 if passed else 0,
             "passedCount": 1 if passed else 0,
             "totalChecks": 1,
-            "checkResults": [{"name": "Базовая проверка: длина ответа", "passed": passed}],
-            "feedback": "Решение принято: базовая проверка пройдена" if passed else "Добавьте более полное решение: минимум 20 символов",
+            "checkResults": [{"name": "Код выполняется без ошибок", "passed": passed, "output": stdout, "error": stderr}],
+            "feedback": "Код выполняется успешно" if passed else f"Ошибка выполнения: {stderr[:200]}",
         }
 
-    failed_checks: list[str] = []
     check_results: list[dict] = []
     passed_count = 0
 
-    for raw_test in tests:
+    for idx, raw_test in enumerate(tests):
         test = raw_test or {}
-        name = str(test.get("description") or test.get("name") or "Проверка")
-        ttype = str(test.get("type", ""))
-        passed = False
-
-        if ttype == "regex":
-            try:
-                passed = bool(re.search(str(test.get("pattern", "")), answer, re.I))
-            except re.error:
-                passed = False
-        elif ttype == "includesAny":
-            tokens = [str(t).lower() for t in (test.get("tokens") or [])]
-            passed = any(t and t in lowered for t in tokens)
-        elif ttype == "includesAll":
-            tokens = [str(t).lower() for t in (test.get("tokens") or [])]
-            passed = len(tokens) > 0 and all(t and t in lowered for t in tokens)
-        elif ttype == "minCountRegex":
-            try:
-                pattern = re.compile(str(test.get("pattern", "")), re.I)
-                min_count = max(1, int(test.get("min", 1)))
-                matches = pattern.findall(answer)
-                passed = len(matches) >= min_count
-            except (re.error, ValueError):
-                passed = False
-        elif ttype == "treePattern":
-            passed = evaluate_tree_pattern(answer, test.get("levels"))
+        # Support both {input, expectedOutput} and legacy {description, type, pattern, tokens}
+        if "expectedOutput" in test or "input" in test:
+            # IO-based test: run code, compare stdout
+            test_input = str(test.get("input") or "")
+            expected = str(test.get("expectedOutput") or "").strip()
+            name = test.get("description") or f"Тест {idx + 1}: вход={repr(test_input)[:30]}"
+            stdout, stderr, rc = _run_code_with_input(answer, test_input)
+            actual = stdout.strip()
+            passed = rc == 0 and actual == expected
+            check_results.append({
+                "name": name,
+                "passed": passed,
+                "expected": expected,
+                "actual": actual,
+                "error": stderr[:200] if stderr else "",
+            })
         else:
-            passed = len(answer.strip()) >= 20
+            # Legacy pattern-based checks
+            name = str(test.get("description") or test.get("name") or f"Проверка {idx + 1}")
+            ttype = str(test.get("type", ""))
+            lowered = answer.lower()
+            passed = False
+            if ttype == "regex":
+                try:
+                    passed = bool(re.search(str(test.get("pattern", "")), answer, re.I))
+                except re.error:
+                    passed = False
+            elif ttype == "includesAny":
+                tokens = [str(t).lower() for t in (test.get("tokens") or [])]
+                passed = any(t and t in lowered for t in tokens)
+            elif ttype == "includesAll":
+                tokens = [str(t).lower() for t in (test.get("tokens") or [])]
+                passed = len(tokens) > 0 and all(t and t in lowered for t in tokens)
+            else:
+                passed = len(answer.strip()) >= 20
+            check_results.append({"name": name, "passed": passed})
 
-        if passed:
+        if check_results[-1]["passed"]:
             passed_count += 1
-        else:
-            failed_checks.append(name)
-
-        check_results.append({"name": name, "passed": passed})
 
     total = len(tests)
     score_percent = round(passed_count / total * 100) if total else 0
     all_passed = passed_count == total
+    failed_names = [r["name"] for r in check_results if not r["passed"]]
 
     return {
         "passed": all_passed,
@@ -218,9 +255,9 @@ def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
         "totalChecks": total,
         "checkResults": check_results,
         "feedback": (
-            f"Решение принято: пройдено {passed_count}/{total} проверок"
+            f"Все {total} тест(ов) пройдено ✓"
             if all_passed
-            else f"Не пройдено {len(failed_checks)} из {total} проверок: {', '.join(failed_checks)}"
+            else f"Не пройдено {len(failed_names)} из {total}: {', '.join(failed_names[:3])}"
         ),
     }
 
@@ -251,23 +288,104 @@ def estimate_code_quality(code_text: str, tests_weight: int) -> dict:
     }
 
 
-def estimate_essay(answer_text: str, rubric: dict | None = None) -> dict:
+async def _ai_complete(prompt: str, system: str = "") -> str:
+    """Call the configured AI provider and return the response text."""
+    import httpx
+    from app.routes.ai import _ai_generate
+    try:
+        return await _ai_generate(prompt, system)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("_ai_complete failed: %s", exc)
+        return ""
+
+
+async def estimate_essay(answer_text: str, rubric: dict | None = None) -> dict:
     text = (answer_text or "").strip()
-    relevance = min(30, 24 if len(text) > 80 else 12)
-    depth = min(30, 25 if len(text) > 200 else 13)
-    clarity = min(20, 16 if "\n" in text else 10)
-    practicality = min(20, 16 if re.search(r"пример|метрика|шаг|план", text, re.I) else 9)
-    plagiarism_score = min(95, 6 + random.randint(0, 17)) if text else 0
-    total = relevance + depth + clarity + practicality
+    rubric = rubric or {}
+    keywords_str = rubric.get("keywords", "")
+
+    if not text:
+        return {
+            "score": 0,
+            "metrics": {"content": 0, "creativity": 0, "clarity": 0, "keywords": 0},
+            "status": "failed",
+            "feedback": "Эссе не заполнено.",
+            "hints": ["Напишите ответ на задание."],
+            "keywordMatches": [],
+        }
+
+    # Build keyword hint list
+    keyword_list = [kw.strip() for kw in re.split(r"[,;\n]", keywords_str) if kw.strip()] if keywords_str else []
+
+    system_prompt = (
+        "Ты — строгий, но справедливый преподаватель. Оцени студенческое эссе по четырём критериям "
+        "от 0 до 25 баллов каждый:\n"
+        "1. content — соответствие теме и полнота раскрытия\n"
+        "2. creativity — оригинальность мышления, неожиданные идеи\n"
+        "3. clarity — чёткость изложения, структура, грамотность\n"
+        "4. depth — глубина анализа, аргументация\n\n"
+        "Верни ТОЛЬКО JSON без лишнего текста в формате:\n"
+        '{"content":N,"creativity":N,"clarity":N,"depth":N,"feedback":"...","hints":["...","..."]}'
+    )
+
+    keyword_note = ""
+    if keyword_list:
+        keyword_note = f"\n\nОбязательные ключевые слова/фразы: {', '.join(keyword_list)}"
+
+    user_prompt = f"Эссе студента:{keyword_note}\n\n{text}"
+
+    ai_text = await _ai_complete(user_prompt, system_prompt)
+
+    # Parse AI JSON response
+    scores = {"content": 0, "creativity": 0, "clarity": 0, "depth": 0}
+    feedback_text = ""
+    hints: list[str] = []
+    try:
+        json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
+        if json_match:
+            parsed = json.loads(json_match.group())
+            for k in scores:
+                scores[k] = max(0, min(25, int(parsed.get(k, 0))))
+            feedback_text = str(parsed.get("feedback", ""))
+            hints = [str(h) for h in (parsed.get("hints") or [])]
+    except Exception:
+        pass
+
+    # Fallback heuristic if AI failed
+    if not any(scores.values()):
+        scores["content"] = min(25, 20 if len(text) > 80 else 10)
+        scores["creativity"] = min(25, 15 if len(text) > 200 else 8)
+        scores["clarity"] = min(25, 18 if "\n" in text else 10)
+        scores["depth"] = min(25, 16 if re.search(r"пример|метрика|шаг|план|вывод|аргумент", text, re.I) else 9)
+        feedback_text = "Оценка по базовым критериям (AI недоступен)"
+        hints = [
+            "Сформулируйте тезис в первом абзаце.",
+            "Добавьте конкретные примеры.",
+            "Разделите текст на смысловые блоки.",
+        ]
+
+    total = sum(scores.values())
+
+    # Check keyword presence
+    keyword_matches = []
+    if keyword_list:
+        text_lower = text.lower()
+        for kw in keyword_list:
+            found = kw.lower() in text_lower
+            keyword_matches.append({"keyword": kw, "found": found})
+        missing_count = sum(1 for m in keyword_matches if not m["found"])
+        if missing_count > 0:
+            total = max(0, total - missing_count * 3)
+            if not hints:
+                hints = []
+            hints.append(f"Не хватает ключевых слов: {', '.join(m['keyword'] for m in keyword_matches if not m['found'])}")
 
     return {
         "score": total,
-        "metrics": {"relevance": relevance, "depth": depth, "clarity": clarity, "practicality": practicality, "rubric": rubric or {}, "plagiarismScore": plagiarism_score},
-        "status": "passed" if total >= 70 else "manual_review",
-        "feedback": "Ответ содержательный и хорошо структурирован." if total >= 70 else "Ответ частично покрывает задачу.",
-        "hints": [
-            "Сформулируйте тезис в первом абзаце.",
-            "Добавьте минимум один измеримый критерий.",
-            "Разделите выводы и рекомендации по пунктам.",
-        ],
+        "metrics": scores,
+        "status": "passed" if total >= 60 else "manual_review",
+        "feedback": feedback_text or ("Ответ содержательный." if total >= 60 else "Ответ требует доработки."),
+        "hints": hints[:4],
+        "keywordMatches": keyword_matches,
     }

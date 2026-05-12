@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Request
 from app import db
 from app.deps import CurrentUser, require_roles
 from app.schemas import EnrollmentRequestBody, SubmitBody, WeeklyGoalBody
-from app.services import evaluate_code_by_tests, utcnow, write_audit
+from app.services import evaluate_code_by_tests, estimate_essay, utcnow, write_audit
 
 router = APIRouter(prefix="/api/student", tags=["student"])
 
@@ -454,11 +454,19 @@ async def get_steps(course_id: int, user: CurrentUser):
                 tests_raw = json.loads(tests_raw)
 
             if atype == "quiz":
-                # Extract options from tests JSON
-                options = []
+                # Extract and normalize options to plain strings for display
+                raw_opts = []
                 if tests_raw and isinstance(tests_raw, list):
                     first = tests_raw[0]
-                    options = first.get("options", []) if isinstance(first, dict) else []
+                    if isinstance(first, dict):
+                        raw_opts = first.get("options", [])
+                # Normalize: both old (strings) and new ({text, correct}) formats
+                option_strings = []
+                for opt in raw_opts:
+                    if isinstance(opt, str):
+                        option_strings.append(opt)
+                    elif isinstance(opt, dict):
+                        option_strings.append(str(opt.get("text", "")))
                 steps.append({
                     "id": lesson["id"] * 10 + 1,
                     "title": lesson["title"],
@@ -466,7 +474,7 @@ async def get_steps(course_id: int, user: CurrentUser):
                     "taskTypeLabel": "Тест",
                     "theoryText": theory_text,
                     "quizQuestion": desc,
-                    "options": options,
+                    "options": option_strings,
                     "stepOrder": order,
                     "xp": 15,
                 })
@@ -474,9 +482,9 @@ async def get_steps(course_id: int, user: CurrentUser):
                 steps.append({
                     "id": lesson["id"] * 10 + 1,
                     "title": lesson["title"],
-                    "kind": "code",
-                    "taskTypeLabel": "Свободный ответ",
-                    "theoryText": theory_text + "\n\n---\n\n" + desc,
+                    "kind": "essay",
+                    "taskTypeLabel": "Эссе",
+                    "theoryText": desc,
                     "checks": [],
                     "checkCount": 0,
                     "options": [],
@@ -572,7 +580,7 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
 
     if slot == 1:
         assignment = await db.fetchrow(
-            "SELECT id, assignment_type, tests FROM assignments WHERE lesson_id=$1 ORDER BY id ASC LIMIT 1",
+            "SELECT id, assignment_type, tests, rubric FROM assignments WHERE lesson_id=$1 ORDER BY id ASC LIMIT 1",
             lesson_id,
         )
         if assignment:
@@ -580,61 +588,65 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
             assignment_id = assignment["id"]
             tests_data = assignment["tests"] or []
             if isinstance(tests_data, str):
-                tests_data = json.loads(tests_data)
+                try:
+                    tests_data = json.loads(tests_data)
+                except Exception:
+                    tests_data = []
+            rubric_data = assignment["rubric"] or {}
+            if isinstance(rubric_data, str):
+                try:
+                    rubric_data = json.loads(rubric_data)
+                except Exception:
+                    rubric_data = {}
 
             if atype == "quiz":
                 kind = "quiz"
-                # Find correct answer from tests JSON
-                correct = None
+                # Find correct answer — support both old and new formats
+                correct_answer = None
                 if tests_data and isinstance(tests_data, list):
                     first = tests_data[0]
                     if isinstance(first, dict):
-                        correct = first.get("correct")
-                if correct and answer == correct:
+                        # Old format: {"options": ["A","B"], "correct": "A"}
+                        old_correct = first.get("correct")
+                        if old_correct and isinstance(old_correct, str):
+                            correct_answer = old_correct
+                        else:
+                            # New format: {"options": [{"text":"A","correct":true}, ...]}
+                            opts = first.get("options", [])
+                            for opt in opts:
+                                if isinstance(opt, dict) and opt.get("correct"):
+                                    correct_answer = str(opt.get("text", ""))
+                                    break
+                if correct_answer and answer.strip() == correct_answer.strip():
                     passed = True
                     score = 15
                     feedback = "Верно! Отличная работа."
                 elif answer:
                     passed = False
                     score = 0
-                    feedback = "Неверно, попробуйте ещё раз."
+                    feedback = f"Неверно. Правильный ответ: {correct_answer}" if correct_answer else "Неверно, попробуйте ещё раз."
                 else:
                     passed = False
                     score = 0
                     feedback = "Выберите вариант ответа."
 
             elif atype == "essay":
-                kind = "code"
+                kind = "essay"
                 if len(answer) < 20:
                     passed = False
                     score = 0
                     feedback = "Ответ слишком короткий. Напишите развёрнутый ответ."
+                    check_results = None
                 else:
-                    # Check keywords if specified
-                    keywords = []
-                    if tests_data and isinstance(tests_data, list):
-                        first = tests_data[0]
-                        if isinstance(first, dict):
-                            keywords = first.get("keywords", [])
-                    min_len = 30
-                    if tests_data and isinstance(tests_data, list):
-                        first = tests_data[0]
-                        if isinstance(first, dict):
-                            min_len = first.get("minLength", 30)
-                    if len(answer) < min_len:
-                        passed = False
-                        score = 0
-                        feedback = f"Ответ слишком короткий. Минимум {min_len} символов."
-                    else:
-                        found = [k for k in keywords if k.lower() in answer.lower()] if keywords else []
-                        if keywords and len(found) < max(1, len(keywords) // 2):
-                            passed = False
-                            score = max(5, round(len(found) / max(len(keywords), 1) * 20))
-                            feedback = f"Ответ принят частично. Постарайтесь раскрыть тему глубже."
-                        else:
-                            passed = True
-                            score = 20
-                            feedback = "Отличный развёрнутый ответ! Засчитано."
+                    essay_eval = await estimate_essay(answer, rubric_data)
+                    passed = essay_eval["status"] == "passed"
+                    score = max(0, min(20, round(essay_eval["score"] / 5)))
+                    feedback = essay_eval["feedback"]
+                    kw_matches = essay_eval.get("keywordMatches", [])
+                    check_results = [
+                        {"name": f"Ключевое слово: {m['keyword']}", "passed": m["found"]}
+                        for m in kw_matches
+                    ] if kw_matches else None
 
             else:
                 kind = "code"

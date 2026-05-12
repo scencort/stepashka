@@ -22,7 +22,21 @@
       "Bash(python import_courses.py)",
       "Bash(find /mnt/c/Users/yaros/Desktop/stepashka -name \"*.py\" -not -path \"*/venv/*\" -not -path \"*/__pycache__/*\" | sort)",
       "Bash(extract-text 'C:\\\\Users\\\\yaros\\\\Downloads\\\\Диаграммы для дипломного проекта.docx')",
-      "Bash(python scripts/office/unpack.py '/mnt/c/Users/yaros/Downloads/Диаграммы для дипломного проекта.docx' /tmp/diagrams_docx/)"
+      "Bash(python scripts/office/unpack.py '/mnt/c/Users/yaros/Downloads/Диаграммы для дипломного проекта.docx' /tmp/diagrams_docx/)",
+      "Bash(python -c ' *)",
+      "Bash(backend/venv/Scripts/python.exe -c ' *)",
+      "Bash(xargs grep -l \"openai\\\\|anthropic\\\\|gemini\\\\|ai_review\\\\|estimate_essay\")",
+      "Bash(python -m py_compile app/services.py)",
+      "Bash(python -m py_compile app/routes/teacher_admin.py)",
+      "Bash(python -m py_compile app/routes/student.py)",
+      "Bash(python -c \"import app.services; print\\('OK'\\)\")",
+      "Bash(python -m py_compile app/routes/ai.py)",
+      "Bash(python -m py_compile /c/Users/yaros/Desktop/stepashka/backend/app/routes/teacher_admin.py)",
+      "Bash(xargs grep -l \"btn-primary\\\\|card\\\\|primary\")",
+      "Bash(xargs grep -l \"DATABASE_URL\\\\|asyncpg\\\\|db =\")",
+      "Bash(./venv/Scripts/python.exe -c ' *)",
+      "Bash(python3 -c \"import sys; sys.stdout.buffer.write\\(sys.stdin.buffer.read\\(\\)\\)\")",
+      "Bash(./venv/Scripts/python.exe -W ignore -c ' *)"
     ]
   }
 }

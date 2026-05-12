@@ -8,7 +8,7 @@ import Skeleton from "../components/ui/Skeleton"
 
 import { api } from "../lib/api"
 import { useToast } from "../hooks/useToast"
-import { ChevronRight, ChevronLeft, Plus, Trash2, GripVertical, BookOpen, FileQuestion, Code2, Check } from "lucide-react"
+import { ChevronRight, ChevronLeft, Plus, Trash2, GripVertical, BookOpen, FileQuestion, Code2, Check, PenLine } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,7 +43,7 @@ type Lesson = {
   steps: Step[]
 }
 
-type StepType = "theory" | "quiz" | "code"
+type StepType = "theory" | "quiz" | "code" | "essay"
 
 type QuizOption = { text: string; correct: boolean }
 
@@ -60,6 +60,7 @@ type Step = {
     taskDescription?: string
     starterCode?: string
     tests?: Array<{ input: string; expectedOutput: string }>
+    essayKeywords?: string
   }
 }
 
@@ -91,12 +92,14 @@ const STEP_ICONS: Record<StepType, React.ReactNode> = {
   theory: <BookOpen size={14} />,
   quiz: <FileQuestion size={14} />,
   code: <Code2 size={14} />,
+  essay: <PenLine size={14} />,
 }
 
 const STEP_LABELS: Record<StepType, string> = {
   theory: "Теория",
   quiz: "Тест",
   code: "Код",
+  essay: "Эссе",
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -130,11 +133,23 @@ function emptyLesson(order: number): Lesson {
   }
 }
 
+// Virtual lesson is just a container; id < 0 = virtual (not saved to DB)
+function virtualLesson(): Lesson {
+  return {
+    id: -1,
+    title: "Шаги",
+    lessonOrder: 1,
+    lessonType: "text",
+    contentText: "",
+    steps: [],
+  }
+}
+
 function emptyModule(order: number): Module {
   return {
     title: `Модуль ${order}`,
     moduleOrder: order,
-    lessons: [emptyLesson(1)],
+    lessons: [virtualLesson()],
   }
 }
 
@@ -192,7 +207,7 @@ function StepEditor({
           >
             <div className="p-3 space-y-3 border-t border-slate-100 dark:border-slate-700">
               <div className="flex flex-wrap gap-2">
-                {(["theory", "quiz", "code"] as StepType[]).map((t) => (
+                {(["theory", "quiz", "code", "essay"] as StepType[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => onChange({ ...step, stepType: t, content: {} })}
@@ -220,13 +235,16 @@ function StepEditor({
 
               {step.stepType === "theory" && (
                 <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Текст теории</label>
+                  <label className="text-xs text-slate-500 mb-1 block">
+                    Текст теории{" "}
+                    <span className="text-slate-400 font-normal">(поддерживается Markdown: **жирный**, `код`, ## заголовок)</span>
+                  </label>
                   <textarea
                     value={step.content.text || ""}
                     onChange={(e) => updateContent({ text: e.target.value })}
-                    rows={6}
-                    placeholder="Напишите теоретический материал..."
-                    className="input-field text-sm w-full resize-y"
+                    rows={8}
+                    placeholder={"## Что такое список в Python?\n\nСписок — это упорядоченная коллекция элементов.\n\n```python\nmy_list = [1, 2, 3]\nmy_list.append(4)  # добавляем элемент\nprint(my_list)     # [1, 2, 3, 4]\n```\n\nСписки изменяемы и могут содержать элементы разных типов."}
+                    className="input-field text-sm w-full resize-y font-mono"
                   />
                 </div>
               )}
@@ -239,26 +257,39 @@ function StepEditor({
                       value={step.content.text || ""}
                       onChange={(e) => updateContent({ text: e.target.value })}
                       rows={2}
-                      placeholder="Формулировка вопроса..."
+                      placeholder="Например: Какой метод используется для добавления элемента в конец списка в Python?"
                       className="input-field text-sm w-full"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-500 mb-1 block">Варианты ответа (отметьте правильный)</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs text-slate-500">
+                        Варианты ответа —{" "}
+                        <span className="text-emerald-600 font-medium">нажмите на кружок рядом с правильным</span>
+                      </label>
+                      {(step.content.options || []).length > 0 && !(step.content.options || []).some(o => o.correct) && (
+                        <span className="text-xs font-semibold text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-800/40">
+                          ⚠ Правильный ответ не выбран
+                        </span>
+                      )}
+                    </div>
                     <div className="space-y-2">
-                      {(step.content.options || [{ text: "", correct: true }, { text: "", correct: false }]).map(
-                        (opt, idx) => (
+                      {(step.content.options && step.content.options.length > 0
+                        ? step.content.options
+                        : [{ text: "", correct: true }, { text: "", correct: false }]
+                      ).map((opt, idx) => (
                           <div key={idx} className="flex items-center gap-2">
                             <button
+                              title={opt.correct ? "Правильный ответ" : "Отметить как правильный"}
                               onClick={() => {
-                                const opts = [...(step.content.options || [])]
-                                opts.forEach((o, i) => { o.correct = i === idx })
+                                // immutable update — create new objects so React re-renders
+                                const opts = (step.content.options || []).map((o, i) => ({ ...o, correct: i === idx }))
                                 updateContent({ options: opts, correctIndex: idx })
                               }}
                               className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                                 opt.correct
                                   ? "border-emerald-500 bg-emerald-500 text-white"
-                                  : "border-slate-300 dark:border-slate-600"
+                                  : "border-slate-300 dark:border-slate-600 hover:border-emerald-400"
                               }`}
                             >
                               {opt.correct && <Check size={10} />}
@@ -266,16 +297,17 @@ function StepEditor({
                             <input
                               value={opt.text}
                               onChange={(e) => {
-                                const opts = [...(step.content.options || [])]
-                                opts[idx] = { ...opts[idx], text: e.target.value }
+                                const opts = (step.content.options || []).map((o, i) =>
+                                  i === idx ? { ...o, text: e.target.value } : o
+                                )
                                 updateContent({ options: opts })
                               }}
-                              placeholder={`Вариант ${idx + 1}`}
+                              placeholder={`Вариант ${idx + 1}${idx === 0 ? " (например: append)" : idx === 1 ? " (например: push)" : ""}`}
                               className="flex-1 input-field text-sm py-1.5"
                             />
                             <button
                               onClick={() => {
-                                const opts = [...(step.content.options || [])].filter((_, i) => i !== idx)
+                                const opts = (step.content.options || []).filter((_, i) => i !== idx)
                                 updateContent({ options: opts })
                               }}
                               className="text-slate-400 hover:text-rose-500 transition-colors"
@@ -307,7 +339,7 @@ function StepEditor({
                       value={step.content.taskDescription || ""}
                       onChange={(e) => updateContent({ taskDescription: e.target.value })}
                       rows={3}
-                      placeholder="Опишите задачу..."
+                      placeholder="Например: Напишите функцию sum_list(lst), которая принимает список чисел и возвращает их сумму."
                       className="input-field text-sm w-full"
                     />
                   </div>
@@ -317,42 +349,66 @@ function StepEditor({
                       value={step.content.starterCode || ""}
                       onChange={(e) => updateContent({ starterCode: e.target.value })}
                       rows={4}
-                      placeholder="# Начальный код для студента..."
+                      placeholder={"def sum_list(lst):\n    # ваш код здесь\n    pass"}
                       className="input-field text-sm w-full font-mono"
                     />
                   </div>
+
+                  {/* Hint box about evaluation logic */}
+                  <div className="rounded-xl border border-blue-200 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 space-y-1.5 text-xs text-blue-700 dark:text-blue-300">
+                    <p className="font-semibold">Как проверяется код студента:</p>
+                    <p>📝 <b>Без тест-кейсов</b> — нейронка оценивает качество, стиль и логику кода (творческое задание)</p>
+                    <p>⚙️ <b>С тест-кейсами</b> — код студента реально запускается на Python, stdin подаётся как «Ввод», stdout сравнивается с «Ожидаемым выводом». Все тесты должны пройти.</p>
+                    <p className="text-blue-500 dark:text-blue-400">Пример: ввод <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">3 5</code> → программа читает два числа через пробел, ожидаемый вывод <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">8</code></p>
+                  </div>
+
                   <div>
-                    <label className="text-xs text-slate-500 mb-1 block">Тест-кейсы</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs text-slate-500">
+                        Тест-кейсы{" "}
+                        <span className="text-slate-400 font-normal">
+                          ({(step.content.tests || []).length === 0 ? "нет → AI-оценка" : `${(step.content.tests || []).length} шт → запуск кода`})
+                        </span>
+                      </label>
+                    </div>
                     <div className="space-y-2">
                       {(step.content.tests || []).map((test, idx) => (
-                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <input
-                            value={test.input}
-                            onChange={(e) => {
-                              const tests = [...(step.content.tests || [])]
-                              tests[idx] = { ...tests[idx], input: e.target.value }
-                              updateContent({ tests })
-                            }}
-                            placeholder="Input"
-                            className="input-field text-sm py-1.5 font-mono"
-                          />
-                          <div className="flex gap-1">
+                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-start">
+                          <div>
+                            <p className="text-[10px] text-slate-400 mb-0.5">Ввод (stdin)</p>
                             <input
-                              value={test.expectedOutput}
+                              value={test.input}
                               onChange={(e) => {
-                                const tests = [...(step.content.tests || [])]
-                                tests[idx] = { ...tests[idx], expectedOutput: e.target.value }
+                                const tests = (step.content.tests || []).map((t, i) =>
+                                  i === idx ? { ...t, input: e.target.value } : t
+                                )
                                 updateContent({ tests })
                               }}
-                              placeholder="Expected output"
-                              className="flex-1 input-field text-sm py-1.5 font-mono"
+                              placeholder="Например: 3 5"
+                              className="input-field text-sm py-1.5 font-mono w-full"
                             />
+                          </div>
+                          <div className="flex gap-1 items-end">
+                            <div className="flex-1">
+                              <p className="text-[10px] text-slate-400 mb-0.5">Ожидаемый вывод (stdout)</p>
+                              <input
+                                value={test.expectedOutput}
+                                onChange={(e) => {
+                                  const tests = (step.content.tests || []).map((t, i) =>
+                                    i === idx ? { ...t, expectedOutput: e.target.value } : t
+                                  )
+                                  updateContent({ tests })
+                                }}
+                                placeholder="Например: 8"
+                                className="input-field text-sm py-1.5 font-mono w-full"
+                              />
+                            </div>
                             <button
                               onClick={() => {
-                                const tests = [...(step.content.tests || [])].filter((_, i) => i !== idx)
+                                const tests = (step.content.tests || []).filter((_, i) => i !== idx)
                                 updateContent({ tests })
                               }}
-                              className="text-slate-400 hover:text-rose-500"
+                              className="text-slate-400 hover:text-rose-500 mb-0.5"
                             >
                               <Trash2 size={12} />
                             </button>
@@ -366,9 +422,42 @@ function StepEditor({
                           updateContent({ tests })
                         }}
                       >
-                        <Plus size={12} className="mr-1" /> Добавить тест
+                        <Plus size={12} className="mr-1" /> Добавить тест-кейс
                       </Button>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {step.stepType === "essay" && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Задание для эссе</label>
+                    <textarea
+                      value={step.content.taskDescription || ""}
+                      onChange={(e) => updateContent({ taskDescription: e.target.value })}
+                      rows={4}
+                      placeholder="Например: Опишите преимущества и недостатки объектно-ориентированного программирования. Приведите примеры из реальных проектов. Минимум 150 слов."
+                      className="input-field text-sm w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">
+                      Ключевые слова/фразы{" "}
+                      <span className="text-slate-400 font-normal">(через запятую — AI снизит оценку, если они отсутствуют)</span>
+                    </label>
+                    <input
+                      value={step.content.essayKeywords || ""}
+                      onChange={(e) => updateContent({ essayKeywords: e.target.value })}
+                      placeholder="Например: инкапсуляция, наследование, полиморфизм, пример"
+                      className="input-field text-sm w-full"
+                    />
+                  </div>
+                  <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-xs text-amber-700 dark:text-amber-300 space-y-1">
+                    <p className="font-semibold">Как оценивается эссе:</p>
+                    <p>🤖 AI выставляет оценки по 4 критериям: содержание, творчество, ясность изложения, глубина анализа</p>
+                    <p>🔑 Ключевые слова проверяются отдельно — каждое пропущенное снижает итоговый балл</p>
+                    <p>💡 Оставьте поле ключевых слов пустым, если хотите полностью свободное эссе</p>
                   </div>
                 </div>
               )}
@@ -497,7 +586,9 @@ export default function CourseEditor() {
 
   const [modules, setModules] = useState<Module[]>([emptyModule(1)])
   const [savedCourseId, setSavedCourseId] = useState<number | null>(courseId ? Number(courseId) : null)
-  const [publishStatus, setPublishStatus] = useState<"draft" | "published">("draft")
+  const [publishStatus, setPublishStatus] = useState<"draft" | "pending_review">("draft")
+  // Track IDs of steps that were in the DB when we loaded — used to diff and DELETE removed ones
+  const [loadedStepIds, setLoadedStepIds] = useState<number[]>([])
 
   // Load existing course for edit mode
   useEffect(() => {
@@ -523,34 +614,42 @@ export default function CourseEditor() {
           accessType: (courseData.accessType as AccessType) || "open",
           coverUrl: String(courseData.coverUrl || ""),
         })
-        setPublishStatus((courseData.status as string) === "published" ? "published" : "draft")
+        const st = courseData.status as string
+        setPublishStatus(st === "pending_review" ? "pending_review" : "draft")
 
-        const builtModules: Module[] = (structure.modules || []).map((m) => ({
-          id: m.id,
-          title: m.title,
-          moduleOrder: m.moduleOrder,
-          lessons: (structure.lessons || [])
-            .filter((l) => l.moduleId === m.id)
-            .map((l) => ({
-              id: l.id,
-              title: l.title,
-              lessonOrder: l.lessonOrder,
-              lessonType: (l.lessonType as "text" | "video") || "text",
-              contentText: l.contentText || "",
-              steps: (structure.steps || [])
-                .filter((s) => s.lessonId === l.id)
-                .map((s) => ({
-                  id: s.id,
-                  title: s.title,
-                  stepOrder: s.stepOrder,
-                  stepType: (s.stepType as StepType) || "theory",
-                  xp: s.xp || 10,
-                  content: (s.content as Step["content"]) || {},
-                })),
-            })),
-        }))
+        // Each module gets ONE virtual lesson; steps from backend go into it
+        const builtModules: Module[] = (structure.modules || []).map((m) => {
+          const vLessonId = m.id * -1000  // same formula as backend
+          const stepsForModule = (structure.steps || [])
+            .filter((s: Record<string, unknown>) => s.lessonId === vLessonId)
+            .map((s: Record<string, unknown>) => ({
+              id: s.id as number,
+              title: s.title as string,
+              stepOrder: s.stepOrder as number,
+              stepType: (s.stepType as StepType) || "theory",
+              xp: (s.xp as number) || 10,
+              content: (s.content as Step["content"]) || {},
+            }))
+
+          return {
+            id: m.id,
+            title: m.title,
+            moduleOrder: m.moduleOrder,
+            lessons: [{
+              id: vLessonId,
+              title: "Шаги",
+              lessonOrder: 1,
+              lessonType: "text" as const,
+              contentText: "",
+              steps: stepsForModule,
+            }],
+          }
+        })
 
         setModules(builtModules.length > 0 ? builtModules : [emptyModule(1)])
+        // Remember all DB step IDs so we can delete removed ones on save
+        const allIds = (structure.steps || []).map((s) => s.id).filter((id) => id > 0)
+        setLoadedStepIds(allIds)
       } catch {
         toast.error("Не удалось загрузить курс")
       } finally {
@@ -604,10 +703,24 @@ export default function CourseEditor() {
   }
 
   const saveStructure = async (cid: number) => {
+    // Collect all step IDs currently in the editor
+    const currentStepIds = new Set<number>()
+    for (const mod of modules) {
+      for (const lesson of mod.lessons) {
+        for (const step of lesson.steps) {
+          if (step.id && step.id > 0) currentStepIds.add(step.id)
+        }
+      }
+    }
+
+    // Delete steps that were in DB but removed from UI
+    const toDelete = loadedStepIds.filter((id) => !currentStepIds.has(id))
+    await Promise.all(toDelete.map((id) => api.delete(`/teacher/steps/${id}`)))
+
     for (const mod of modules) {
       let modId = mod.id
       const modPayload = { title: mod.title, moduleOrder: mod.moduleOrder }
-      if (modId) {
+      if (modId && modId > 0) {
         await api.patch(`/teacher/modules/${modId}`, modPayload)
       } else {
         const savedMod = await api.post<{ id: number }>(`/teacher/courses/${cid}/modules`, modPayload)
@@ -615,38 +728,39 @@ export default function CourseEditor() {
       }
 
       for (const lesson of mod.lessons) {
-        let lessonId = lesson.id
-        const lessonPayload = {
-          moduleId: modId,
-          title: lesson.title,
-          lessonOrder: lesson.lessonOrder,
-          lessonType: lesson.lessonType,
-          contentText: lesson.contentText,
-        }
-        if (lessonId) {
-          await api.patch(`/teacher/lessons/${lessonId}`, lessonPayload)
-        } else {
-          const savedLesson = await api.post<{ id: number }>(`/teacher/courses/${cid}/lessons`, lessonPayload)
-          lessonId = savedLesson.id
-        }
+        // Virtual lessons (id < 0) are just grouping containers — skip saving them.
+        // Use real modId to compute the virtual lesson id so backend resolves the correct module.
+        const virtualLessonId = (modId ?? 0) * -1000
 
         for (const step of lesson.steps) {
           const stepPayload = {
-            lessonId,
+            lessonId: virtualLessonId,
             title: step.title,
             stepOrder: step.stepOrder,
             stepType: step.stepType,
             xp: step.xp,
             content: step.content,
           }
-          if (step.id) {
+          if (step.id && step.id > 0) {
             await api.patch(`/teacher/steps/${step.id}`, stepPayload)
           } else {
-            await api.post(`/teacher/courses/${cid}/steps`, stepPayload)
+            const created = await api.post<{ id: number }>(`/teacher/courses/${cid}/steps`, stepPayload)
+            step.id = created.id  // update in-memory so repeated saves work
           }
         }
       }
     }
+
+    // After save, re-collect all step IDs (including newly created ones whose id was mutated above)
+    const savedIds: number[] = []
+    for (const mod of modules) {
+      for (const lesson of mod.lessons) {
+        for (const step of lesson.steps) {
+          if (step.id && step.id > 0) savedIds.push(step.id)
+        }
+      }
+    }
+    setLoadedStepIds(savedIds)
   }
 
   const handleNext = async () => {
@@ -903,7 +1017,12 @@ export default function CourseEditor() {
             </p>
 
             <div className="space-y-4">
-              {modules.map((mod, modIdx) => (
+              {modules.map((mod, modIdx) => {
+                // Flatten all steps across all virtual lessons in this module
+                const allSteps = mod.lessons.flatMap((l) => l.steps)
+                const virtualLesson = mod.lessons[0] // single virtual lesson per module
+
+                return (
                 <div key={modIdx} className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
                   <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 dark:bg-zinc-800/80">
                     <GripVertical size={16} className="text-slate-400" />
@@ -916,7 +1035,7 @@ export default function CourseEditor() {
                       className="flex-1 bg-transparent font-semibold text-sm outline-none"
                       placeholder="Название модуля"
                     />
-                    <span className="text-xs text-slate-400">{mod.lessons.length} уроков</span>
+                    <span className="text-xs text-slate-400">{allSteps.length} шагов</span>
                     <button
                       onClick={() => deleteModule(modIdx)}
                       className="text-slate-400 hover:text-rose-500 transition-colors"
@@ -926,23 +1045,39 @@ export default function CourseEditor() {
                   </div>
 
                   <div className="p-3 space-y-2">
-                    {mod.lessons.map((lesson, lesIdx) => (
-                      <LessonEditor
-                        key={lesIdx}
-                        lesson={lesson}
-                        onChange={(l) => updateLesson(modIdx, lesIdx, l)}
-                        onDelete={() => deleteLesson(modIdx, lesIdx)}
+                    {allSteps.map((step, stepIdx) => (
+                      <StepEditor
+                        key={stepIdx}
+                        step={step}
+                        onChange={(s) => {
+                          if (!virtualLesson) return
+                          const newSteps = allSteps.map((st, i) => i === stepIdx ? s : st)
+                          updateLesson(modIdx, 0, { ...virtualLesson, steps: newSteps })
+                        }}
+                        onDelete={() => {
+                          if (!virtualLesson) return
+                          const newSteps = allSteps.filter((_, i) => i !== stepIdx)
+                          updateLesson(modIdx, 0, { ...virtualLesson, steps: newSteps })
+                        }}
                       />
                     ))}
                     <Button
                       variant="outline"
-                      onClick={() => addLesson(modIdx)}
+                      onClick={() => {
+                        if (!virtualLesson) {
+                          addLesson(modIdx)
+                          return
+                        }
+                        const newStep = emptyStep(allSteps.length + 1)
+                        updateLesson(modIdx, 0, { ...virtualLesson, steps: [...allSteps, newStep] })
+                      }}
                     >
-                      <Plus size={12} className="mr-1" /> Добавить урок
+                      <Plus size={12} className="mr-1" /> Добавить шаг
                     </Button>
                   </div>
                 </div>
-              ))}
+                )
+              })}
 
               {modules.length === 0 && (
                 <div className="text-center py-8 text-slate-400">
@@ -993,21 +1128,21 @@ export default function CourseEditor() {
                   <p className="text-xs text-slate-500 mt-1">Курс виден только вам. Можно редактировать без ограничений.</p>
                 </button>
                 <button
-                  onClick={() => setPublishStatus("published")}
+                  onClick={() => setPublishStatus("pending_review")}
                   className={`text-left p-4 rounded-xl border-2 transition-all ${
-                    publishStatus === "published"
-                      ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20"
+                    publishStatus === "pending_review"
+                      ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20"
                       : "border-slate-200 dark:border-slate-700"
                   }`}
                 >
-                  <p className="font-semibold">Опубликовать</p>
-                  <p className="text-xs text-slate-500 mt-1">Курс появится в каталоге и будет доступен студентам.</p>
+                  <p className="font-semibold">Отправить на модерацию</p>
+                  <p className="text-xs text-slate-500 mt-1">Курс уйдёт администратору на проверку. После одобрения появится в каталоге.</p>
                 </button>
               </div>
             </div>
 
             <Button onClick={handlePublish} disabled={saving} className="w-full">
-              {saving ? "Сохранение..." : publishStatus === "published" ? "Опубликовать курс" : "Сохранить черновик"}
+              {saving ? "Сохранение..." : publishStatus === "pending_review" ? "Отправить на модерацию" : "Сохранить черновик"}
             </Button>
           </Card>
         )}

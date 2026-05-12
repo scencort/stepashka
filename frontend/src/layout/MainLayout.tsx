@@ -404,11 +404,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 label="Кабинет преподавателя"
                 icon={GraduationCap}
               />
-              <NavLink
-                to="/assignment-builder"
-                label="Конструктор заданий"
-                icon={Wrench}
-              />
               <NavLink to="/analytics" label="Аналитика" icon={ChartColumn} />
             </>
           )}
@@ -426,11 +421,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <NavLink
                 to="/admin"
                 label="Панель администратора"
-                icon={ShieldCheck}
-              />
-              <NavLink
-                to="/roles-access"
-                label="Роли и доступы"
                 icon={ShieldCheck}
               />
             </>
@@ -535,11 +525,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       icon={GraduationCap}
                     />
                     <MobileNavLink
-                      to="/assignment-builder"
-                      label="Конструктор заданий"
-                      icon={Wrench}
-                    />
-                    <MobileNavLink
                       to="/analytics"
                       label="Аналитика"
                       icon={ChartColumn}
@@ -552,11 +537,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     <MobileNavLink
                       to="/admin"
                       label="Панель администратора"
-                      icon={ShieldCheck}
-                    />
-                    <MobileNavLink
-                      to="/roles-access"
-                      label="Роли и доступы"
                       icon={ShieldCheck}
                     />
                   </>
