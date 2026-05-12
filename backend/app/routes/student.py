@@ -431,7 +431,8 @@ async def get_steps(course_id: int, user: CurrentUser):
     assignments_rows = []
     if lesson_ids:
         assignments_rows = await db.fetch(
-            """SELECT id, lesson_id AS "lessonId", title, description
+            """SELECT id, lesson_id AS "lessonId", title, description,
+                      assignment_type AS "assignmentType", tests
                FROM assignments WHERE lesson_id = ANY($1::int[]) ORDER BY id ASC""",
             lesson_ids,
         )
@@ -446,34 +447,67 @@ async def get_steps(course_id: int, user: CurrentUser):
         theory_text = lesson["contentText"] or "Изучите материал урока."
 
         if assignment:
-            # Combined step: theory + code task in one
-            steps.append(
-                {
+            atype = assignment["assignmentType"] or "code"
+            desc = assignment["description"] or ""
+            tests_raw = assignment["tests"]
+            if isinstance(tests_raw, str):
+                tests_raw = json.loads(tests_raw)
+
+            if atype == "quiz":
+                # Extract options from tests JSON
+                options = []
+                if tests_raw and isinstance(tests_raw, list):
+                    first = tests_raw[0]
+                    options = first.get("options", []) if isinstance(first, dict) else []
+                steps.append({
+                    "id": lesson["id"] * 10 + 1,
+                    "title": lesson["title"],
+                    "kind": "quiz",
+                    "taskTypeLabel": "Тест",
+                    "theoryText": theory_text,
+                    "quizQuestion": desc,
+                    "options": options,
+                    "stepOrder": order,
+                    "xp": 15,
+                })
+            elif atype == "essay":
+                steps.append({
                     "id": lesson["id"] * 10 + 1,
                     "title": lesson["title"],
                     "kind": "code",
-                    "taskTypeLabel": "Теория + задание",
-                    "theoryText": theory_text + "\n\n---\n\n**Задание:** " + (assignment["description"] or "Решите задание."),
+                    "taskTypeLabel": "Свободный ответ",
+                    "theoryText": theory_text + "\n\n---\n\n" + desc,
+                    "checks": [],
+                    "checkCount": 0,
+                    "options": [],
+                    "stepOrder": order,
+                    "xp": 20,
+                })
+            else:
+                # code assignment
+                steps.append({
+                    "id": lesson["id"] * 10 + 1,
+                    "title": lesson["title"],
+                    "kind": "code",
+                    "taskTypeLabel": "Практика",
+                    "theoryText": theory_text + "\n\n---\n\n" + desc,
                     "checks": [],
                     "checkCount": 0,
                     "options": [],
                     "stepOrder": order,
                     "xp": 25,
-                }
-            )
+                })
         else:
-            steps.append(
-                {
-                    "id": lesson["id"] * 10 + 1,
-                    "title": lesson["title"],
-                    "kind": "theory",
-                    "taskTypeLabel": "Теория",
-                    "theoryText": theory_text,
-                    "options": [],
-                    "stepOrder": order,
-                    "xp": 10,
-                }
-            )
+            steps.append({
+                "id": lesson["id"] * 10 + 1,
+                "title": lesson["title"],
+                "kind": "theory",
+                "taskTypeLabel": "Теория",
+                "theoryText": theory_text,
+                "options": [],
+                "stepOrder": order,
+                "xp": 10,
+            })
         order += 1
 
     progress_rows = await db.fetch(
@@ -537,22 +571,78 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
     check_results = None
 
     if slot == 1:
-        # Check if lesson has an assignment — if so, this is a code step
         assignment = await db.fetchrow(
-            "SELECT id, tests FROM assignments WHERE lesson_id=$1 ORDER BY id ASC LIMIT 1",
+            "SELECT id, assignment_type, tests FROM assignments WHERE lesson_id=$1 ORDER BY id ASC LIMIT 1",
             lesson_id,
         )
         if assignment:
-            kind = "code"
+            atype = assignment["assignment_type"] or "code"
             assignment_id = assignment["id"]
-            tests_data = assignment["tests"] if assignment else []
+            tests_data = assignment["tests"] or []
             if isinstance(tests_data, str):
                 tests_data = json.loads(tests_data)
-            evaluation = evaluate_code_by_tests(answer, tests_data)
-            passed = evaluation["passed"]
-            score = 25 if passed else max(0, round(evaluation["scorePercent"] / 100 * 25))
-            feedback = evaluation["feedback"]
-            check_results = evaluation["checkResults"]
+
+            if atype == "quiz":
+                kind = "quiz"
+                # Find correct answer from tests JSON
+                correct = None
+                if tests_data and isinstance(tests_data, list):
+                    first = tests_data[0]
+                    if isinstance(first, dict):
+                        correct = first.get("correct")
+                if correct and answer == correct:
+                    passed = True
+                    score = 15
+                    feedback = "Верно! Отличная работа."
+                elif answer:
+                    passed = False
+                    score = 0
+                    feedback = "Неверно, попробуйте ещё раз."
+                else:
+                    passed = False
+                    score = 0
+                    feedback = "Выберите вариант ответа."
+
+            elif atype == "essay":
+                kind = "code"
+                if len(answer) < 20:
+                    passed = False
+                    score = 0
+                    feedback = "Ответ слишком короткий. Напишите развёрнутый ответ."
+                else:
+                    # Check keywords if specified
+                    keywords = []
+                    if tests_data and isinstance(tests_data, list):
+                        first = tests_data[0]
+                        if isinstance(first, dict):
+                            keywords = first.get("keywords", [])
+                    min_len = 30
+                    if tests_data and isinstance(tests_data, list):
+                        first = tests_data[0]
+                        if isinstance(first, dict):
+                            min_len = first.get("minLength", 30)
+                    if len(answer) < min_len:
+                        passed = False
+                        score = 0
+                        feedback = f"Ответ слишком короткий. Минимум {min_len} символов."
+                    else:
+                        found = [k for k in keywords if k.lower() in answer.lower()] if keywords else []
+                        if keywords and len(found) < max(1, len(keywords) // 2):
+                            passed = False
+                            score = max(5, round(len(found) / max(len(keywords), 1) * 20))
+                            feedback = f"Ответ принят частично. Постарайтесь раскрыть тему глубже."
+                        else:
+                            passed = True
+                            score = 20
+                            feedback = "Отличный развёрнутый ответ! Засчитано."
+
+            else:
+                kind = "code"
+                evaluation = evaluate_code_by_tests(answer, tests_data)
+                passed = evaluation["passed"]
+                score = 25 if passed else max(0, round(evaluation["scorePercent"] / 100 * 25))
+                feedback = evaluation["feedback"]
+                check_results = evaluation["checkResults"]
         else:
             kind = "theory"
             passed = True

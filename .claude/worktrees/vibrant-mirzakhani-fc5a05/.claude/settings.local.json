@@ -20,7 +20,9 @@
       "Bash(mkdir -p \"C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\frontend\\\\src\\\\pages\\\\course\")",
       "Bash(npx tsc *)",
       "Bash(python import_courses.py)",
-      "Bash(find /mnt/c/Users/yaros/Desktop/stepashka -name \"*.py\" -not -path \"*/venv/*\" -not -path \"*/__pycache__/*\" | sort)"
+      "Bash(find /mnt/c/Users/yaros/Desktop/stepashka -name \"*.py\" -not -path \"*/venv/*\" -not -path \"*/__pycache__/*\" | sort)",
+      "Bash(extract-text 'C:\\\\Users\\\\yaros\\\\Downloads\\\\Диаграммы для дипломного проекта.docx')",
+      "Bash(python scripts/office/unpack.py '/mnt/c/Users/yaros/Downloads/Диаграммы для дипломного проекта.docx' /tmp/diagrams_docx/)"
     ]
   }
 }

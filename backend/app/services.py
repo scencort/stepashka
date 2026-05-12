@@ -172,7 +172,7 @@ def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
 
     for raw_test in tests:
         test = raw_test or {}
-        name = str(test.get("name", "Проверка"))
+        name = str(test.get("description") or test.get("name") or "Проверка")
         ttype = str(test.get("type", ""))
         passed = False
 

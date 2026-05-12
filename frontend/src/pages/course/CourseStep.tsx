@@ -7,7 +7,111 @@ import {
   BookOpen,
   Check,
   X,
+  Copy,
+  CheckCheck,
 } from "lucide-react";
+import { useState as useStateLocal } from "react";
+
+// ── Theory renderer ──────────────────────────────────────────────
+function isCodeLine(line: string): boolean {
+  if (!line.trim()) return false;
+  if (line.startsWith("    ") || line.startsWith("\t")) return true;
+  const s = line.trimStart();
+  const cyrillic = (s.match(/[а-яА-ЯёЁ]/g) || []).length;
+  if (cyrillic > 4) return false;
+  return /^(def |class |import |from |for |while |if |elif |else:|return |print\(|try:|except|finally:|with |raise |pass\b|break\b|continue\b|async |await |#|lambda )/.test(s)
+    || /^[a-zA-Z_]\w*(\s*[+\-*\/]?=(?!=)\s*|\s*\(|\s*\[)/.test(s);
+}
+
+type Segment = { type: "text"; lines: string[] } | { type: "code"; lines: string[] };
+
+function parseTheory(text: string): Segment[] {
+  const raw = text.split("\n");
+  const segments: Segment[] = [];
+  let i = 0;
+
+  while (i < raw.length) {
+    const line = raw[i];
+
+    if (!line.trim()) {
+      // blank line — attach to previous text segment or skip
+      if (segments.length && segments[segments.length - 1].type === "text") {
+        segments[segments.length - 1].lines.push("");
+      }
+      i++;
+      continue;
+    }
+
+    if (isCodeLine(line)) {
+      // collect consecutive code lines
+      const codeLines: string[] = [];
+      while (i < raw.length && (isCodeLine(raw[i]) || (raw[i].trim() === "" && i + 1 < raw.length && isCodeLine(raw[i + 1])))) {
+        if (raw[i].trim() === "") {
+          // blank inside code block — include if next is also code
+          if (i + 1 < raw.length && isCodeLine(raw[i + 1])) {
+            codeLines.push("");
+          } else {
+            break;
+          }
+        } else {
+          codeLines.push(raw[i]);
+        }
+        i++;
+      }
+      if (codeLines.length) segments.push({ type: "code", lines: codeLines });
+    } else {
+      if (!segments.length || segments[segments.length - 1].type === "code") {
+        segments.push({ type: "text", lines: [] });
+      }
+      segments[segments.length - 1].lines.push(line);
+      i++;
+    }
+  }
+
+  return segments.filter(s => s.lines.some(l => l.trim()));
+}
+
+function CodeBlock({ code }: { code: string }) {
+  const [copied, setCopied] = useStateLocal(false);
+  const copy = () => {
+    navigator.clipboard.writeText(code).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+  return (
+    <div className="relative group rounded-xl overflow-hidden border border-[var(--border)] bg-zinc-950 dark:bg-zinc-900">
+      <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 dark:bg-zinc-800 border-b border-zinc-700/60">
+        <span className="text-[10px] font-mono font-semibold text-zinc-400 uppercase tracking-widest">code</span>
+        <button
+          onClick={copy}
+          className="flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors"
+        >
+          {copied ? <CheckCheck size={13} className="text-green-400" /> : <Copy size={13} />}
+          {copied ? "Скопировано" : "Копировать"}
+        </button>
+      </div>
+      <pre className="p-4 text-sm font-mono text-zinc-100 overflow-x-auto leading-relaxed whitespace-pre">{code}</pre>
+    </div>
+  );
+}
+
+function TheoryRenderer({ text }: { text: string }) {
+  const segments = parseTheory(text);
+  return (
+    <div className="space-y-3 text-sm leading-relaxed">
+      {segments.map((seg, i) =>
+        seg.type === "code" ? (
+          <CodeBlock key={i} code={seg.lines.join("\n")} />
+        ) : (
+          <div key={i} className="text-[var(--text)] whitespace-pre-wrap">
+            {seg.lines.join("\n").trim()}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+// ────────────────────────────────────────────────────────────────
 
 type CourseStepType = {
   id: number;
@@ -15,6 +119,7 @@ type CourseStepType = {
   kind: "theory" | "quiz" | "code";
   taskTypeLabel?: string;
   theoryText: string;
+  quizQuestion?: string;
   checks?: string[];
   checkCount?: number;
   options: string[];
@@ -131,6 +236,16 @@ export default function CourseStep(props: Props) {
                     {activeStep.xp} XP
                   </span>
                 )}
+                {activeProgress && activeProgress.attempts > 0 && (
+                  <span className="text-xs text-[var(--muted)]">
+                    {activeProgress.attempts}{" "}
+                    {activeProgress.attempts === 1
+                      ? "попытка"
+                      : activeProgress.attempts >= 2 && activeProgress.attempts <= 4
+                        ? "попытки"
+                        : "попыток"}
+                  </span>
+                )}
               </div>
               <h2 className="font-display font-bold text-lg text-[var(--text)]">
                 {activeStep.title}
@@ -146,18 +261,21 @@ export default function CourseStep(props: Props) {
 
           {/* Theory */}
           {activeStep.kind === "theory" && (
-            <div className="prose prose-sm dark:prose-invert max-w-none text-[var(--text)] leading-relaxed text-sm whitespace-pre-wrap">
-              {activeStep.theoryText || (
-                <span className="text-[var(--muted)] italic">
-                  Теоретический материал будет добавлен.
-                </span>
-              )}
-            </div>
+            activeStep.theoryText
+              ? <TheoryRenderer text={activeStep.theoryText} />
+              : <span className="text-[var(--muted)] italic text-sm">Теоретический материал будет добавлен.</span>
           )}
 
           {/* Quiz */}
           {activeStep.kind === "quiz" && (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              {activeStep.theoryText && (
+                <TheoryRenderer text={activeStep.theoryText} />
+              )}
+              {activeStep.quizQuestion && (
+                <p className="font-semibold text-[var(--text)] text-sm mt-2">{activeStep.quizQuestion}</p>
+              )}
+              <div className="space-y-2">
               {activeStep.options.map((option, idx) => (
                 <button
                   key={idx}
@@ -184,6 +302,7 @@ export default function CourseStep(props: Props) {
                   </div>
                 </button>
               ))}
+              </div>
             </div>
           )}
 
@@ -191,9 +310,7 @@ export default function CourseStep(props: Props) {
           {activeStep.kind === "code" && (
             <div className="space-y-3">
               {activeStep.theoryText && (
-                <div className="text-sm text-[var(--text)] leading-relaxed p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] whitespace-pre-wrap">
-                  {activeStep.theoryText}
-                </div>
+                <TheoryRenderer text={activeStep.theoryText} />
               )}
               {activeStep.checks && activeStep.checks.length > 0 && (
                 <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] space-y-1.5">
@@ -218,8 +335,8 @@ export default function CourseStep(props: Props) {
               <textarea
                 value={stepAnswer}
                 onChange={(e) => setStepAnswer(e.target.value)}
-                placeholder="// Напишите код здесь..."
-                className="w-full h-52 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] p-4 text-sm font-mono outline-none focus:border-primary/50 transition-colors resize-none"
+                placeholder={activeStep.taskTypeLabel === "Свободный ответ" ? "Напишите ваш развёрнутый ответ здесь..." : "// Напишите код здесь..."}
+                className={`w-full h-52 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] p-4 text-sm outline-none focus:border-primary/50 transition-colors resize-none ${activeStep.taskTypeLabel === "Свободный ответ" ? "" : "font-mono"}`}
               />
             </div>
           )}
