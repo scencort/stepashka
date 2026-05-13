@@ -36,7 +36,10 @@
       "Bash(xargs grep -l \"DATABASE_URL\\\\|asyncpg\\\\|db =\")",
       "Bash(./venv/Scripts/python.exe -c ' *)",
       "Bash(python3 -c \"import sys; sys.stdout.buffer.write\\(sys.stdin.buffer.read\\(\\)\\)\")",
-      "Bash(./venv/Scripts/python.exe -W ignore -c ' *)"
+      "Bash(./venv/Scripts/python.exe -W ignore -c ' *)",
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "PowerShell([System.IO.File]::ReadAllText\\(\"C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\frontend\\\\src\\\\layout\\\\MainLayout.tsx\"\\) -match \"streak|Streak|дн|недел\" | Out-String)"
     ]
   }
 }

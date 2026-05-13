@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
+import uuid
 from datetime import date, timedelta
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi.responses import JSONResponse
 
 from app import db
 from app.deps import CurrentUser, require_roles
@@ -28,6 +32,38 @@ router = APIRouter(prefix="/api", tags=["teacher", "admin"])
 
 TeacherDep = Depends(require_roles("teacher", "admin"))
 AdminDep = Depends(require_roles("admin"))
+
+# ── Cover image upload ────────────────────────────────────────────────────────
+
+_COVERS_DIR = Path(__file__).resolve().parent.parent.parent / "covers"
+_ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp", "image/svg+xml", "image/gif"}
+_EXT_MAP = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/svg+xml": ".svg",
+    "image/gif": ".gif",
+}
+
+
+@router.post("/upload/cover", dependencies=[TeacherDep])
+async def upload_cover(file: UploadFile = File(...)):
+    """Upload a course cover image. Returns {url: '/covers/filename.ext'}"""
+    content_type = file.content_type or ""
+    if content_type not in _ALLOWED_MIME:
+        return JSONResponse(status_code=400, content={"error": "Допустимые форматы: JPG, PNG, WEBP, SVG, GIF"})
+
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        return JSONResponse(status_code=400, content={"error": "Файл слишком большой (максимум 5 МБ)"})
+
+    _COVERS_DIR.mkdir(parents=True, exist_ok=True)
+    ext = _EXT_MAP.get(content_type, ".jpg")
+    filename = f"{uuid.uuid4().hex}{ext}"
+    filepath = _COVERS_DIR / filename
+    filepath.write_bytes(data)
+
+    return {"url": f"/covers/{filename}"}
 
 
 # ---- Teacher ----
@@ -934,7 +970,7 @@ def _serialize_ticket(row) -> dict:
         "id": row["id"],
         "subject": row["subject"] if "subject" in keys else "",
         "message": row["message"],
-        "status": (row["status"] or "new").replace("_", " "),
+        "status": (row["status"] or "new"),
         "adminReply": (row["admin_reply"] if "admin_reply" in keys else "") or "",
         "repliedBy": row["replied_by"] if "replied_by" in keys else None,
         "createdAt": created_at.isoformat() if created_at else None,
@@ -988,14 +1024,25 @@ async def create_feedback(request: Request, user: CurrentUser):
     "/feedback/{ticket_id}/status",
     dependencies=[Depends(require_roles("admin"))],
 )
-async def update_feedback_status(ticket_id: int, user: CurrentUser):
+async def update_feedback_status(ticket_id: int, request: Request, user: CurrentUser):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
     row = await db.fetchrow(
         "SELECT id, status FROM support_tickets WHERE id=$1 LIMIT 1", ticket_id
     )
     if not row:
         return {"error": "Обращение не найдено"}
-    status_flow = {"new": "in_progress", "in_progress": "closed", "closed": "new"}
-    new_status = status_flow.get(row["status"], "new")
+    valid_statuses = {"new", "in_progress", "closed"}
+    requested = body.get("status") if body else None
+    if isinstance(requested, str) and requested in valid_statuses:
+        new_status = requested
+    else:
+        # fallback: cycle through
+        status_flow = {"new": "in_progress", "in_progress": "closed", "closed": "new"}
+        new_status = status_flow.get(row["status"], "new")
     updated = await db.fetchrow(
         """UPDATE support_tickets SET status=$1, updated_at=NOW() WHERE id=$2
            RETURNING id, subject, message, status,
@@ -1018,16 +1065,18 @@ async def reply_feedback(ticket_id: int, request: Request, user: CurrentUser):
         return {"error": "Ответ не может быть пустым"}
     requested_status = body.get("status")
     valid_statuses = {"new", "in_progress", "closed"}
-    if isinstance(requested_status, str) and requested_status in valid_statuses:
-        new_status = requested_status
-    else:
-        new_status = "in_progress"
 
     existing = await db.fetchrow(
-        "SELECT id FROM support_tickets WHERE id=$1 LIMIT 1", ticket_id
+        "SELECT id, status FROM support_tickets WHERE id=$1 LIMIT 1", ticket_id
     )
     if not existing:
         return {"error": "Обращение не найдено"}
+
+    # Keep current status unless caller explicitly passes a valid one
+    if isinstance(requested_status, str) and requested_status in valid_statuses:
+        new_status = requested_status
+    else:
+        new_status = existing["status"]
 
     updated = await db.fetchrow(
         """UPDATE support_tickets

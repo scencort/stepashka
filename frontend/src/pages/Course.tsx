@@ -107,7 +107,10 @@ type AttemptEntry = {
   passed: boolean;
   feedback: string;
   createdAt: string;
+  checkResults?: Array<{ name: string; passed: boolean; expected?: string; actual?: string; error?: string }> | null;
 };
+
+const STEP_KEY = (cId: number) => `gradus_last_step_${cId}`;
 
 export default function Course() {
   const navigate = useNavigate();
@@ -138,16 +141,20 @@ export default function Course() {
   }> | null>(null);
   const [stepAiComment, setStepAiComment] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [newCourseTitle, setNewCourseTitle] = useState("");
-  const [newCourseType, setNewCourseType] = useState("Frontend");
-  const [newCourseLevel, setNewCourseLevel] = useState("Начальный");
   const [attemptHistory, setAttemptHistory] = useState<AttemptEntry[]>([]);
   const [_autoAdvance] = useState(false);
   const [openModules, setOpenModules] = useState<Record<number, boolean>>({});
   const [enrollmentStatus, setEnrollmentStatus] =
     useState<EnrollmentStatus | null>(null);
   const [courseDetail, setCourseDetail] = useState<CourseDetailType | null>(null);
+  const [myRating, setMyRating] = useState<{
+    myScore: number | null;
+    myComment: string;
+    avgRating: number;
+    ratingCount: number;
+    progress: number;
+    canRate: boolean;
+  } | null>(null);
   const [enrollRequestMessage, setEnrollRequestMessage] = useState("");
   const [enrollRequestLoading, setEnrollRequestLoading] = useState(false);
   const [enrollingIds, setEnrollingIds] = useState<Set<number>>(new Set());
@@ -210,18 +217,46 @@ export default function Course() {
       );
       setCourseContent(data);
       const firstStepId = data.steps[0]?.id ?? null;
-      const selectedStillExists = data.steps.some(
-        (s) => s.id === selectedStepId,
-      );
+
+      // Restore last visited step from localStorage
+      const savedStepId = Number(localStorage.getItem(STEP_KEY(cId)) || 0);
+      const savedStepExists = savedStepId > 0 && data.steps.some(s => s.id === savedStepId);
+
       const requestStepExists =
         requestedStepId && data.steps.some((s) => s.id === requestedStepId);
-      if (requestStepExists) setSelectedStepId(requestedStepId);
-      else
-        setSelectedStepId(selectedStillExists ? selectedStepId : firstStepId);
-      if (!selectedStillExists) setStepAnswer("");
-      setAttemptHistory((prev) =>
-        prev.filter((a) => data.steps.some((s) => s.id === a.stepId)),
-      );
+
+      if (requestStepExists) {
+        setSelectedStepId(requestedStepId);
+      } else if (savedStepExists) {
+        // Restore saved progress from localStorage
+        const savedProgress = data.progress.find(p => p.stepId === savedStepId);
+        setSelectedStepId(savedStepId);
+        setStepAnswer(savedProgress?.answerText || "");
+      } else {
+        setSelectedStepId(firstStepId);
+        setStepAnswer("");
+      }
+
+      // Restore attempt history from server-side progress (last attempt per step).
+      // Keep real in-session attempts (id > stepId*1000 threshold), only fill gaps.
+      setAttemptHistory((prev) => {
+        const restoredHistory: AttemptEntry[] = data.progress
+          .filter((p) => p.answerText || p.score > 0)
+          .map((p) => ({
+            id: p.stepId * 1000, // stable synthetic ID for server-restored entries
+            stepId: p.stepId,
+            answer: p.answerText || "",
+            passed: p.status === "completed",
+            feedback: p.status === "completed" ? "Принято" : "Не засчитано",
+            createdAt: p.completedAt || new Date().toISOString(),
+            checkResults: null,
+          }));
+        // Merge: keep in-session real attempts, add restored ones only if no real attempt exists for that step
+        const realAttempts = prev.filter((a) => a.id > 1_000_000); // Date.now() IDs
+        const realStepIds = new Set(realAttempts.map((a) => a.stepId));
+        const fillIns = restoredHistory.filter((r) => !realStepIds.has(r.stepId));
+        return [...realAttempts, ...fillIns];
+      });
     } catch (err) {
       setContentError(
         err instanceof Error ? err.message : "Не удалось загрузить шаги курса",
@@ -251,6 +286,33 @@ export default function Course() {
     }
   };
 
+  const loadMyRating = async (cId: number) => {
+    try {
+      const data = await api.get<{
+        myScore: number | null;
+        myComment: string;
+        avgRating: number;
+        ratingCount: number;
+        progress: number;
+        canRate: boolean;
+      }>(`/student/courses/${cId}/my-rating`);
+      setMyRating(data);
+    } catch {
+      setMyRating(null);
+    }
+  };
+
+  const submitRating = async (score: number, comment: string) => {
+    if (!selectedCourseId) return;
+    try {
+      await api.post(`/student/courses/${selectedCourseId}/rate`, { score, comment });
+      await loadMyRating(selectedCourseId);
+      toast.success("Оценка сохранена!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось сохранить оценку");
+    }
+  };
+
   useEffect(() => {
     void loadCourses();
   }, []);
@@ -268,6 +330,7 @@ export default function Course() {
     void loadCourseContent(selectedCourseId);
     void loadEnrollmentStatus(selectedCourseId);
     void loadCourseDetail(selectedCourseId);
+    void loadMyRating(selectedCourseId);
   }, [isCoursePage, selectedCourseId, requestedStepId]);
 
   const requestEnrollment = async () => {
@@ -293,29 +356,6 @@ export default function Course() {
       );
     } finally {
       setEnrollRequestLoading(false);
-    }
-  };
-
-  const createCourse = async () => {
-    if (!newCourseTitle.trim()) {
-      setError("Введите название курса");
-      return;
-    }
-    try {
-      await api.post("/courses", {
-        title: newCourseTitle.trim(),
-        type: newCourseType,
-        level: newCourseLevel,
-      });
-      await loadCourses();
-      setCreateModalOpen(false);
-      setNewCourseTitle("");
-      toast.success("Курс создан");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Не удалось создать курс";
-      setError(message);
-      toast.error(message);
     }
   };
 
@@ -371,11 +411,12 @@ export default function Course() {
       setAttemptHistory((prev) => [
         {
           id: Date.now(),
-          stepId: selectedStepId,
+          stepId: selectedStepId!,
           answer: stepAnswer,
           passed: response.passed,
           feedback: response.feedback,
           createdAt: new Date().toISOString(),
+          checkResults: response.checkResults ?? null,
         },
         ...prev,
       ]);
@@ -398,6 +439,9 @@ export default function Course() {
     setStepMessage("");
     setStepCheckResults(null);
     setStepAiComment(null);
+    if (selectedCourseId) {
+      localStorage.setItem(STEP_KEY(selectedCourseId), String(stepId));
+    }
   };
 
   const toggleModule = (moduleId: number) => {
@@ -437,6 +481,8 @@ export default function Course() {
           onSubmitStep={submitStep}
           onSelectStep={selectStep}
           onToggleModule={toggleModule}
+          myRating={myRating}
+          onSubmitRating={submitRating}
         />
       </MainLayout>
     );
@@ -459,20 +505,11 @@ export default function Course() {
         viewTab={viewTab}
         setViewTab={setViewTab}
         canCreateCourse={canCreateCourse}
-        onCreateModalOpen={() => setCreateModalOpen(true)}
+        onNavigateToCreate={() => navigate("/teacher/courses/new")}
         onNavigateToCourse={(id) => navigate(`/course/${id}`)}
         onEnroll={enrollCourse}
         enrollingIds={enrollingIds}
         courseCoverUrl={courseCoverUrl}
-        createModalOpen={createModalOpen}
-        onCreateModalClose={() => setCreateModalOpen(false)}
-        newCourseTitle={newCourseTitle}
-        setNewCourseTitle={setNewCourseTitle}
-        newCourseType={newCourseType}
-        setNewCourseType={setNewCourseType}
-        newCourseLevel={newCourseLevel}
-        setNewCourseLevel={setNewCourseLevel}
-        onCreateCourse={createCourse}
       />
     </MainLayout>
   );

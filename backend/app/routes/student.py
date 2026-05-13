@@ -841,3 +841,78 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
             "percent": percent,
         },
     }
+
+
+# ── Course rating ─────────────────────────────────────────────────────────────
+
+@router.get("/courses/{course_id}/my-rating", dependencies=[AllRoles])
+async def get_my_rating(course_id: int, user: CurrentUser):
+    """Return current user's rating for this course (if any) and overall stats."""
+    row = await db.fetchrow(
+        "SELECT score, comment FROM course_ratings WHERE course_id=$1 AND user_id=$2",
+        course_id, user["id"],
+    )
+    stats = await db.fetchrow(
+        "SELECT ROUND(AVG(score)::numeric, 1) AS avg, COUNT(*) AS cnt FROM course_ratings WHERE course_id=$1",
+        course_id,
+    )
+    enrollment = await db.fetchrow(
+        "SELECT progress_percent FROM enrollments WHERE course_id=$1 AND user_id=$2 AND status='active'",
+        course_id, user["id"],
+    )
+    return {
+        "myScore": row["score"] if row else None,
+        "myComment": row["comment"] if row else "",
+        "avgRating": float(stats["avg"]) if stats and stats["avg"] else 0,
+        "ratingCount": int(stats["cnt"]) if stats else 0,
+        "progress": int(enrollment["progress_percent"]) if enrollment else 0,
+        "canRate": bool(enrollment and (enrollment["progress_percent"] or 0) >= 75),
+    }
+
+
+@router.post("/courses/{course_id}/rate", dependencies=[AllRoles])
+async def rate_course(course_id: int, request: Request, user: CurrentUser):
+    """Submit or update a course rating (requires ≥75% progress)."""
+    body = await request.json()
+    score = int(body.get("score", 0))
+    comment = str(body.get("comment", "")).strip()[:500]
+
+    if not (1 <= score <= 5):
+        return {"error": "Оценка должна быть от 1 до 5"}
+
+    # Check enrollment & progress
+    enrollment = await db.fetchrow(
+        "SELECT progress_percent FROM enrollments WHERE course_id=$1 AND user_id=$2 AND status='active'",
+        course_id, user["id"],
+    )
+    if not enrollment:
+        return {"error": "Вы не записаны на этот курс"}
+    if (enrollment["progress_percent"] or 0) < 75:
+        return {"error": "Нужно пройти хотя бы 75% курса, чтобы оставить оценку"}
+
+    # Upsert rating
+    await db.execute(
+        """INSERT INTO course_ratings (course_id, user_id, score, comment)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (course_id, user_id) DO UPDATE
+           SET score=$3, comment=$4, created_at=NOW()""",
+        course_id, user["id"], score, comment,
+    )
+
+    # Update courses.rating with real average
+    await db.execute(
+        """UPDATE courses
+           SET rating = (SELECT ROUND(AVG(score)::numeric, 2) FROM course_ratings WHERE course_id=$1)
+           WHERE id=$1""",
+        course_id,
+    )
+
+    stats = await db.fetchrow(
+        "SELECT ROUND(AVG(score)::numeric, 1) AS avg, COUNT(*) AS cnt FROM course_ratings WHERE course_id=$1",
+        course_id,
+    )
+    return {
+        "success": True,
+        "avgRating": float(stats["avg"]) if stats and stats["avg"] else 0,
+        "ratingCount": int(stats["cnt"]) if stats else 0,
+    }

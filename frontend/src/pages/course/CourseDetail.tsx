@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   MessageSquare,
   ListOrdered,
+  Star,
 } from "lucide-react";
 import CourseStep from "./CourseStep";
 import CourseDiscussion from "./CourseDiscussion";
@@ -90,6 +91,7 @@ type AttemptEntry = {
   passed: boolean;
   feedback: string;
   createdAt: string;
+  checkResults?: Array<{ name: string; passed: boolean; expected?: string; actual?: string; error?: string }> | null;
 };
 
 type Props = {
@@ -121,6 +123,15 @@ type Props = {
   onSubmitStep: () => void;
   onSelectStep: (stepId: number, answerText: string) => void;
   onToggleModule: (moduleId: number) => void;
+  myRating?: {
+    myScore: number | null;
+    myComment: string;
+    avgRating: number;
+    ratingCount: number;
+    progress: number;
+    canRate: boolean;
+  } | null;
+  onSubmitRating?: (score: number, comment: string) => Promise<void>;
 };
 
 export default function CourseDetail(props: Props) {
@@ -153,7 +164,19 @@ export default function CourseDetail(props: Props) {
     onSubmitStep,
     onSelectStep,
     onToggleModule,
+    myRating,
+    onSubmitRating,
   } = props;
+
+  const [hoverStar, setHoverStar] = useState(0);
+  const [selectedStar, setSelectedStar] = useState(myRating?.myScore ?? 0);
+  const [ratingComment, setRatingComment] = useState(myRating?.myComment ?? "");
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+
+  useEffect(() => {
+    setSelectedStar(myRating?.myScore ?? 0);
+    setRatingComment(myRating?.myComment ?? "");
+  }, [myRating?.myScore, myRating?.myComment]);
 
   const activeStep =
     courseContent?.steps.find((s) => s.id === selectedStepId) ?? null;
@@ -357,7 +380,7 @@ export default function CourseDetail(props: Props) {
       )}
 
       {/* Main layout: content + sidebar */}
-      <div className="grid xl:grid-cols-[1fr_300px] gap-4">
+      <div className="grid xl:grid-cols-[1fr_380px] gap-4">
         {/* Left: Step content */}
         <div className="space-y-4 min-w-0">
           {/* Step selector tabs */}
@@ -415,93 +438,174 @@ export default function CourseDetail(props: Props) {
               stepTitle={activeStep?.title}
             />
           )}
+
+          {/* Rating widget — shown when canRate */}
+          {myRating?.canRate && (
+            <div className="card p-5 space-y-4 border-amber-200/50 dark:border-amber-800/30 bg-gradient-to-br from-amber-50/50 to-orange-50/30 dark:from-amber-900/10 dark:to-orange-900/5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <Star size={16} className="text-amber-500" fill="currentColor" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-[var(--text)]">
+                    {myRating.myScore ? "Ваша оценка курса" : "Оцените курс"}
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {myRating.ratingCount > 0
+                      ? `Средняя оценка: ${myRating.avgRating.toFixed(1)} ★ · ${myRating.ratingCount} отзывов`
+                      : "Будьте первым, кто оценит курс!"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Stars */}
+              <div className="flex items-center gap-1.5">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onMouseEnter={() => setHoverStar(star)}
+                    onMouseLeave={() => setHoverStar(0)}
+                    onClick={() => setSelectedStar(star)}
+                    className="transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <Star
+                      size={32}
+                      className={`transition-colors ${
+                        star <= (hoverStar || selectedStar)
+                          ? "text-amber-400"
+                          : "text-[var(--border)]"
+                      }`}
+                      fill={star <= (hoverStar || selectedStar) ? "currentColor" : "none"}
+                    />
+                  </button>
+                ))}
+                {selectedStar > 0 && (
+                  <span className="ml-2 text-sm font-semibold text-amber-600 dark:text-amber-400">
+                    {["", "Плохо", "Так себе", "Нормально", "Хорошо", "Отлично!"][selectedStar]}
+                  </span>
+                )}
+              </div>
+
+              {/* Comment */}
+              <textarea
+                value={ratingComment}
+                onChange={(e) => setRatingComment(e.target.value)}
+                placeholder="Напишите отзыв (необязательно)..."
+                rows={3}
+                className="input-field w-full px-3 py-2.5 text-sm resize-none"
+              />
+
+              <button
+                disabled={selectedStar === 0 || ratingSubmitting}
+                onClick={async () => {
+                  if (!onSubmitRating || selectedStar === 0) return;
+                  setRatingSubmitting(true);
+                  try { await onSubmitRating(selectedStar, ratingComment); }
+                  finally { setRatingSubmitting(false); }
+                }}
+                className="btn-primary px-5 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {ratingSubmitting ? "Сохраняю..." : myRating.myScore ? "Обновить оценку" : "Оставить оценку"}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: Syllabus sidebar */}
-        <div className="xl:sticky xl:top-4 h-fit">
-          <div className="card p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <ListOrdered size={15} className="text-[var(--muted)]" />
-              <p className="font-semibold text-sm text-[var(--text)]">
-                Содержание
-              </p>
+        <div className="xl:sticky xl:top-4 h-fit xl:pl-4">
+          <div className="card p-5 space-y-4">
+            {/* Header */}
+            <div className="flex items-center gap-2.5 pb-3 border-b border-[var(--border)]">
+              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                <ListOrdered size={14} className="text-primary" />
+              </div>
+              <p className="font-bold text-sm text-[var(--text)]">Содержание</p>
+              {courseContent && (
+                <span className="ml-auto text-xs text-[var(--muted)] font-medium">
+                  {courseContent.summary.completed}/{courseContent.summary.total}
+                </span>
+              )}
             </div>
 
-            <div className="space-y-1.5 max-h-[calc(100vh-200px)] overflow-auto pr-1">
-              {syllabusModules.map((module) => (
-                <div key={module.id}>
-                  <button
-                    onClick={() => onToggleModule(module.id)}
-                    className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--surface)] transition-colors text-left"
-                  >
-                    <span className="text-xs font-semibold text-[var(--text)]">
-                      {module.title}
-                    </span>
-                    {openModules[module.id] ? (
-                      <ChevronDown
-                        size={13}
-                        className="text-[var(--muted)] shrink-0"
-                      />
-                    ) : (
-                      <ChevronRight
-                        size={13}
-                        className="text-[var(--muted)] shrink-0"
-                      />
-                    )}
-                  </button>
+            <div className="space-y-2 max-h-[calc(100vh-220px)] overflow-auto pr-1 -mr-1">
+              {syllabusModules.map((module) => {
+                const moduleSteps = module.lessons.flatMap(l => l.steps);
+                const moduleDone = moduleSteps.filter(s =>
+                  courseContent?.progress.find(p => p.stepId === s.id)?.status === "completed"
+                ).length;
+                return (
+                  <div key={module.id} className="rounded-xl overflow-hidden border border-[var(--border)]">
+                    {/* Module header */}
+                    <button
+                      onClick={() => onToggleModule(module.id)}
+                      className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-[var(--surface)] hover:bg-[var(--border)]/30 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-bold text-[var(--text)] truncate">
+                          {module.title}
+                        </span>
+                        <span className="text-[11px] text-[var(--muted)] shrink-0">
+                          {moduleDone}/{moduleSteps.length}
+                        </span>
+                      </div>
+                      {openModules[module.id]
+                        ? <ChevronDown size={14} className="text-[var(--muted)] shrink-0" />
+                        : <ChevronRight size={14} className="text-[var(--muted)] shrink-0" />
+                      }
+                    </button>
 
-                  {openModules[module.id] && (
-                    <div className="ml-2 space-y-0.5 mt-0.5">
-                      {module.lessons.flatMap((lesson) =>
-                        lesson.steps.map((step) => {
-                          const prog = courseContent?.progress.find(
-                            (p) => p.stepId === step.id,
-                          );
-                          const isActive = selectedStepId === step.id;
-                          const isDone = prog?.status === "completed";
-                          return (
-                            <button
-                              key={step.id}
-                              onClick={() =>
-                                onSelectStep(step.id, prog?.answerText || "")
-                              }
-                              className={`w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-lg transition-all text-xs ${
-                                isActive
-                                  ? "bg-primary-50 dark:bg-primary-900/20 text-primary border border-primary/20"
-                                  : "text-[var(--text)] hover:bg-[var(--surface)]"
-                              }`}
-                            >
-                              <div
-                                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                    {openModules[module.id] && (
+                      <div className="divide-y divide-[var(--border)]">
+                        {module.lessons.flatMap((lesson) =>
+                          lesson.steps.map((step) => {
+                            const prog = courseContent?.progress.find(p => p.stepId === step.id);
+                            const isActive = selectedStepId === step.id;
+                            const isDone = prog?.status === "completed";
+                            return (
+                              <button
+                                key={step.id}
+                                onClick={() => onSelectStep(step.id, prog?.answerText || "")}
+                                className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-all ${
+                                  isActive
+                                    ? "bg-primary-50 dark:bg-primary-900/20"
+                                    : "bg-[var(--bg)] hover:bg-[var(--surface)]"
+                                }`}
+                              >
+                                {/* Status icon */}
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                                   isDone
                                     ? "bg-green-500 border-green-500"
                                     : isActive
-                                      ? "border-primary bg-primary-50 dark:bg-primary-900/20"
-                                      : "border-[var(--border)]"
-                                }`}
-                              >
-                                {isDone && (
-                                  <Check size={9} className="text-white" />
-                                )}
-                                {!isDone && isActive && (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                                )}
-                              </div>
-                              <span className="truncate leading-snug">
-                                {step.title}
-                              </span>
-                            </button>
-                          );
-                        }),
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
+                                      ? "border-primary bg-primary/10"
+                                      : "border-[var(--border)] bg-[var(--surface)]"
+                                }`}>
+                                  {isDone && <Check size={10} className="text-white" strokeWidth={3} />}
+                                  {!isDone && isActive && <div className="w-2 h-2 rounded-full bg-primary" />}
+                                </div>
+                                {/* Title */}
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm leading-snug truncate font-medium ${
+                                    isActive ? "text-primary" : isDone ? "text-[var(--muted)]" : "text-[var(--text)]"
+                                  }`}>
+                                    {step.title}
+                                  </p>
+                                  {step.xp > 0 && (
+                                    <p className="text-[11px] text-[var(--muted)] mt-0.5 flex items-center gap-0.5">
+                                      ⚡ {step.xp} XP
+                                    </p>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {!courseContent?.steps.length && !contentLoading && (
-                <p className="text-xs text-[var(--muted)] px-2">
-                  Шаги ещё не добавлены.
-                </p>
+                <p className="text-xs text-[var(--muted)] px-2">Шаги ещё не добавлены.</p>
               )}
             </div>
           </div>

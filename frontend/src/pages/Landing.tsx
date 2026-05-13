@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -23,6 +23,8 @@ import {
   Sparkles,
   Send,
   Flame,
+  Palette,
+  Server,
 } from "lucide-react";
 import { api } from "../lib/api";
 import BrandLogo from "../components/BrandLogo";
@@ -30,6 +32,103 @@ import BinaryGlobe from "../components/BinaryGlobe";
 import ParticleNetwork from "../components/ParticleNetwork";
 import { useTheme } from "../context/theme";
 import { useAppStore } from "../store/AppStore";
+
+// ─── Team revolver component ───────────────────────────────────────────────
+type Member = {
+  name: string; roles: string[]; photo: string; link: string;
+  objectPosition: string; scale: number;
+};
+
+const PHOTO_D = 155; // photo diameter
+const CELL_W  = 190; // total cell width
+const CELL_H  = 230; // photo + name + roles
+const CY_R    = 280;
+const CY_C    = CY_R + CELL_H / 2 + 20;
+const CY_SZ   = CY_C * 2;
+
+function TeamRevolver({ members }: { members: Member[] }) {
+  return (
+    <div className="hidden lg:block relative mx-auto" style={{ width: CY_SZ, height: CY_SZ }}>
+      {/* Outer decorative ring */}
+      <div
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/12"
+        style={{ width: CY_R * 2 + PHOTO_D + 24, height: CY_R * 2 + PHOTO_D + 24 }}
+      />
+      {/* Center axis */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-primary/25 bg-primary/5 flex items-center justify-center z-10">
+        <div className="w-2.5 h-2.5 rounded-full bg-primary/40" />
+      </div>
+
+      {members.map((dev, i) => {
+        const angleDeg = (360 / members.length) * i - 90;
+        const rad      = angleDeg * Math.PI / 180;
+        const left     = CY_C + CY_R * Math.cos(rad) - CELL_W / 2;
+        const top      = CY_C + CY_R * Math.sin(rad) - CELL_H / 2;
+        const [firstName, ...rest] = dev.name.split(" ");
+        const lastName = rest.join(" ");
+        return (
+          <motion.a
+            key={dev.name}
+            href={dev.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute flex flex-col items-center text-center group cursor-pointer no-underline"
+            style={{ left, top, width: CELL_W }}
+            initial={{ opacity: 0, scale: 0.6 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={{ y: -5 }}
+          >
+            {/* Photo circle — cylinder chamber look */}
+            <div className="relative mb-2.5" style={{ width: PHOTO_D, height: PHOTO_D }}>
+              {/* Outer glow — пламя гильзы */}
+              <div className="absolute -inset-3 rounded-full bg-gradient-to-tr from-primary via-rose-400 to-primary opacity-40 blur-xl group-hover:opacity-70 transition-all" />
+              {/* Metallic outer ring — бордовый */}
+              <div className="absolute -inset-2 rounded-full shadow-lg" style={{ background: "linear-gradient(135deg, #7c1d2e, #4a0e1a, #2d0810)" }} />
+              {/* Inner accent ring */}
+              <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-primary to-rose-800" />
+              {/* Inner metallic sheen — тёмно-бордовый глянец */}
+              <div className="absolute inset-1 rounded-full shadow-inner" style={{ background: "linear-gradient(135deg, #a83252, #6b1a2e)" }} />
+              <div className="relative w-full h-full rounded-full overflow-hidden bg-[var(--surface)]">
+                {dev.photo ? (
+                  <img
+                    src={dev.photo} alt={dev.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.08]"
+                    style={{ objectPosition: dev.objectPosition, transform: `scale(${dev.scale})`, transformOrigin: "center center" }}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-900/30 dark:to-primary-900/10">
+                    <svg viewBox="0 0 80 80" className="w-10 h-10 text-primary/25" fill="currentColor">
+                      <circle cx="40" cy="28" r="16" /><ellipse cx="40" cy="72" rx="26" ry="18" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Name */}
+            <p className="font-bold text-base leading-tight text-[var(--text)] mb-2">
+              {firstName}{lastName && <><br />{lastName}</>}
+            </p>
+            {/* Role badges */}
+            <div className="flex flex-col items-center gap-1.5">
+              {dev.roles.map((r) => {
+                const icon = r === "Дизайнер" ? <Palette size={11} /> : r === "ML инженер" ? <Brain size={11} /> : r === "Бэкенд" ? <Server size={11} /> : r === "Фронтенд" ? <Layers size={11} /> : <Code size={11} />;
+                return (
+                  <span key={r} className="inline-flex items-center gap-1 text-primary text-[11px] font-semibold uppercase tracking-wide">
+                    {icon} {r}
+                  </span>
+                );
+              })}
+            </div>
+          </motion.a>
+        );
+      })}
+    </div>
+  );
+}
+// ──────────────────────────────────────────────────────────────────────────
 
 export default function Landing() {
   const { theme, toggleTheme } = useTheme();
@@ -363,9 +462,9 @@ export default function Landing() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-primary/8 rounded-full blur-[160px]" />
         </div>
 
-        <div className="relative w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
+        <div className="relative w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-12 lg:py-24">
           <motion.div
-            className="text-center mb-16"
+            className="text-center mb-10 lg:mb-16"
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
@@ -390,13 +489,24 @@ export default function Landing() {
               transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="relative">
-                <BinaryGlobe
-                  size={520}
-                  pointCount={1200}
-                  palette={globePalette}
-                  pulseColor={globePulseColor}
-                  className="max-w-full h-auto"
-                />
+                {/* Desktop globe */}
+                <div className="hidden lg:block">
+                  <BinaryGlobe
+                    size={520}
+                    pointCount={1200}
+                    palette={globePalette}
+                    pulseColor={globePulseColor}
+                  />
+                </div>
+                {/* Mobile globe */}
+                <div className="lg:hidden">
+                  <BinaryGlobe
+                    size={320}
+                    pointCount={700}
+                    palette={globePalette}
+                    pulseColor={globePulseColor}
+                  />
+                </div>
               </div>
             </motion.div>
 
@@ -543,7 +653,7 @@ export default function Landing() {
       {/* ── TRACKS ── */}
       <section id="tracks" className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
         <motion.div
-          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12"
+          className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 md:mb-12"
           initial={{ opacity: 0, y: 32 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
@@ -553,12 +663,12 @@ export default function Landing() {
             <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Направления</p>
             <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl">Выберите свой трек</h2>
           </div>
-          <Link to="/register" className="btn-secondary px-5 py-2.5 text-sm w-fit gap-1.5">
+          <Link to="/register" className="btn-secondary px-5 py-2.5 text-sm w-fit gap-1.5 shrink-0">
             Все треки <ArrowRight size={15} />
           </Link>
         </motion.div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {tracks.map((track, i) => (
             <motion.div
               key={i}
@@ -653,7 +763,7 @@ export default function Landing() {
       </section>
 
       {/* ── DEVELOPERS ── */}
-      <section id="developers" className="relative bg-[var(--surface)] border-t border-[var(--border)] py-28 overflow-hidden">
+      <section id="developers" className="relative bg-[var(--surface)] border-t border-[var(--border)] py-16 lg:py-28 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[500px] bg-primary/5 rounded-full blur-[140px]" />
           <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-burgundy-500/10 blur-3xl" />
@@ -661,7 +771,7 @@ export default function Landing() {
         </div>
 
         <div className="relative w-full px-4 sm:px-6 lg:px-10 xl:px-16">
-          <div className="text-center mb-20">
+          <div className="text-center mb-10 lg:mb-20">
             <h2 className="font-display font-bold text-3xl sm:text-5xl md:text-6xl lg:text-7xl tracking-tight mb-6">
               Наша <span className="text-gradient-red">команда</span>
             </h2>
@@ -672,19 +782,25 @@ export default function Landing() {
 
           {(() => {
             const members = [
-              { name: "Радкевич Роман",    role: "Разработчик", photo: "/developers/radkevich-roman.jpg",      link: "https://t.me/liiiiiliiiiiliiiiiliiiiiliiiiil", objectPosition: "center 22%", scale: 1.18 },
-              { name: "Виктория Кужелева", role: "Разработчик", photo: "",                                      link: "https://t.me/viktoriakuzheleva",                objectPosition: "center 50%", scale: 1.00 },
-              { name: "Поляков Ярослав",   role: "Разработчик", photo: "/developers/polyakov-yaroslav.jpg",    link: "https://t.me/scencort",                        objectPosition: "center 22%", scale: 1.18 },
-              { name: "Вероника Кужелева", role: "Разработчик", photo: "",                                      link: "https://t.me/veronika_vladislavovnaa",          objectPosition: "center 50%", scale: 1.00 },
-              { name: "Чеха Иван",         role: "Разработчик", photo: "/developers/chekha-ivan.jpg",          link: "https://t.me/aaaaaqiwi",                       objectPosition: "center 5%",  scale: 1.00 },
-              { name: "Вартанян Вячеслав", role: "Разработчик", photo: "/developers/vartanyan-vyacheslav.jpg", link: "https://t.me/A597MP97",                        objectPosition: "center 5%",  scale: 1.00 },
+              { name: "Радкевич Роман",    roles: ["Бэкенд", "ML инженер"],              photo: "/developers/radkevich-roman.jpg",      link: "https://t.me/liiiiiliiiiiliiiiiliiiiiliiiiil", objectPosition: "center 22%", scale: 1.18 },
+              { name: "Виктория Кужелева", roles: ["Разработчик", "Дизайнер"],              photo: "/developers/kuzheleva-victoria.jpg",     link: "https://t.me/viktoriakuzheleva",                objectPosition: "center -40%", scale: 1.10 },
+              { name: "Поляков Ярослав",   roles: ["Фронтенд", "Дизайнер"],    photo: "/developers/polyakov-yaroslav.jpg",    link: "https://t.me/scencort",                        objectPosition: "center 22%", scale: 1.18 },
+              { name: "Чеха Иван",         roles: ["Разработчик", "Бэкенд"],   photo: "/developers/chekha-ivan.jpg",          link: "https://t.me/aaaaaqiwi",                       objectPosition: "center 5%",  scale: 1.00 },
+              { name: "Вероника Кужелева", roles: ["Разработчик", "Дизайнер"], photo: "/developers/kuzheleva-veronika.jpg",      link: "https://t.me/veronika_vladislavovnaa",          objectPosition: "center -15%", scale: 1.10 },
+              { name: "Вартанян Вячеслав", roles: ["Разработчик", "Бэкенд"],    photo: "/developers/vartanyan-vyacheslav.jpg", link: "https://t.me/A597MP97",                        objectPosition: "center 5%",  scale: 1.00 },
             ];
 
             const colStarts = ["lg:col-start-1","lg:col-start-3","lg:col-start-5","lg:col-start-2","lg:col-start-4","lg:col-start-6"];
 
-            const cardJsx = (dev: typeof members[0], i: number, extraClass = "") => {
+            const cardJsx = (dev: typeof members[0], i: number, compact = false) => {
               const [firstName, ...rest] = dev.name.split(" ");
               const lastName = rest.join(" ");
+              const photoSize  = compact ? "w-28 h-28" : "w-44 h-44 md:w-52 md:h-52";
+              const nameSize   = compact ? "text-base" : "text-2xl md:text-3xl";
+              const nameMinH   = compact ? "min-h-[2.5rem]" : "min-h-[4.5rem] md:min-h-[5.25rem]";
+              const padding    = compact ? "p-4" : "p-8";
+              const badgeClass = compact ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs";
+              const iconSize   = compact ? 10 : 12;
               return (
                 <motion.a
                   key={dev.name}
@@ -692,18 +808,18 @@ export default function Landing() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`Telegram ${dev.name}`}
-                  initial={{ opacity: 0, y: 40 }}
+                  initial={{ opacity: 0, y: compact ? 0 : 40 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-60px" }}
                   transition={{ duration: 0.5, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
                   whileHover={{ y: -6 }}
-                  className={`group relative card p-8 overflow-hidden flex flex-col items-center text-center transition-all duration-300 hover:shadow-card-lg hover:border-primary/30 cursor-pointer no-underline h-full ${extraClass}`}
+                  className={`group relative card overflow-hidden flex flex-col items-center text-center transition-all duration-300 hover:shadow-card-lg hover:border-primary/30 cursor-pointer no-underline h-full ${padding}`}
                 >
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-burgundy-500 to-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="relative mb-6">
+                  <div className={`relative ${compact ? "mb-3" : "mb-6"}`}>
                     <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-primary via-burgundy-500 to-primary-300 opacity-60 blur-md group-hover:opacity-90 group-hover:blur-lg transition-all" />
                     <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-primary to-burgundy-500" />
-                    <div className="relative w-44 h-44 md:w-52 md:h-52 rounded-full overflow-hidden ring-4 ring-[var(--card)] bg-[var(--surface)]">
+                    <div className={`relative ${photoSize} rounded-full overflow-hidden ring-4 ring-[var(--card)] bg-[var(--surface)]`}>
                       {dev.photo ? (
                         <div className="w-full h-full transition-transform duration-500 group-hover:scale-[1.08]">
                           <img
@@ -716,7 +832,7 @@ export default function Landing() {
                         </div>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-900/30 dark:to-primary-900/10">
-                          <svg viewBox="0 0 80 80" className="w-20 h-20 text-primary/25" fill="currentColor">
+                          <svg viewBox="0 0 80 80" className={`${compact ? "w-12 h-12" : "w-20 h-20"} text-primary/25`} fill="currentColor">
                             <circle cx="40" cy="28" r="16" />
                             <ellipse cx="40" cy="72" rx="26" ry="18" />
                           </svg>
@@ -724,15 +840,22 @@ export default function Landing() {
                       )}
                     </div>
                   </div>
-                  <h3 className="font-display font-bold text-2xl md:text-3xl tracking-tight mb-2 text-[var(--text)] leading-tight min-h-[4.5rem] md:min-h-[5.25rem] flex flex-col justify-start">
+                  <h3 className={`font-display font-bold tracking-tight mb-2 text-[var(--text)] leading-tight ${nameSize} ${nameMinH} flex flex-col justify-start`}>
                     <span>{firstName}</span>
                     {lastName && <span>{lastName}</span>}
                   </h3>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary text-xs font-semibold uppercase tracking-wider mb-3">
-                    <Code size={12} /> {dev.role}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--muted)] group-hover:text-primary transition-colors">
-                    <Send size={14} /> Telegram
+                  <div className="flex flex-wrap gap-1 mb-2 justify-center">
+                    {dev.roles.map((r) => {
+                      const icon = r === "Дизайнер" ? <Palette size={iconSize} /> : r === "ML инженер" ? <Brain size={iconSize} /> : r === "Бэкенд" ? <Server size={iconSize} /> : r === "Фронтенд" ? <Layers size={iconSize} /> : <Code size={iconSize} />;
+                      return (
+                        <span key={r} className={`inline-flex items-center gap-1 rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary font-semibold uppercase tracking-wider ${badgeClass}`}>
+                          {icon} {r}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 font-medium text-[var(--muted)] group-hover:text-primary transition-colors ${compact ? "text-xs mt-1" : "text-sm"}`}>
+                    <Send size={compact ? 12 : 14} /> Telegram
                   </span>
                 </motion.a>
               );
@@ -741,18 +864,12 @@ export default function Landing() {
             return (
               <div className="max-w-5xl mx-auto">
                 {/* Мобилка: 2 колонки */}
-                <div className="grid grid-cols-2 gap-5 lg:hidden">
-                  {members.map((dev, i) => cardJsx(dev, i))}
+                <div className="grid grid-cols-2 gap-3 lg:hidden">
+                  {members.map((dev, i) => cardJsx(dev, i, true))}
                 </div>
 
-                {/* Десктоп: шахматка — ряд 1 col 1,3,5 / ряд 2 col 2,4,6 */}
-                <div className="hidden lg:grid lg:grid-cols-7 gap-y-5">
-                  {members.map((dev, i) => (
-                    <div key={dev.name} className={`col-span-2 ${colStarts[i]} px-2.5`}>
-                      {cardJsx(dev, i)}
-                    </div>
-                  ))}
-                </div>
+                {/* Десктоп: барабан */}
+                <TeamRevolver members={members} />
               </div>
             );
           })()}

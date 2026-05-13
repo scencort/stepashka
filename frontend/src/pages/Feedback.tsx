@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
 
 import MainLayout from "../layout/MainLayout"
-import Card from "../components/ui/Card"
-import Button from "../components/ui/Button"
-
 import { api } from "../lib/api"
-import { useAppStore } from "../store/AppStore"
+import { MessageSquare, Clock, CheckCircle2, Loader2, Send } from "lucide-react"
 
-type FeedbackStatus = "new" | "in progress" | "closed"
+type FeedbackStatus = "new" | "in_progress" | "closed"
 
 type FeedbackItem = {
   id: number
@@ -15,34 +12,43 @@ type FeedbackItem = {
   status: FeedbackStatus
   subject?: string
   adminReply?: string
-  repliedBy?: number | null
   repliedAt?: string | null
   createdAt?: string | null
-  updatedAt?: string | null
 }
 
-const STATUS_LABEL: Record<FeedbackStatus, string> = {
-  new: "новое",
-  "in progress": "в работе",
-  closed: "закрыто",
+const STATUS_META: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
+  new: {
+    label: "Новое",
+    icon: <Clock size={12} />,
+    cls: "bg-primary/10 text-primary border-primary/20",
+  },
+  in_progress: {
+    label: "В работе",
+    icon: <Loader2 size={12} className="animate-spin" />,
+    cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/40",
+  },
+  closed: {
+    label: "Закрыто",
+    icon: <CheckCircle2 size={12} />,
+    cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40",
+  },
 }
 
-const STATUS_COLOR: Record<FeedbackStatus, string> = {
-  new: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
-  "in progress": "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400",
-  closed: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400",
+const formatDate = (iso?: string | null) => {
+  if (!iso) return ""
+  return new Date(iso).toLocaleString("ru-RU", {
+    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+  })
 }
 
 export default function Feedback() {
-  const { user } = useAppStore()
-  const isAdmin = user?.role === "admin"
-
   const [text, setText] = useState("")
+  const [subject, setSubject] = useState("")
   const [items, setItems] = useState<FeedbackItem[]>([])
   const [filter, setFilter] = useState<"all" | FeedbackStatus>("all")
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
-  const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({})
-  const [replyingId, setReplyingId] = useState<number | null>(null)
+  const [success, setSuccess] = useState(false)
 
   const loadFeedback = async () => {
     try {
@@ -53,203 +59,193 @@ export default function Feedback() {
     }
   }
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      void loadFeedback()
-    }, 0)
-
-    return () => clearTimeout(timer)
-  }, [])
+  useEffect(() => { void loadFeedback() }, [])
 
   const submit = async () => {
-    if (!text.trim()) {
-      return
-    }
-
+    if (!text.trim()) return
+    setSubmitting(true)
+    setError("")
     try {
-      const created = await api.post<FeedbackItem>("/feedback", { message: text.trim() })
+      const created = await api.post<FeedbackItem>("/feedback", {
+        message: text.trim(),
+        subject: subject.trim() || undefined,
+      })
       setItems((prev) => [created, ...prev])
       setText("")
+      setSubject("")
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось отправить обращение")
-    }
-  }
-
-  const moveStatus = async (id: number) => {
-    try {
-      const updated = await api.patch<FeedbackItem>(`/feedback/${id}/status`, {})
-      setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updated } : item)))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось изменить статус")
-    }
-  }
-
-  const sendReply = async (id: number) => {
-    const draft = (replyDrafts[id] || "").trim()
-    if (!draft) return
-    setReplyingId(id)
-    try {
-      const updated = await api.post<FeedbackItem>(`/feedback/${id}/reply`, {
-        reply: draft,
-      })
-      setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updated } : item)))
-      setReplyDrafts((prev) => {
-        const next = { ...prev }
-        delete next[id]
-        return next
-      })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отправить ответ")
     } finally {
-      setReplyingId(null)
-    }
-  }
-
-  const removeFeedback = async (id: number) => {
-    try {
-      await api.delete<{ success: boolean }>(`/feedback/${id}`)
-      setItems((prev) => prev.filter((item) => item.id !== id))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось удалить обращение")
+      setSubmitting(false)
     }
   }
 
   const visibleItems = useMemo(() => {
-    if (filter === "all") {
-      return items
-    }
+    if (filter === "all") return items
     return items.filter((item) => item.status === filter)
   }, [items, filter])
 
+  const counts = useMemo(() => ({
+    all: items.length,
+    new: items.filter(i => i.status === "new").length,
+    active: items.filter(i => i.status === "in_progress").length,
+    closed: items.filter(i => i.status === "closed").length,
+  }), [items])
+
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <h2 className="text-2xl md:text-3xl font-bold">Обратная связь</h2>
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold font-display tracking-tight">Обратная связь</h1>
+          <p className="text-sm text-[var(--muted)] mt-1">Напишите нам — мы ответим как можно скорее</p>
+        </div>
 
-        <Card className="space-y-3">
-          <p className="font-semibold">Новое обращение</p>
-          {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+        {/* New message form */}
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <MessageSquare size={14} className="text-primary" />
+            </div>
+            <p className="font-bold text-sm">Новое обращение</p>
+          </div>
+
+          <input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Тема (необязательно)"
+            className="input-field px-3 py-2.5 text-sm"
+          />
           <textarea
             value={text}
-            onChange={(event) => setText(event.target.value)}
-            placeholder="Опишите проблему или предложение"
-            className="w-full h-28 rounded-xl glass-input px-3 py-2"
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Опишите проблему или предложение…"
+            rows={4}
+            className="input-field px-3 py-2.5 text-sm resize-none"
           />
-          <Button onClick={submit} className="w-full md:w-auto">Отправить</Button>
-        </Card>
 
-        <Card className="space-y-3">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-            <p className="font-semibold">
-              {isAdmin ? "Список обращений пользователей" : "Мои обращения"}
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          {success && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+              <CheckCircle2 size={13} /> Обращение отправлено — ждите ответа!
             </p>
+          )}
+
+          <button
+            onClick={submit}
+            disabled={!text.trim() || submitting}
+            className="btn-primary px-5 py-2.5 text-sm flex items-center gap-2 disabled:opacity-50"
+          >
+            {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+            {submitting ? "Отправляем…" : "Отправить"}
+          </button>
+        </div>
+
+        {/* My tickets */}
+        {items.length > 0 && (
+          <div className="space-y-3">
+            {/* Filter pills */}
             <div className="flex gap-2 flex-wrap">
-              {(["all", "new", "in progress", "closed"] as const).map((item) => (
+              {([
+                { v: "all", l: `Все (${counts.all})` },
+                { v: "new", l: `Новые (${counts.new})` },
+                { v: "in_progress", l: `В работе (${counts.active})` },
+                { v: "closed", l: `Закрытые (${counts.closed})` },
+              ] as const).filter(f => {
+                if (f.v === "all") return true
+                const n = f.v === "in progress" ? counts.active : counts[f.v as keyof typeof counts]
+                return (n as number) > 0
+              }).map((f) => (
                 <button
-                  key={item}
-                  onClick={() => setFilter(item)}
-                  className={`px-3 py-1.5 rounded-xl text-xs ${
-                    filter === item
-                      ? "text-white bg-gradient-to-r from-rose-700 via-red-700 to-red-900"
-                      : "glass-panel"
+                  key={f.v}
+                  onClick={() => setFilter(f.v)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                    filter === f.v
+                      ? "btn-gradient"
+                      : "bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]"
                   }`}
                 >
-                  {item === "all" ? "все" : STATUS_LABEL[item]}
+                  {f.l}
                 </button>
               ))}
             </div>
-          </div>
-          <div className="space-y-3">
-            {visibleItems.map((item) => {
-              const status = (item.status || "new") as FeedbackStatus
-              const draft = replyDrafts[item.id] ?? ""
-              const hasReply = Boolean(item.adminReply && item.adminReply.trim())
-              return (
-                <div key={item.id} className="glass-panel rounded-xl p-3 space-y-3">
-                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      {item.subject && (
-                        <p className="text-xs text-slate-500 mb-1">{item.subject}</p>
-                      )}
-                      <p className="font-medium whitespace-pre-wrap break-words">
-                        {item.message}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span
-                          className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[status] || ""}`}
-                        >
-                          {STATUS_LABEL[status] || status}
+
+            {/* Ticket list */}
+            <div className="space-y-3">
+              {visibleItems.map((item) => {
+                const meta = STATUS_META[item.status] ?? STATUS_META["new"]
+                const hasReply = Boolean(item.adminReply?.trim())
+                return (
+                  <div
+                    key={item.id}
+                    className={`card p-5 space-y-3 transition-all ${
+                      item.status === "new" && !hasReply
+                        ? "border-primary/25 bg-[var(--bg-tint)]"
+                        : ""
+                    }`}
+                  >
+                    {/* Header row */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        {item.subject && (
+                          <p className="text-xs font-semibold text-[var(--muted)] mb-1 truncate">
+                            {item.subject}
+                          </p>
+                        )}
+                        <p className="text-sm text-[var(--text)] whitespace-pre-wrap break-words leading-relaxed">
+                          {item.message}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Status + date */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full font-semibold border ${meta.cls}`}>
+                        {meta.icon}
+                        {meta.label}
+                      </span>
+                      {hasReply && (
+                        <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full font-semibold border bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40">
+                          <CheckCircle2 size={11} />
+                          Получен ответ
                         </span>
-                        {hasReply && (
-                          <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
-                            Ответ получен
-                          </span>
+                      )}
+                      {item.createdAt && (
+                        <span className="text-xs text-[var(--muted)] ml-auto">
+                          {formatDate(item.createdAt)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Admin reply */}
+                    {hasReply && (
+                      <div className="rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 space-y-1">
+                        <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                          Ответ администратора
+                        </p>
+                        <p className="text-sm text-[var(--text)] whitespace-pre-wrap break-words leading-relaxed">
+                          {item.adminReply}
+                        </p>
+                        {item.repliedAt && (
+                          <p className="text-xs text-[var(--muted)]">{formatDate(item.repliedAt)}</p>
                         )}
                       </div>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      {isAdmin && (
-                        <Button variant="outline" onClick={() => moveStatus(item.id)}>
-                          Следующий статус
-                        </Button>
-                      )}
-                      {isAdmin && (
-                        <Button variant="outline" onClick={() => removeFeedback(item.id)}>
-                          Удалить
-                        </Button>
-                      )}
-                    </div>
+                    )}
                   </div>
-
-                  {hasReply && (
-                    <div className="rounded-lg border border-emerald-200/50 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-900/10 px-3 py-2">
-                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
-                        Ответ администратора
-                      </p>
-                      <p className="text-sm whitespace-pre-wrap break-words">
-                        {item.adminReply}
-                      </p>
-                    </div>
-                  )}
-
-                  {isAdmin && (
-                    <div className="rounded-lg border border-[var(--border)] px-3 py-2 space-y-2">
-                      <p className="text-xs font-semibold text-[var(--muted)]">
-                        {hasReply ? "Изменить ответ" : "Ответить пользователю"}
-                      </p>
-                      <textarea
-                        value={draft}
-                        onChange={(event) =>
-                          setReplyDrafts((prev) => ({
-                            ...prev,
-                            [item.id]: event.target.value,
-                          }))
-                        }
-                        placeholder={
-                          hasReply
-                            ? "Введите новый ответ..."
-                            : "Введите ответ пользователю..."
-                        }
-                        className="w-full h-20 rounded-xl glass-input px-3 py-2 text-sm"
-                      />
-                      <div className="flex justify-end">
-                        <Button
-                          onClick={() => sendReply(item.id)}
-                          disabled={!draft.trim() || replyingId === item.id}
-                        >
-                          {replyingId === item.id ? "Отправляем..." : "Отправить ответ"}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-            {visibleItems.length === 0 && (
-              <p className="text-sm text-slate-500">По выбранному фильтру обращений нет.</p>
-            )}
+                )
+              })}
+            </div>
           </div>
-        </Card>
+        )}
+
+        {items.length === 0 && !submitting && (
+          <div className="card p-10 text-center space-y-2">
+            <MessageSquare size={32} className="mx-auto text-[var(--border)]" />
+            <p className="text-sm text-[var(--muted)]">У вас пока нет обращений</p>
+          </div>
+        )}
       </div>
     </MainLayout>
   )

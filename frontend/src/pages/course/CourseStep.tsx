@@ -9,6 +9,10 @@ import {
   X,
   Copy,
   CheckCheck,
+  PartyPopper,
+  ChevronDown,
+  ChevronUp,
+  Code2,
 } from "lucide-react";
 import { useState as useStateLocal, useRef, useMemo, useEffect as useEffectLocal } from "react";
 
@@ -341,8 +345,19 @@ function TheoryRenderer({ text }: { text: string }) {
         seg.type === "code" ? (
           <CodeBlock key={i} code={seg.lines.join("\n")} />
         ) : (
-          <div key={i} className="text-[var(--text)] whitespace-pre-wrap">
-            {seg.lines.join("\n").trim()}
+          <div key={i} className="text-[var(--text)] whitespace-pre-wrap space-y-3">
+            {seg.lines.join("\n").trim().split(/^---$/m).map((part, j, arr) => (
+              <span key={j}>
+                {part.trim() && <span className="block whitespace-pre-wrap">{part.trim()}</span>}
+                {j < arr.length - 1 && (
+                  <span className="block my-3 flex items-center gap-3">
+                    <span className="flex-1 h-px bg-gradient-to-r from-transparent via-[var(--border)] to-transparent" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/40 shrink-0" />
+                    <span className="flex-1 h-px bg-gradient-to-r from-transparent via-[var(--border)] to-transparent" />
+                  </span>
+                )}
+              </span>
+            ))}
           </div>
         )
       )}
@@ -381,6 +396,7 @@ type AttemptEntry = {
   passed: boolean;
   feedback: string;
   createdAt: string;
+  checkResults?: Array<{ name: string; passed: boolean; expected?: string; actual?: string; error?: string }> | null;
 };
 
 type Props = {
@@ -427,6 +443,7 @@ export default function CourseStep(props: Props) {
   const filteredAttempts = attemptHistory.filter(
     (a) => a.stepId === selectedStepId,
   );
+  const [expandedAttemptId, setExpandedAttemptId] = useStateLocal<number | null>(null);
 
   return (
     <>
@@ -464,7 +481,7 @@ export default function CourseStep(props: Props) {
                     : activeStep.kind === "quiz"
                       ? "Тест"
                       : activeStep.kind === "essay"
-                        ? "Эссе"
+                        ? "Эссе (сочинение)"
                         : "Практика"}
                 </span>
                 <span className="text-xs text-[var(--muted)]">
@@ -708,6 +725,63 @@ export default function CourseStep(props: Props) {
             );
           })()}
 
+          {/* ── SUCCESS BANNER ── */}
+          {activeProgress?.status === "completed" && !stepLoading && (
+            <div className="relative overflow-hidden rounded-2xl border-2 border-green-300 dark:border-green-700/60 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/40 dark:to-emerald-950/40 px-5 py-4 flex items-center gap-4">
+              {/* glow */}
+              <div className="absolute -right-8 -top-8 w-32 h-32 bg-green-400/20 rounded-full blur-2xl pointer-events-none" />
+              <div className="w-11 h-11 rounded-full bg-green-100 dark:bg-green-900/50 border-2 border-green-300 dark:border-green-700 flex items-center justify-center shrink-0">
+                <PartyPopper size={20} className="text-green-600 dark:text-green-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-green-800 dark:text-green-300 text-base leading-snug">
+                  Задание выполнено!
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
+                  Вы уже прошли этот шаг
+                  {activeStep.xp > 0 && ` · получено ${activeStep.xp} XP`}
+                </p>
+              </div>
+              {activeStep.xp > 0 && (
+                <div className="shrink-0 flex items-center gap-1 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-full font-bold text-sm border border-amber-200 dark:border-amber-700/40">
+                  <Zap size={13} className="fill-current" />
+                  +{activeStep.xp} XP
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* AI loading banner */}
+          {stepLoading && (
+            <div className="relative overflow-hidden rounded-xl border border-violet-200 dark:border-violet-700/40 bg-violet-50 dark:bg-violet-950/30 px-4 py-3 flex items-center gap-3">
+              {/* скользящий прогресс-бар */}
+              <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden">
+                <div
+                  style={{ width: "40%", animation: "ai-shimmer 1.6s ease-in-out infinite" }}
+                  className="h-full bg-gradient-to-r from-transparent via-violet-500 to-transparent"
+                />
+                <style>{`@keyframes ai-shimmer{0%{transform:translateX(-250%)}100%{transform:translateX(650%)}}`}</style>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center shrink-0 relative">
+                <span className="text-base leading-none">🤖</span>
+                <span className="absolute inset-0 rounded-full border-2 border-violet-400/50 animate-ping" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-violet-900 dark:text-violet-200 leading-snug">
+                  ИИ-наставник проверяет ответ
+                  <span className="inline-flex gap-0.5 ml-1">
+                    <span style={{ animation: "bounce 1s infinite 0ms" }} className="inline-block">.</span>
+                    <span style={{ animation: "bounce 1s infinite 150ms" }} className="inline-block">.</span>
+                    <span style={{ animation: "bounce 1s infinite 300ms" }} className="inline-block">.</span>
+                  </span>
+                </p>
+                <p className="text-xs text-violet-600 dark:text-violet-400 mt-0.5">
+                  Анализирую решение, пожалуйста подождите
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border)]">
             <div className="flex items-center gap-2">
@@ -736,10 +810,18 @@ export default function CourseStep(props: Props) {
                 ) : (
                   <>
                     <span>{submitLabel}</span>
-                    {nextStep && <ArrowRight size={14} />}
                   </>
                 )}
               </button>
+              {activeProgress?.status === "completed" && nextStep && (
+                <button
+                  onClick={() => onSelectStep(nextStep.id, "")}
+                  className="btn-secondary px-5 py-2.5 text-sm gap-2"
+                >
+                  Следующий шаг
+                  <ArrowRight size={14} />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -748,40 +830,122 @@ export default function CourseStep(props: Props) {
       {/* Attempt history */}
       {filteredAttempts.length > 0 && (
         <div className="card p-5 space-y-3">
-          <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">
-            История попыток
-          </p>
-          <div className="space-y-2 max-h-48 overflow-auto">
-            {filteredAttempts.map((attempt) => (
-              <div
-                key={attempt.id}
-                className={`flex items-start gap-3 px-3 py-2.5 rounded-xl text-sm ${
-                  attempt.passed
-                    ? "bg-green-50 dark:bg-green-900/10"
-                    : "bg-[var(--surface)]"
-                }`}
-              >
-                {attempt.passed ? (
-                  <CheckCircle2
-                    size={15}
-                    className="text-green-500 mt-0.5 shrink-0"
-                  />
-                ) : (
-                  <Circle
-                    size={15}
-                    className="text-[var(--muted)] mt-0.5 shrink-0"
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-[var(--text)] truncate">
-                    {attempt.feedback}
-                  </p>
-                  <p className="text-xs text-[var(--muted)] mt-0.5">
-                    {new Date(attempt.createdAt).toLocaleTimeString()}
-                  </p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-bold text-[var(--text)]">История попыток</p>
+            <span className="text-xs text-[var(--muted)] font-medium bg-[var(--surface)] px-2 py-0.5 rounded-full border border-[var(--border)]">
+              {filteredAttempts.length}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {[...filteredAttempts].reverse().map((attempt, idx) => {
+              const isOpen = expandedAttemptId === attempt.id;
+              const checks = attempt.checkResults ?? [];
+              const passedCount = checks.filter(c => c.passed).length;
+
+              return (
+                <div
+                  key={attempt.id}
+                  className={`rounded-2xl border overflow-hidden transition-all ${
+                    attempt.passed
+                      ? "border-green-200 dark:border-green-800/40"
+                      : "border-red-200 dark:border-red-800/30"
+                  }`}
+                >
+                  {/* Header */}
+                  <button
+                    onClick={() => setExpandedAttemptId(isOpen ? null : attempt.id)}
+                    className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${
+                      attempt.passed
+                        ? "bg-green-50 dark:bg-green-900/15 hover:bg-green-100/60 dark:hover:bg-green-900/25"
+                        : "bg-red-50 dark:bg-red-900/10 hover:bg-red-100/60 dark:hover:bg-red-900/20"
+                    }`}
+                  >
+                    {attempt.passed
+                      ? <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                      : <X size={16} className="text-red-500 shrink-0" />
+                    }
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-sm font-semibold ${attempt.passed ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                          Попытка {filteredAttempts.length - idx}
+                        </span>
+                        {checks.length > 0 && (
+                          <span className="text-xs text-[var(--muted)] font-medium">
+                            тесты: {passedCount}/{checks.length}
+                          </span>
+                        )}
+                        <span className="text-xs text-[var(--muted)] ml-auto shrink-0">
+                          {new Date(attempt.createdAt).toLocaleString("ru-RU", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+                        </span>
+                      </div>
+                      {!isOpen && (
+                        <p className="text-xs text-[var(--muted)] truncate mt-0.5">{attempt.feedback}</p>
+                      )}
+                    </div>
+                    {isOpen
+                      ? <ChevronUp size={14} className="text-[var(--muted)] shrink-0" />
+                      : <ChevronDown size={14} className="text-[var(--muted)] shrink-0" />
+                    }
+                  </button>
+
+                  {/* Expanded */}
+                  {isOpen && (
+                    <div className="px-4 pb-4 pt-3 space-y-3 bg-[var(--bg)] border-t border-[var(--border)]">
+
+                      {/* Feedback */}
+                      <p className="text-sm text-[var(--text)] leading-relaxed">{attempt.feedback}</p>
+
+                      {/* Code */}
+                      {attempt.answer && (
+                        <div>
+                          <p className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                            <Code2 size={11} /> Код решения
+                          </p>
+                          <pre className="text-xs font-mono bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3 overflow-auto max-h-52 whitespace-pre-wrap break-words text-[var(--text)] leading-relaxed">
+                            {attempt.answer}
+                          </pre>
+                        </div>
+                      )}
+
+                      {/* Check results */}
+                      {checks.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wide">Тесты</p>
+                          {checks.map((c, i) => (
+                            <div key={i} className={`rounded-xl border overflow-hidden ${c.passed ? "border-green-200 dark:border-green-800/40" : "border-red-200 dark:border-red-800/30"}`}>
+                              <div className={`flex items-center gap-2 px-3 py-2 text-xs font-medium ${c.passed ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400" : "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"}`}>
+                                {c.passed ? <Check size={11} strokeWidth={3} /> : <X size={11} />}
+                                {c.name}
+                              </div>
+                              {!c.passed && (c.error || c.expected !== undefined) && (
+                                <div className="bg-[var(--surface)] px-3 py-2 text-xs font-mono">
+                                  {c.error
+                                    ? <pre className="text-red-500 dark:text-red-400 whitespace-pre-wrap">{c.error}</pre>
+                                    : (
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider mb-1">Ожидалось</p>
+                                          <pre className="text-green-600 dark:text-green-400 whitespace-pre-wrap">{c.expected ?? "(пусто)"}</pre>
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider mb-1">Получено</p>
+                                          <pre className="text-red-500 dark:text-red-400 whitespace-pre-wrap">{c.actual ?? "(пусто)"}</pre>
+                                        </div>
+                                      </div>
+                                    )
+                                  }
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

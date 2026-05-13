@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { api } from "../lib/api";
-import Modal from "../components/ui/Modal";
 import BrandLogo from "../components/BrandLogo";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../hooks/useToast";
@@ -103,10 +102,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showAddCourse, setShowAddCourse] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [courseName, setCourseName] = useState("");
-  const [courseLevel, setCourseLevel] = useState("Начальный");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState("");
@@ -115,7 +111,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
   );
   const notificationsListRef = useRef<HTMLDivElement | null>(null);
   const [showStreakPanel, setShowStreakPanel] = useState(false);
-  const [courseFormError, setCourseFormError] = useState("");
   const [streakDays, setStreakDays] = useState(0);
   const [weeklyCompleted, setWeeklyCompleted] = useState(0);
   const [weeklyGoal, setWeeklyGoal] = useState(10);
@@ -212,40 +207,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
     setShowNotifications(false);
     setShowProfile(false);
     setMobileMenuOpen(false);
-  };
-
-  const openAddCourse = () => {
-    setShowAddCourse(true);
-    setShowNotifications(false);
-    setShowProfile(false);
-    setMobileMenuOpen(false);
-  };
-
-  const closeAddCourse = () => {
-    setShowAddCourse(false);
-    setCourseName("");
-    setCourseLevel("Начальный");
-    setCourseFormError("");
-  };
-
-  const createCourse = async () => {
-    if (!courseName.trim()) {
-      setCourseFormError("Введите название курса");
-      return;
-    }
-    setCourseFormError("");
-    try {
-      await api.post("/courses", {
-        title: courseName.trim(),
-        level: courseLevel,
-      });
-      closeAddCourse();
-      void loadNotifications();
-    } catch (error) {
-      setCourseFormError(
-        error instanceof Error ? error.message : "Не удалось создать курс",
-      );
-    }
   };
 
   const handleLogout = async () => {
@@ -617,13 +578,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
             {/* Add course — teachers only */}
             {isTeacherOrAdmin && (
-              <button
-                onClick={openAddCourse}
+              <Link
+                to="/teacher/courses/new"
                 className="hidden sm:flex btn-primary px-3.5 py-2 text-sm"
               >
                 <Plus size={15} />
                 Новый курс
-              </button>
+              </Link>
             )}
 
             {/* Notifications */}
@@ -829,7 +790,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
             {/* Streak panel */}
                           {showStreakPanel && (
-                <div className="absolute right-0 top-12 w-[320px] max-w-[calc(100vw-2rem)] card shadow-card-lg z-50 overflow-hidden"
+                <div className="absolute right-0 top-12 w-[420px] max-w-[calc(100vw-2rem)] card shadow-card-lg z-50 overflow-hidden"
                 >
                   <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] gap-2">
                     <div className="flex items-center gap-2">
@@ -854,7 +815,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       <X size={13} />
                     </button>
                   </div>
-                  <div className="p-4 space-y-3">
+                  <div className="p-5 space-y-4">
                     {/* Current week */}
                     {(() => {
                       const today = new Date();
@@ -879,18 +840,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
                           <p className="text-[11px] uppercase tracking-wide text-[var(--muted)] font-semibold">
                             Эта неделя · {monthLabel}
                           </p>
-                          <div className="grid grid-cols-7 gap-1.5">
+                          <div className="grid grid-cols-7 gap-2">
                             {days.map((d) => (
                               <div
                                 key={d.iso}
                                 title={`${d.iso}${d.isActive ? " · были активности" : d.isFuture ? "" : " · без активности"}`}
-                                className="flex flex-col items-center gap-1"
+                                className="flex flex-col items-center gap-1.5"
                               >
-                                <span className="text-[10px] uppercase text-[var(--muted)] font-medium">
+                                <span className="text-[11px] uppercase text-[var(--muted)] font-medium">
                                   {d.label}
                                 </span>
                                 <div
-                                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-semibold border transition-colors ${
+                                  className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-semibold border transition-colors ${
                                     d.isFuture
                                       ? "bg-transparent border-dashed border-[var(--border)] text-[var(--muted)]"
                                       : d.isActive
@@ -914,11 +875,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       <p className="text-[11px] uppercase tracking-wide text-[var(--muted)] font-semibold mb-2">
                         Последние 9 недель
                       </p>
-                      <div className="flex items-end gap-[3px]">
+                      <div className="flex items-end gap-[5px]">
                         {Array.from({ length: 9 }).map((_, weekIdx) => (
                           <div
                             key={weekIdx}
-                            className="flex flex-col gap-[3px]"
+                            className="flex flex-col gap-[5px]"
                           >
                             {Array.from({ length: 7 }).map((_, dayIdx) => {
                               const daysAgo =
@@ -932,7 +893,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                                 <div
                                   key={dayIdx}
                                   title={`${iso}${active ? " · были активности" : ""}`}
-                                  className={`w-[10px] h-[10px] rounded-[2px] ${
+                                  className={`w-[14px] h-[14px] rounded-[3px] ${
                                     active
                                       ? "bg-primary"
                                       : "bg-[var(--border)]"
@@ -945,9 +906,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-[var(--muted)] pt-1">
-                      Чтобы продлить серию, выполните хотя бы одно задание
-                      сегодня.
+                    <p className="text-xs text-[var(--muted)] pt-1">
+                      Чтобы продлить серию, выполните хотя бы одно задание сегодня.
                     </p>
                   </div>
                 </div>
@@ -992,55 +952,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
           })}
         </div>
 
-        {/* Modal: new course */}
-        <Modal open={showAddCourse} onClose={closeAddCourse} title="Новый курс">
-          <div className="space-y-4 py-2">
-            <label className="block">
-              <span className="text-sm font-semibold text-[var(--text-2)] mb-1.5 block">
-                Название курса
-              </span>
-              <input
-                value={courseName}
-                onChange={(e) => setCourseName(e.target.value)}
-                placeholder="Введите название"
-                className="input-field px-4 py-3"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-semibold text-[var(--text-2)] mb-1.5 block">
-                Уровень
-              </span>
-              <select
-                value={courseLevel}
-                onChange={(e) => setCourseLevel(e.target.value)}
-                className="input-field px-4 py-3"
-              >
-                <option>Начальный</option>
-                <option>Средний</option>
-                <option>Продвинутый</option>
-              </select>
-            </label>
-            {courseFormError && (
-              <p className="text-sm font-medium text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
-                {courseFormError}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-3 justify-end mt-6">
-            <button
-              onClick={closeAddCourse}
-              className="btn-ghost px-5 py-2.5 text-sm"
-            >
-              Отмена
-            </button>
-            <button
-              onClick={createCourse}
-              className="btn-primary px-6 py-2.5 text-sm"
-            >
-              Добавить
-            </button>
-          </div>
-        </Modal>
       </div>
 
       {/* Dismiss overlays on outside click */}

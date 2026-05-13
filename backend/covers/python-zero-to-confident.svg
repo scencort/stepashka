@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" overflow="hidden">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f0c29"/>
+      <stop offset="50%" stop-color="#1a1040"/>
+      <stop offset="100%" stop-color="#0d1b2a"/>
+    </linearGradient>
+
+    <!-- Python blue gradient -->
+    <linearGradient id="pyBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4b8bbe"/>
+      <stop offset="100%" stop-color="#306998"/>
+    </linearGradient>
+
+    <!-- Python yellow gradient -->
+    <linearGradient id="pyYellow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe873"/>
+      <stop offset="100%" stop-color="#ffd43b"/>
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Soft glow for orbs -->
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Grid pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+    </pattern>
+
+    <!-- Clip for Python logo -->
+    <clipPath id="logoClip">
+      <rect x="0" y="0" width="960" height="540"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#logoClip)">
+  <!-- Background -->
+  <rect width="960" height="540" fill="url(#bg)"/>
+
+  <!-- Grid overlay -->
+  <rect width="960" height="540" fill="url(#grid)"/>
+
+  <!-- Ambient orbs -->
+  <circle cx="120" cy="100" r="180" fill="#4b8bbe" opacity="0.08" filter="url(#softGlow)"/>
+  <circle cx="840" cy="440" r="200" fill="#ffd43b" opacity="0.07" filter="url(#softGlow)"/>
+  <circle cx="700" cy="80" r="120" fill="#7c3aed" opacity="0.09" filter="url(#softGlow)"/>
+
+  <!-- Code lines — background decoration -->
+  <g font-family="'Courier New', monospace" font-size="13" fill="rgba(255,255,255,0.07)">
+    <text x="30" y="50">def fibonacci(n):</text>
+    <text x="30" y="68">    if n &lt;= 1: return n</text>
+    <text x="30" y="86">    return fibonacci(n-1) + fibonacci(n-2)</text>
+    <text x="30" y="480">class PythonDev:</text>
+    <text x="30" y="498">    def __init__(self): self.level = "expert"</text>
+    <text x="30" y="516">    def code(self): return "🐍"</text>
+    <text x="640" y="510">import asyncio, typing</text>
+    <text x="640" y="528">from pathlib import Path</text>
+  </g>
+
+  <!-- Floating code tokens -->
+  <g font-family="'Courier New', monospace" font-size="11" fill="rgba(255,255,255,0.12)">
+    <text x="820" y="40">for i in range(10):</text>
+    <text x="820" y="56">    print(i ** 2)</text>
+    <text x="820" y="130">lambda x: x * 2</text>
+    <text x="20" y="310">@decorator</text>
+    <text x="20" y="326">async def main():</text>
+    <text x="20" y="342">    await asyncio.run()</text>
+  </g>
+
+  <!-- Python Logo — large, right side -->
+  <g transform="translate(630, 80) scale(0.88)" opacity="0.92" filter="url(#glow)">
+    <!-- Snake body top (blue) -->
+    <path d="
+      M80,0
+      C80,0 130,0 130,50
+      L130,90
+      C130,90 130,120 100,120
+      L60,120
+      C60,120 20,120 20,150
+      L20,170
+      L0,170
+      L0,140
+      C0,140 0,100 40,100
+      L80,100
+      C80,100 110,100 110,70
+      L110,50
+      C110,50 110,20 80,20
+      Z
+    " fill="url(#pyBlue)"/>
+    <!-- Blue snake eye -->
+    <circle cx="88" cy="13" r="7" fill="white"/>
+    <circle cx="88" cy="13" r="4" fill="#1a365d"/>
+    <!-- Blue body connector left -->
+    <rect x="0" y="155" width="130" height="18" rx="9" fill="url(#pyBlue)" opacity="0.3"/>
+
+    <!-- Snake body bottom (yellow) -->
+    <path d="
+      M50,340
+      C50,340 0,340 0,290
+      L0,250
+      C0,250 0,220 30,220
+      L70,220
+      C70,220 110,220 110,190
+      L110,170
+      L130,170
+      L130,200
+      C130,200 130,240 90,240
+      L50,240
+      C50,240 20,240 20,270
+      L20,290
+      C20,290 20,320 50,320
+      Z
+    " fill="url(#pyYellow)"/>
+    <!-- Yellow snake eye -->
+    <circle cx="42" cy="327" r="7" fill="white"/>
+    <circle cx="42" cy="327" r="4" fill="#7a5000"/>
+    <!-- Yellow body connector right -->
+    <rect x="0" y="167" width="130" height="18" rx="9" fill="url(#pyYellow)" opacity="0.3"/>
+  </g>
+
+  <!-- Main title -->
+  <text x="60" y="200" font-family="'Segoe UI', Arial, sans-serif" font-size="52" font-weight="800" fill="white" letter-spacing="-1">
+    Python
+  </text>
+  <text x="60" y="258" font-family="'Segoe UI', Arial, sans-serif" font-size="36" font-weight="700" fill="rgba(255,255,255,0.85)">
+    с нуля до
+  </text>
+  <text x="60" y="304" font-family="'Segoe UI', Arial, sans-serif" font-size="36" font-weight="700" fill="rgba(255,255,255,0.85)">
+    уверенного уровня
+  </text>
+
+  <!-- Accent underline under Python -->
+  <rect x="60" y="212" width="240" height="4" rx="2" fill="url(#pyYellow)" opacity="0.9"/>
+
+  <!-- Tags row -->
+  <g transform="translate(60, 340)">
+    <!-- Tag 1 -->
+    <rect width="110" height="30" rx="15" fill="rgba(75,139,190,0.25)" stroke="#4b8bbe" stroke-width="1.5"/>
+    <text x="55" y="20" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="600" fill="#4b8bbe" text-anchor="middle"># Программирование</text>
+    <!-- Tag 2 -->
+    <rect x="120" width="105" height="30" rx="15" fill="rgba(255,212,59,0.15)" stroke="#ffd43b" stroke-width="1.5"/>
+    <text x="172" y="20" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="600" fill="#ffd43b" text-anchor="middle">🌱 Начинающий</text>
+    <!-- Tag 3 -->
+    <rect x="235" width="90" height="30" rx="15" fill="rgba(124,58,237,0.2)" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="280" y="20" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="600" fill="#a78bfa" text-anchor="middle">Бесплатно</text>
+  </g>
+
+  <!-- Bottom stats bar -->
+  <rect x="0" y="490" width="960" height="50" fill="rgba(0,0,0,0.35)"/>
+  <g font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="rgba(255,255,255,0.55)">
+    <text x="60" y="521">50+ практических заданий</text>
+    <text x="300" y="521">·</text>
+    <text x="320" y="521">Автопроверка кода</text>
+    <text x="490" y="521">·</text>
+    <text x="510" y="521">ИИ-наставник</text>
+    <text x="640" y="521">·</text>
+    <text x="660" y="521">Сертификат</text>
+  </g>
+
+  <!-- Decorative dots -->
+  <g fill="rgba(255,255,255,0.15)">
+    <circle cx="870" cy="200" r="3"/>
+    <circle cx="890" cy="190" r="2"/>
+    <circle cx="910" cy="210" r="4"/>
+    <circle cx="880" cy="220" r="2"/>
+    <circle cx="55" cy="390" r="3"/>
+    <circle cx="40" cy="410" r="2"/>
+    <circle cx="60" cy="420" r="4"/>
+  </g>
+
+  <!-- Top-left badge -->
+  <rect x="60" y="140" width="90" height="26" rx="13" fill="rgba(255,212,59,0.2)" stroke="rgba(255,212,59,0.5)" stroke-width="1"/>
+  <text x="105" y="157" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" fill="#ffd43b" text-anchor="middle">PYTHON 3.x</text>
+  </g>
+</svg>

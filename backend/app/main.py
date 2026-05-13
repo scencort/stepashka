@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -62,6 +64,18 @@ async def startup():
                  END IF;
                END$$"""
         )
+        # migration: course ratings table
+        await database.execute("""
+            CREATE TABLE IF NOT EXISTS course_ratings (
+                id SERIAL PRIMARY KEY,
+                course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 5),
+                comment TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                UNIQUE (course_id, user_id)
+            )
+        """)
         logger.info("PostgreSQL connected and initialized")
     except Exception as e:
         logger.error(f"PostgreSQL unavailable: {e}")
@@ -136,12 +150,33 @@ async def course_detail(course_id: int):
 @app.get("/api/courses")
 async def courses_alias():
     rows = await database.fetch(
-        """SELECT c.id, c.title, c.slug, c.description, c.level, c.category, c.status, c.rating,
-                  c.students_count AS "studentsCount", c.duration_hours AS "durationHours",
-                  c.price_cents AS "priceCents", c.currency, c.access_type AS "accessType",
-                  c.cover_url AS "coverUrl", u.full_name AS "teacherName", u.full_name AS "author"
-           FROM courses c LEFT JOIN users u ON u.id=c.teacher_id
-           WHERE c.status IN ('published','pending_review')
+        """SELECT
+               c.id, c.title, c.slug, c.description, c.level, c.category, c.status,
+               c.price_cents AS "priceCents", c.currency, c.access_type AS "accessType",
+               c.cover_url AS "coverUrl", u.full_name AS "author",
+
+               -- real student count from enrollments
+               COUNT(DISTINCT e.user_id) FILTER (WHERE e.status = 'active') AS "studentsCount",
+
+               -- real average rating from completed submissions (0–100 → 0–5 stars)
+               ROUND(
+                 COALESCE(AVG(sub.score) FILTER (WHERE sub.score IS NOT NULL), 0) / 20.0,
+               1) AS rating,
+
+               -- real lesson count
+               COUNT(DISTINCT l.id) AS "lessonsCount",
+
+               -- estimated duration: 10 min per lesson, rounded to 0.5h
+               ROUND(COUNT(DISTINCT l.id) * 10.0 / 60 * 2) / 2.0 AS "durationHours"
+
+           FROM courses c
+           LEFT JOIN users u ON u.id = c.teacher_id
+           LEFT JOIN enrollments e ON e.course_id = c.id
+           LEFT JOIN course_modules cm ON cm.course_id = c.id
+           LEFT JOIN lessons l ON l.module_id = cm.id
+           LEFT JOIN submissions sub ON sub.lesson_id = l.id AND sub.score IS NOT NULL
+           WHERE c.status IN ('published', 'pending_review')
+           GROUP BY c.id, u.full_name
            ORDER BY c.created_at DESC"""
     )
     result = []
@@ -149,10 +184,14 @@ async def courses_alias():
         row = dict(r)
         price_cents = row.get("priceCents") or 0
         row["price"] = "Бесплатно" if price_cents == 0 else f"{price_cents // 100} ₽"
-        row["students"] = str(row.get("studentsCount") or 0)
-        row["rating"] = str(round(float(row.get("rating") or 0), 1))
-        row["duration"] = f"{row.get('durationHours') or 0} ч"
-        row["lessons"] = 0
+        students = int(row.get("studentsCount") or 0)
+        row["students"] = str(students)
+        raw_rating = float(row.get("rating") or 0)
+        row["rating"] = str(raw_rating) if raw_rating > 0 else "—"
+        lessons = int(row.get("lessonsCount") or 0)
+        row["lessons"] = lessons
+        duration = float(row.get("durationHours") or 0)
+        row["duration"] = f"{int(duration)} ч" if duration >= 1 else (f"{int(duration * 60)} мин" if duration > 0 else "—")
         row["progress"] = 0
         result.append(row)
     return result
@@ -404,6 +443,11 @@ app.include_router(account_router)
 app.include_router(student_router)
 app.include_router(teacher_admin_router)
 app.include_router(ai_router)
+
+# ── Serve uploaded cover images as static files ──
+_covers_dir = Path(__file__).resolve().parent.parent / "covers"
+_covers_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/covers", StaticFiles(directory=str(_covers_dir)), name="covers")
 
 
 @app.exception_handler(Exception)

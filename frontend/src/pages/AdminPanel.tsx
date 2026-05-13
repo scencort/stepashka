@@ -116,9 +116,11 @@ export default function AdminPanel() {
     if (!reply) return
     setReplyLoading(ticketId)
     try {
+      const body: Record<string, string> = { reply }
+      if (closeAfter) body.status = "closed"
       const updated = await api.post<FeedbackItem & { adminReply?: string; status: string }>(
         `/feedback/${ticketId}/reply`,
-        { reply, status: closeAfter ? "closed" : "in_progress" }
+        body
       )
       setFeedbackItems(prev => prev.map(f => f.id === ticketId ? { ...f, ...updated } : f))
       setReplyText(prev => ({ ...prev, [ticketId]: "" }))
@@ -126,10 +128,10 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка отправки ответа") } finally { setReplyLoading(null) }
   }
 
-  const cycleStatus = async (ticketId: number) => {
+  const setStatus = async (ticketId: number, status: "new" | "in_progress" | "closed") => {
     setActionId(ticketId)
     try {
-      const updated = await api.patch<FeedbackItem>(`/feedback/${ticketId}/status`, {})
+      const updated = await api.patch<FeedbackItem>(`/feedback/${ticketId}/status`, { status })
       setFeedbackItems(prev => prev.map(f => f.id === ticketId ? { ...f, ...updated } : f))
       toast.success("Статус обновлён")
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
@@ -479,16 +481,41 @@ export default function AdminPanel() {
                             {/* Full message */}
                             <div className="pt-4">
                               <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide mb-2">Сообщение</p>
-                              <p className="text-sm text-[var(--text)] bg-[var(--surface)] rounded-xl px-4 py-3 border border-[var(--border)] leading-relaxed">
+                              <p className="text-sm text-[var(--text)] bg-[var(--surface)] rounded-xl px-4 py-3 border border-[var(--border)] leading-relaxed whitespace-pre-wrap break-words">
                                 {ticket.message}
                               </p>
+                            </div>
+
+                            {/* Status switcher */}
+                            <div>
+                              <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide mb-2">Статус</p>
+                              <div className="flex gap-2 flex-wrap">
+                                {([
+                                  { v: "new", l: "Новое", cls: "border-primary/30 text-primary bg-primary/10 hover:bg-primary/20" },
+                                  { v: "in_progress", l: "В работе", cls: "border-amber-300/60 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30" },
+                                  { v: "closed", l: "Закрыто", cls: "border-emerald-300/60 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30" },
+                                ] as const).map(s => (
+                                  <button
+                                    key={s.v}
+                                    onClick={() => setStatus(ticket.id, s.v)}
+                                    disabled={ticket.status === s.v || actionId === ticket.id}
+                                    className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all disabled:opacity-40 disabled:cursor-default ${
+                                      ticket.status === s.v
+                                        ? s.cls + " ring-2 ring-offset-1 ring-current/30"
+                                        : "border-[var(--border)] text-[var(--muted)] bg-[var(--surface)] hover:text-[var(--text)] hover:bg-[var(--border)]/40"
+                                    }`}
+                                  >
+                                    {ticket.status === s.v ? "✓ " : ""}{s.l}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
 
                             {/* Existing reply */}
                             {ticket.adminReply && (
                               <div>
-                                <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide mb-2">Ваш ответ</p>
-                                <p className="text-sm text-[var(--text)] bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl px-4 py-3 leading-relaxed">
+                                <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide mb-2">Текущий ответ</p>
+                                <p className="text-sm text-[var(--text)] bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl px-4 py-3 leading-relaxed whitespace-pre-wrap break-words">
                                   {ticket.adminReply}
                                 </p>
                               </div>
@@ -497,40 +524,32 @@ export default function AdminPanel() {
                             {/* Reply form */}
                             <div className="space-y-2">
                               <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">
-                                {ticket.adminReply ? "Обновить ответ" : "Написать ответ"}
+                                {ticket.adminReply ? "Обновить ответ" : "Ответить"}
                               </p>
                               <textarea
                                 rows={3}
-                                placeholder="Введите ответ на обращение…"
+                                placeholder="Введите ответ пользователю…"
                                 value={replyText[ticket.id] || ""}
                                 onChange={e => setReplyText(prev => ({ ...prev, [ticket.id]: e.target.value }))}
                                 className="input-field px-4 py-3 text-sm resize-none"
                               />
-                              <div className="flex gap-2 flex-wrap">
+                              <div className="flex gap-2 flex-wrap items-center">
                                 <button
                                   onClick={() => sendReply(ticket.id, false)}
                                   disabled={!replyText[ticket.id]?.trim() || replyLoading === ticket.id}
-                                  className="btn-primary text-xs px-4 py-2 disabled:opacity-50"
+                                  className="btn-primary text-xs px-4 py-2 gap-1.5 disabled:opacity-50"
                                 >
-                                  <Send size={13} />
-                                  {replyLoading === ticket.id ? "Отправка…" : "Отправить ответ"}
+                                  <Send size={12} />
+                                  {replyLoading === ticket.id ? "Отправка…" : "Ответить"}
                                 </button>
                                 <button
                                   onClick={() => sendReply(ticket.id, true)}
                                   disabled={!replyText[ticket.id]?.trim() || replyLoading === ticket.id}
-                                  className="btn-ghost text-xs px-4 py-2 disabled:opacity-50"
+                                  className="btn-ghost text-xs px-4 py-2 gap-1.5 disabled:opacity-50"
                                 >
+                                  <Send size={12} />
                                   Ответить и закрыть
                                 </button>
-                                {ticket.status !== "closed" && (
-                                  <button
-                                    onClick={() => cycleStatus(ticket.id)}
-                                    disabled={actionId === ticket.id}
-                                    className="btn-ghost text-xs px-4 py-2 disabled:opacity-50"
-                                  >
-                                    {ticket.status === "new" ? "В работу" : "Закрыть"}
-                                  </button>
-                                )}
                                 <button
                                   onClick={() => deleteFeedback(ticket.id)}
                                   disabled={actionId === ticket.id}

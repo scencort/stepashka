@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import MainLayout from "../layout/MainLayout"
 import Skeleton from "../components/ui/Skeleton"
 import { api } from "../lib/api"
 import { useToast } from "../hooks/useToast"
 import { Link } from "react-router-dom"
-import { BookOpen, Users, BarChart2, FileText, Plus, Send } from "lucide-react"
+import { BookOpen, Users, BarChart2, FileText, Plus, Send, UserCheck, ChevronDown, ChevronUp, Check, X } from "lucide-react"
 
 type TeacherOverview = {
   courses: Array<{ id: number; title: string; progress: number; students: string; level: string; price: string }>
@@ -16,6 +16,23 @@ type TeacherCourse = {
   students: string; progress: number; published: boolean; status?: string
 }
 
+type EnrollmentRequest = {
+  id: number
+  userId: number
+  userName: string
+  userEmail: string
+  status: "pending" | "approved" | "rejected"
+  message: string
+  teacherComment: string | null
+  createdAt: string
+}
+
+type CourseRequests = {
+  courseId: number
+  courseTitle: string
+  requests: EnrollmentRequest[]
+}
+
 export default function TeacherStudio() {
   const toast = useToast()
   const [data, setData] = useState<TeacherOverview | null>(null)
@@ -23,6 +40,9 @@ export default function TeacherStudio() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | "published" | "draft">("all")
   const [actionId, setActionId] = useState<number | null>(null)
+  const [courseRequests, setCourseRequests] = useState<CourseRequests[]>([])
+  const [expandedCourse, setExpandedCourse] = useState<number | null>(null)
+  const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({})
 
   const load = async () => {
     setLoading(true)
@@ -33,10 +53,41 @@ export default function TeacherStudio() {
       ])
       setData(overview)
       setCourses(list)
+      // Load pending enrollment requests for all courses
+      const allRequests = await Promise.all(
+        list.map(async (c) => {
+          try {
+            const reqs = await api.get<EnrollmentRequest[]>(`/teacher/courses/${c.id}/enrollment-requests`)
+            return { courseId: c.id, courseTitle: c.title, requests: reqs }
+          } catch { return { courseId: c.id, courseTitle: c.title, requests: [] } }
+        })
+      )
+      setCourseRequests(allRequests.filter(cr => cr.requests.length > 0))
     } catch { /* silent */ } finally { setLoading(false) }
   }
 
   useEffect(() => { void load() }, [])
+
+  const pendingTotal = useMemo(() =>
+    courseRequests.reduce((sum, cr) => sum + cr.requests.filter(r => r.status === "pending").length, 0),
+    [courseRequests]
+  )
+
+  const decide = async (requestId: number, status: "approved" | "rejected") => {
+    setActionId(requestId)
+    try {
+      await api.patch(`/teacher/enrollment-requests/${requestId}`, {
+        status,
+        teacherComment: commentDrafts[requestId] || "",
+      })
+      setCourseRequests(prev => prev.map(cr => ({
+        ...cr,
+        requests: cr.requests.map(r => r.id === requestId ? { ...r, status } : r),
+      })))
+      setCommentDrafts(prev => { const n = { ...prev }; delete n[requestId]; return n })
+      toast.success(status === "approved" ? "Заявка одобрена" : "Заявка отклонена")
+    } catch { toast.error("Ошибка") } finally { setActionId(null) }
+  }
 
   const visible = filter === "all" ? courses
     : filter === "published" ? courses.filter(c => c.published)
@@ -76,6 +127,92 @@ export default function TeacherStudio() {
               {[1,2,3,4].map(i => <Skeleton key={i} className="h-28 rounded-2xl" />)}
             </div>
             <Skeleton className="h-64 rounded-2xl" />
+          </div>
+        )}
+
+        {/* Enrollment requests */}
+        {!loading && pendingTotal > 0 && (
+          <div className="card p-5 border-l-4 border-l-primary space-y-4">
+            <div className="flex items-center gap-2">
+              <UserCheck size={17} className="text-primary" />
+              <p className="text-sm font-bold font-display text-[var(--text)]">
+                Заявки на запись · {pendingTotal}
+              </p>
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse ml-1" />
+            </div>
+
+            <div className="space-y-2">
+              {courseRequests.map(cr => {
+                const pending = cr.requests.filter(r => r.status === "pending")
+                if (pending.length === 0) return null
+                const isOpen = expandedCourse === cr.courseId
+                return (
+                  <div key={cr.courseId} className="rounded-xl border border-[var(--border)] overflow-hidden">
+                    <button
+                      onClick={() => setExpandedCourse(isOpen ? null : cr.courseId)}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-[var(--surface)] hover:bg-[var(--border)]/30 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-semibold text-[var(--text)] truncate">{cr.courseTitle}</span>
+                        <span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                          {pending.length} заявок
+                        </span>
+                      </div>
+                      {isOpen ? <ChevronUp size={15} className="text-[var(--muted)] shrink-0" /> : <ChevronDown size={15} className="text-[var(--muted)] shrink-0" />}
+                    </button>
+
+                    {isOpen && (
+                      <div className="divide-y divide-[var(--border)]">
+                        {pending.map(req => (
+                          <div key={req.id} className="px-4 py-4 space-y-3 bg-[var(--bg)]">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-[var(--text)]">{req.userName}</p>
+                                <p className="text-xs text-[var(--muted)]">{req.userEmail}</p>
+                                {req.message && (
+                                  <p className="text-xs text-[var(--text)] mt-1.5 bg-[var(--surface)] px-3 py-2 rounded-lg border border-[var(--border)] italic">
+                                    «{req.message}»
+                                  </p>
+                                )}
+                              </div>
+                              <p className="text-xs text-[var(--muted)] shrink-0">
+                                {new Date(req.createdAt).toLocaleDateString("ru-RU")}
+                              </p>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <input
+                                value={commentDrafts[req.id] ?? ""}
+                                onChange={e => setCommentDrafts(prev => ({ ...prev, [req.id]: e.target.value }))}
+                                placeholder="Комментарий (необязательно)"
+                                className="input-field px-3 py-2 text-xs flex-1"
+                              />
+                              <div className="flex gap-2 shrink-0">
+                                <button
+                                  onClick={() => decide(req.id, "approved")}
+                                  disabled={actionId === req.id}
+                                  className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white transition-colors disabled:opacity-50"
+                                >
+                                  <Check size={13} />
+                                  Принять
+                                </button>
+                                <button
+                                  onClick={() => decide(req.id, "rejected")}
+                                  disabled={actionId === req.id}
+                                  className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl border border-[var(--border)] text-[var(--muted)] hover:text-red-500 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors disabled:opacity-50"
+                                >
+                                  <X size={13} />
+                                  Отклонить
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 

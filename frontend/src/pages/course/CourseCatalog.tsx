@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import {
   Users,
   Star,
@@ -18,8 +18,12 @@ import {
   Calculator,
   Smartphone,
   Lock,
+  Briefcase,
+  Sparkles,
+  Sprout,
+  Flame,
+  Trophy,
 } from "lucide-react";
-import Modal from "../../components/ui/Modal";
 
 type CourseItem = {
   id: number;
@@ -45,38 +49,72 @@ const CATEGORY_META: Record<
   string,
   { label: string; icon: React.ReactNode; color: string }
 > = {
+  // lowercase keys — matches CourseEditor values
+  programming: {
+    label: "Программирование",
+    icon: <Code2 size={14} />,
+    color: "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50",
+  },
+  design: {
+    label: "Дизайн",
+    icon: <Palette size={14} />,
+    color: "text-pink-600 bg-pink-50 dark:text-pink-400 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800/50",
+  },
+  data_science: {
+    label: "Data Science",
+    icon: <FlaskConical size={14} />,
+    color: "text-violet-600 bg-violet-50 dark:text-violet-400 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50",
+  },
+  marketing: {
+    label: "Маркетинг",
+    icon: <BarChart3 size={14} />,
+    color: "text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50",
+  },
+  business: {
+    label: "Бизнес",
+    icon: <Briefcase size={14} />,
+    color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50",
+  },
+  languages: {
+    label: "Языки",
+    icon: <Globe size={14} />,
+    color: "text-teal-600 bg-teal-50 dark:text-teal-400 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800/50",
+  },
+  other: {
+    label: "Другое",
+    icon: <Sparkles size={14} />,
+    color: "text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50",
+  },
+  // legacy uppercase keys — for old data in DB
   Programming: {
     label: "Программирование",
     icon: <Code2 size={14} />,
-    color: "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20",
+    color: "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50",
   },
   Design: {
     label: "Дизайн",
     icon: <Palette size={14} />,
-    color: "text-pink-600 bg-pink-50 dark:text-pink-400 dark:bg-pink-900/20",
+    color: "text-pink-600 bg-pink-50 dark:text-pink-400 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800/50",
   },
   "Data Science": {
     label: "Data Science",
     icon: <FlaskConical size={14} />,
-    color:
-      "text-violet-600 bg-violet-50 dark:text-violet-400 dark:bg-violet-900/20",
+    color: "text-violet-600 bg-violet-50 dark:text-violet-400 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50",
   },
   DevOps: {
     label: "DevOps",
     icon: <Container size={14} />,
-    color:
-      "text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20",
+    color: "text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50",
   },
   QA: {
     label: "Тестирование",
     icon: <ShieldCheck size={14} />,
-    color:
-      "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20",
+    color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50",
   },
   Analytics: {
     label: "Аналитика",
     icon: <BarChart3 size={14} />,
-    color: "text-cyan-600 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/20",
+    color: "text-cyan-600 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800/50",
   },
   Databases: {
     label: "Базы данных",
@@ -96,21 +134,33 @@ const CATEGORY_META: Record<
   Mobile: {
     label: "Мобильная разработка",
     icon: <Smartphone size={14} />,
-    color: "text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-900/20",
+    color: "text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50",
   },
   Security: {
     label: "Безопасность",
     icon: <Lock size={14} />,
-    color: "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20",
+    color: "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50",
   },
 };
 
 const DEFAULT_CAT = {
   label: "Другое",
   icon: <GraduationCap size={14} />,
-  color: "text-[var(--muted)] bg-[var(--surface)]",
+  color: "text-[var(--muted)] bg-[var(--surface)] border border-[var(--border)]",
 };
 const getCatMeta = (cat: string) => CATEGORY_META[cat] ?? DEFAULT_CAT;
+
+const _BEGINNER  = { label: "Начинающий",  icon: <Sprout size={11} />, color: "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50" }
+const _INTERMEDIATE = { label: "Средний",   icon: <Flame  size={11} />, color: "text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50" }
+const _ADVANCED  = { label: "Продвинутый", icon: <Trophy size={11} />, color: "text-rose-700 bg-rose-50 dark:text-rose-300 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" }
+
+const getLevelMeta = (level: string) => {
+  const l = (level || "").toLowerCase().trim()
+  if (["beginner", "начинающий", "начальный", "junior"].includes(l)) return _BEGINNER
+  if (["intermediate", "средний", "средний уровень", "middle"].includes(l)) return _INTERMEDIATE
+  if (["advanced", "продвинутый", "senior", "expert"].includes(l)) return _ADVANCED
+  return null
+}
 
 type Props = {
   courses: CourseItem[];
@@ -126,21 +176,11 @@ type Props = {
   viewTab: "all" | "my";
   setViewTab: (v: "all" | "my") => void;
   canCreateCourse: boolean;
-  onCreateModalOpen: () => void;
   onNavigateToCourse: (id: number) => void;
+  onNavigateToCreate: () => void;
   onEnroll: (id: number) => void;
   enrollingIds: Set<number>;
   courseCoverUrl: (course: { id: number; title: string; coverUrl?: string }) => string;
-  // Create modal
-  createModalOpen: boolean;
-  onCreateModalClose: () => void;
-  newCourseTitle: string;
-  setNewCourseTitle: (v: string) => void;
-  newCourseType: string;
-  setNewCourseType: (v: string) => void;
-  newCourseLevel: string;
-  setNewCourseLevel: (v: string) => void;
-  onCreateCourse: () => void;
 };
 
 const LEVELS = ["Начальный", "Средний", "Продвинутый"];
@@ -160,20 +200,11 @@ export default function CourseCatalog(props: Props) {
     viewTab,
     setViewTab,
     canCreateCourse,
-    onCreateModalOpen,
     onNavigateToCourse,
+    onNavigateToCreate,
     onEnroll,
     enrollingIds,
     courseCoverUrl,
-    createModalOpen,
-    onCreateModalClose,
-    newCourseTitle,
-    setNewCourseTitle,
-    newCourseType,
-    setNewCourseType,
-    newCourseLevel,
-    setNewCourseLevel,
-    onCreateCourse,
   } = props;
 
   const allCategories = useMemo(() => {
@@ -271,10 +302,10 @@ export default function CourseCatalog(props: Props) {
         </div>
         {canCreateCourse && (
           <button
-            onClick={onCreateModalOpen}
+            onClick={onNavigateToCreate}
             className="btn-primary px-4 py-2 text-sm shrink-0"
           >
-            + Добавить курс
+            + Создать курс
           </button>
         )}
       </div>
@@ -360,6 +391,7 @@ export default function CourseCatalog(props: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {catalogFiltered.map((course) => {
             const catMeta = getCatMeta(course.category || "");
+            const levelMeta = getLevelMeta(course.level || "");
             return (
               <div
                 key={course.id}
@@ -388,11 +420,19 @@ export default function CourseCatalog(props: Props) {
 
                 {/* Content */}
                 <div className="p-4 flex-1 flex flex-col">
-                  <div
-                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md mb-2 self-start ${catMeta.color}`}
-                  >
-                    {catMeta.icon}
-                    {catMeta.label}
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <div
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md ${catMeta.color}`}
+                    >
+                      {catMeta.icon}
+                      {catMeta.label}
+                    </div>
+                    {levelMeta && (
+                      <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${levelMeta.color}`}>
+                        {levelMeta.icon}
+                        {levelMeta.label}
+                      </div>
+                    )}
                   </div>
 
                   <h3 className="font-semibold text-base text-[var(--text)] line-clamp-2 group-hover:text-primary transition-colors leading-snug">
@@ -405,18 +445,26 @@ export default function CourseCatalog(props: Props) {
                   <div className="mt-auto pt-3 space-y-2">
                     {/* Meta */}
                     <div className="flex items-center gap-3 text-xs text-[var(--muted)]">
-                      <span className="flex items-center gap-1 text-amber-500 font-semibold">
-                        <Star size={12} fill="currentColor" />
-                        {course.rating}
-                      </span>
+                      {course.rating && course.rating !== "—" && course.rating !== "0" ? (
+                        <span className="flex items-center gap-1 text-amber-500 font-semibold">
+                          <Star size={12} fill="currentColor" />
+                          {course.rating}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[var(--muted)] italic">
+                          нет оценок
+                        </span>
+                      )}
                       <span className="flex items-center gap-1">
                         <Users size={12} />
-                        {course.students}
+                        {course.students === "0" ? "нет студентов" : `${course.students} уч.`}
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Clock3 size={12} />
-                        {course.duration}
-                      </span>
+                      {course.duration && course.duration !== "—" && (
+                        <span className="flex items-center gap-1">
+                          <Clock3 size={12} />
+                          {course.duration}
+                        </span>
+                      )}
                     </div>
 
                     {/* Progress */}
@@ -440,7 +488,7 @@ export default function CourseCatalog(props: Props) {
                       >
                         {course.price}
                       </span>
-                      {course.progress === 0 && (
+                      {!course.enrolled && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -501,53 +549,6 @@ export default function CourseCatalog(props: Props) {
         </div>
       )}
 
-      <Modal
-        open={createModalOpen}
-        onClose={onCreateModalClose}
-        title="Создать курс"
-      >
-        <div className="space-y-4">
-          <input
-            value={newCourseTitle}
-            onChange={(e) => setNewCourseTitle(e.target.value)}
-            placeholder="Название курса"
-            className="input-field w-full px-4 py-3 text-sm"
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <select
-              value={newCourseType}
-              onChange={(e) => setNewCourseType(e.target.value)}
-              className="input-field px-4 py-3 text-sm"
-            >
-              <option>Frontend</option>
-              <option>Backend</option>
-            </select>
-            <select
-              value={newCourseLevel}
-              onChange={(e) => setNewCourseLevel(e.target.value)}
-              className="input-field px-4 py-3 text-sm"
-            >
-              <option>Начальный</option>
-              <option>Средний</option>
-              <option>Продвинутый</option>
-            </select>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={onCreateModalClose}
-              className="btn-ghost px-4 py-2 text-sm"
-            >
-              Отмена
-            </button>
-            <button
-              onClick={onCreateCourse}
-              className="btn-primary px-4 py-2 text-sm"
-            >
-              Создать
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

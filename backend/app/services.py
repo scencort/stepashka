@@ -163,13 +163,14 @@ def _run_code_with_input(code: str, stdin_data: str, timeout: float = 5.0) -> tu
         try:
             result = subprocess.run(
                 [sys.executable, tmp_path],
-                input=stdin_data,
+                input=stdin_data.encode("utf-8", errors="replace"),
                 capture_output=True,
-                text=True,
                 timeout=timeout,
-                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
             )
-            return result.stdout, result.stderr, result.returncode
+            stdout = result.stdout.decode("utf-8", errors="replace")
+            stderr = result.stderr.decode("utf-8", errors="replace")
+            return stdout, stderr, result.returncode
         finally:
             try:
                 os.unlink(tmp_path)
@@ -286,14 +287,42 @@ def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
             expected = str(test.get("expectedOutput") or "").strip()
             name = test.get("description") or f"Тест {idx + 1}"
             stdout, stderr, rc = _run_code_with_input(answer, test_input)
-            actual = stdout.strip()
-            ok = rc == 0 and actual == expected
+
+            # Smart comparison: input("prompt") writes prompts to stdout,
+            # so we check if ALL expected lines appear in actual output
+            # as a subsequence (ignoring prompt lines in between).
+            actual_lines = [l.rstrip() for l in stdout.split("\n")]
+            expected_lines = [l.rstrip() for l in expected.split("\n") if l.rstrip()]
+
+            def _is_subsequence(needle: list[str], haystack: list[str]) -> bool:
+                it = iter(haystack)
+                return all(line in it for line in needle)
+
+            # First try exact match (fastest); then subsequence match for input()-prompts
+            actual_stripped = stdout.strip()
+            if rc == 0 and actual_stripped == expected:
+                ok = True
+            elif rc == 0 and expected_lines and _is_subsequence(expected_lines, actual_lines):
+                ok = True
+            else:
+                ok = False
+
             err_msg = _format_python_error(stderr) if stderr and rc != 0 else ""
+            # Show actual without prompt noise: keep only lines that are NOT
+            # a prefix of any stdin value (best-effort cleanup for display)
+            stdin_values = {v.strip() for v in test_input.split("\n") if v.strip()}
+            display_actual_lines = [
+                l for l in actual_lines
+                if not any(l.endswith(v) or l.endswith(v + " ") for v in stdin_values)
+                   and l.rstrip() not in {""}
+            ] if stdin_values else actual_lines
+            display_actual = "\n".join(display_actual_lines).strip() or actual_stripped
+
             check_results.append({
                 "name": name,
                 "passed": ok,
                 "expected": expected,
-                "actual": actual,
+                "actual": display_actual,
                 "error": err_msg,
             })
         else:
@@ -311,7 +340,10 @@ def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
                 tokens = [str(t).lower() for t in (test.get("tokens") or [])]
                 ok = any(t and t in lowered for t in tokens)
             elif ttype == "includesAll":
-                tokens = [str(t).lower() for t in (test.get("tokens") or [])]
+                raw_tokens = test.get("tokens") or []
+                if isinstance(raw_tokens, str):
+                    raw_tokens = [t.strip() for t in raw_tokens.split(",") if t.strip()]
+                tokens = [str(t).lower() for t in raw_tokens]
                 ok = len(tokens) > 0 and all(t and t in lowered for t in tokens)
             elif ttype == "minCountRegex":
                 try:

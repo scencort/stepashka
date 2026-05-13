@@ -171,12 +171,35 @@ export default function Task() {
             </Button>
 
             {loading && (
-              <Card className="flex flex-col items-center justify-center py-10 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 bg-white/40 dark:bg-zinc-900/40 text-center">
-                <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center mb-4">
-                  <Sparkles size={24} className="text-rose-500 animate-pulse" />
+              <Card className="flex flex-col items-center justify-center py-8 px-6 !rounded-[2rem] border border-primary/20 bg-primary/5 dark:bg-primary/10 text-center overflow-hidden relative">
+                {/* Анимированный прогресс-бар сверху */}
+                <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden rounded-t-[2rem]">
+                  <div
+                    className="h-full bg-gradient-to-r from-transparent via-primary to-transparent"
+                    style={{
+                      width: "40%",
+                      animation: "slide-shimmer 1.6s ease-in-out infinite",
+                    }}
+                  />
+                  <style>{`@keyframes slide-shimmer { 0%{transform:translateX(-250%)} 100%{transform:translateX(650%)} }`}</style>
                 </div>
-                <p className="text-slate-600 dark:text-slate-300 font-semibold">
-                  AI анализирует код...
+
+                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-4 relative">
+                  <Sparkles size={26} className="text-primary animate-pulse" />
+                  {/* Пульсирующий ободок */}
+                  <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-ping" />
+                </div>
+
+                <p className="font-bold text-[var(--text)] text-base mb-1">
+                  ИИ генерирует ответ
+                  <span className="inline-flex gap-0.5 ml-1">
+                    <span className="animate-[bounce_1s_infinite_0ms] inline-block">.</span>
+                    <span className="animate-[bounce_1s_infinite_150ms] inline-block">.</span>
+                    <span className="animate-[bounce_1s_infinite_300ms] inline-block">.</span>
+                  </span>
+                </p>
+                <p className="text-xs text-[var(--muted)] leading-relaxed max-w-[200px]">
+                  Анализирую качество кода, ищу ошибки и формирую рекомендации
                 </p>
               </Card>
             )}
