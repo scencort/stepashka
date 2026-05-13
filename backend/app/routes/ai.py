@@ -85,6 +85,10 @@ def _chat_fallback(message: str) -> str:
 OPENAI_CHAT_PATH = "/chat/completions"
 
 
+class RateLimitError(Exception):
+    """Raised when provider returns HTTP 429 Too Many Requests."""
+
+
 def _gemini_url(model: str) -> str:
     return f"{GEMINI_BASE}/{model}:generateContent?key={settings.gemini_api_key}"
 
@@ -131,6 +135,11 @@ async def _openai_compatible_stream(
                 "stream": True,
             },
         ) as resp:
+            if resp.status_code == 429:
+                body = await resp.aread()
+                raise RateLimitError(
+                    f"{provider_name} rate limit (429): {body.decode()[:200]}"
+                )
             if resp.status_code != 200:
                 body = await resp.aread()
                 raise ValueError(
@@ -268,6 +277,10 @@ async def _openai_compatible_generate(
                 "max_tokens": 4096,
             },
         )
+        if resp.status_code == 429:
+            raise RateLimitError(
+                f"{provider_name} rate limit (429): {resp.text[:200]}"
+            )
         if resp.status_code != 200:
             raise ValueError(
                 f"{provider_name} API error ({resp.status_code}): {resp.text[:400]}"
