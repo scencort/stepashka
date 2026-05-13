@@ -503,13 +503,18 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
     # Save to DB
     try:
         review_id = await db.fetchval(
-            """INSERT INTO ai_reviews (user_id, quality, correctness, style, summary)
-               VALUES ($1, $2, $3, $4, $5) RETURNING id""",
+            """INSERT INTO ai_reviews (user_id, quality, correctness, style, summary, source_code, language, issues, improvements, good_parts)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb) RETURNING id""",
             user["id"],
             quality,
             correctness,
             style,
             summary,
+            body.sourceCode,
+            body.language,
+            json.dumps(issues, ensure_ascii=False),
+            json.dumps(improvements, ensure_ascii=False),
+            json.dumps(good_parts, ensure_ascii=False),
         )
     except Exception:
         review_id = 0
@@ -541,11 +546,27 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
 @router.get("/review/history", dependencies=[AllRoles])
 async def ai_review_history(user: CurrentUser):
     rows = await db.fetch(
-        """SELECT id, quality, correctness, style, summary, created_at AS "createdAt"
+        """SELECT id, quality, correctness, style, summary, source_code AS "sourceCode",
+                  language, issues, improvements, good_parts AS "goodParts",
+                  created_at AS "createdAt"
            FROM ai_reviews WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20""",
         user["id"],
     )
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        row = dict(r)
+        # JSONB fields come as strings or lists depending on asyncpg version
+        for field in ("issues", "improvements", "goodParts"):
+            val = row.get(field)
+            if isinstance(val, str):
+                try:
+                    row[field] = json.loads(val)
+                except Exception:
+                    row[field] = []
+            elif val is None:
+                row[field] = []
+        result.append(row)
+    return result
 
 
 @router.post("/insights", dependencies=[AllRoles])

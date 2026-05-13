@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   Lightbulb,
   ThumbsUp,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { api } from "../lib/api";
 import EmptyState from "../components/ui/EmptyState";
@@ -42,6 +44,7 @@ type CheckResult = {
   improvements?: string[];
   goodParts?: string[];
   language?: string;
+  sourceCode?: string;
 };
 
 export default function Task() {
@@ -54,6 +57,7 @@ export default function Task() {
     Array<CheckResult & { id: number; createdAt: string }>
   >([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const toast = useToast();
 
   const loadHistory = async () => {
@@ -136,22 +140,22 @@ export default function Task() {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
           {/* Editor */}
-          <div className="xl:col-span-2 flex flex-col rounded-[2.5rem] overflow-hidden glass-panel border border-white/60 dark:border-slate-700/60 shadow-lg shadow-slate-200/20 dark:shadow-black/20">
-            <div className="px-6 py-4 border-b border-slate-200/50 dark:border-slate-700/60 flex items-center justify-between bg-white/40 dark:bg-zinc-900/40">
-              <h3 className="text-sm font-bold inline-flex items-center gap-2 text-slate-800 dark:text-slate-200">
-                <Code2 size={18} className="text-rose-500" /> Ваш код
+          <div className="xl:col-span-2 flex flex-col card overflow-hidden self-start">
+            <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
+              <h3 className="text-sm font-bold inline-flex items-center gap-2 text-[var(--text)]">
+                <Code2 size={16} className="text-primary" /> Ваш код
               </h3>
-              <p className="text-xs font-semibold text-slate-400 px-3 py-1 rounded-full bg-slate-100 dark:bg-zinc-800">
+              <p className="text-xs font-semibold text-[var(--muted)] px-3 py-1 rounded-full bg-[var(--surface)]">
                 {LANGUAGES.find((l) => l.value === language)?.label || language}
               </p>
             </div>
 
-            <div className="flex-1 min-h-[400px] relative">
+            <div>
               <CodeEditor
                 value={code}
                 onChange={setCode}
                 language={language}
-                placeholder="// вставьте код для ревью..."
+                placeholder="# вставьте код для ревью..."
               />
             </div>
           </div>
@@ -347,46 +351,120 @@ export default function Task() {
                 />
               )}
               {!historyLoading && history.length > 0 && (
-                <div className="space-y-3 max-h-80 overflow-auto pr-2">
+                <div className="space-y-3 max-h-[600px] overflow-auto pr-1">
                   {history.map((item) => {
                     const avg = Math.round(
                       (item.quality + item.correctness + item.style) / 3,
                     );
                     const hcColor =
                       avg >= 80
-                        ? "text-emerald-600"
+                        ? "text-emerald-500"
                         : avg >= 50
-                          ? "text-amber-600"
-                          : "text-red-600";
+                          ? "text-amber-500"
+                          : "text-red-500";
+                    const isOpen = expandedId === item.id;
                     return (
                       <div
                         key={item.id}
-                        className="rounded-2xl border border-slate-100 dark:border-zinc-800 bg-white/60 dark:bg-zinc-800/60 p-4 hover:bg-white dark:hover:bg-zinc-800 transition-colors shadow-sm cursor-pointer group"
+                        className="rounded-2xl border border-slate-100 dark:border-zinc-800 bg-white/60 dark:bg-zinc-800/60 overflow-hidden shadow-sm transition-all"
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <p
-                            className={`text-xl font-black ${hcColor} group-hover:scale-105 transition-transform`}
-                          >
-                            {avg}%
+                        {/* Header row — click to expand */}
+                        <button
+                          onClick={() => setExpandedId(isOpen ? null : item.id)}
+                          className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-zinc-700/50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <p className={`text-2xl font-black ${hcColor}`}>{avg}%</p>
+                              <div className="flex gap-2 text-[11px] font-semibold text-slate-400">
+                                <span className="flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
+                                  {item.quality}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                                  {item.correctness}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />
+                                  {item.style}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-zinc-900 px-2 py-1 rounded-md">
+                                {new Date(item.createdAt).toLocaleString("ru-RU")}
+                              </p>
+                              {isOpen ? (
+                                <ChevronUp size={14} className="text-slate-400 shrink-0" />
+                              ) : (
+                                <ChevronDown size={14} className="text-slate-400 shrink-0" />
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 text-left">
+                            {item.summary}
                           </p>
-                          <p className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-zinc-900 px-2 py-1 rounded-md">
-                            {new Date(item.createdAt).toLocaleString("ru-RU")}
-                          </p>
-                        </div>
-                        <div className="flex gap-3 text-xs font-semibold text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>{" "}
-                            Q: {item.quality}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>{" "}
-                            C: {item.correctness}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>{" "}
-                            S: {item.style}
-                          </span>
-                        </div>
+                        </button>
+
+                        {/* Expanded content */}
+                        {isOpen && (
+                          <div className="border-t border-slate-100 dark:border-zinc-700 px-4 pb-4 pt-3 space-y-4">
+                            {/* Code */}
+                            {item.sourceCode && (
+                              <div>
+                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                                  <Code2 size={12} /> Код
+                                </p>
+                                <pre className="text-xs font-mono bg-slate-50 dark:bg-zinc-900 rounded-xl p-3 overflow-auto max-h-48 whitespace-pre-wrap break-words text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-zinc-800">
+                                  {item.sourceCode}
+                                </pre>
+                              </div>
+                            )}
+
+                            {/* Summary */}
+                            <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-blue-50/50 dark:bg-blue-900/10 rounded-xl p-3 border border-blue-100 dark:border-blue-800/30">
+                              <p className="font-bold text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1.5"><CheckCircle size={12} /> Резюме</p>
+                              {item.summary}
+                            </div>
+
+                            {/* Issues */}
+                            {item.issues && item.issues.length > 0 && (
+                              <div className="bg-rose-50/50 dark:bg-rose-900/10 rounded-xl p-3 border border-rose-100 dark:border-rose-800/30 space-y-1.5">
+                                <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5"><AlertTriangle size={12} /> Проблемы</p>
+                                {item.issues.map((issue, i) => (
+                                  <p key={i} className="text-xs text-slate-600 dark:text-slate-300 flex gap-1.5">
+                                    <span className="text-rose-400 shrink-0">•</span>{issue}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Improvements */}
+                            {item.improvements && item.improvements.length > 0 && (
+                              <div className="bg-amber-50/50 dark:bg-amber-900/10 rounded-xl p-3 border border-amber-100 dark:border-amber-800/30 space-y-1.5">
+                                <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5"><Lightbulb size={12} /> Улучшения</p>
+                                {item.improvements.map((imp, i) => (
+                                  <p key={i} className="text-xs text-slate-600 dark:text-slate-300 flex gap-1.5">
+                                    <span className="text-amber-400 shrink-0">•</span>{imp}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Good parts */}
+                            {item.goodParts && item.goodParts.length > 0 && (
+                              <div className="bg-emerald-50/50 dark:bg-emerald-900/10 rounded-xl p-3 border border-emerald-100 dark:border-emerald-800/30 space-y-1.5">
+                                <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5"><ThumbsUp size={12} /> Что хорошо</p>
+                                {item.goodParts.map((g, i) => (
+                                  <p key={i} className="text-xs text-slate-600 dark:text-slate-300 flex gap-1.5">
+                                    <span className="text-emerald-400 shrink-0">•</span>{g}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

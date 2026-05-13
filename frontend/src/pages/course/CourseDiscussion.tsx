@@ -23,6 +23,7 @@ export default function CourseDiscussion({ courseId, stepId, stepTitle }: Props)
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -46,8 +47,8 @@ export default function CourseDiscussion({ courseId, stepId, stepTitle }: Props)
   }, [fetchMessages]);
 
   useEffect(() => {
-    if (messages.length > 0) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 0 && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -113,7 +114,7 @@ export default function CourseDiscussion({ courseId, stepId, stepTitle }: Props)
       </div>
 
       {/* Messages */}
-      <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+      <div ref={scrollContainerRef} className="space-y-3 max-h-80 overflow-y-auto pr-1">
         {loading ? (
           <div className="space-y-3">
             {[1, 2].map((i) => (

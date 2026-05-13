@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState, useEffect } from "react"
 import { Highlight, themes, type Language } from "prism-react-renderer"
+import { useTheme } from "../../context/theme"
 
 type Props = {
   value: string
@@ -31,9 +32,11 @@ export default function CodeEditor({ value, onChange, language, placeholder }: P
   const preRef = useRef<HTMLPreElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const [isFocused, setIsFocused] = useState(false)
+  const { theme } = useTheme()
 
   const prismLang = LANG_MAP[language] || "clike"
   const lines = value ? value.split("\n") : [""]
+  const isDark = theme === "dark"
 
   const syncScroll = useCallback(() => {
     const ta = textareaRef.current
@@ -56,20 +59,34 @@ export default function CodeEditor({ value, onChange, language, placeholder }: P
     return () => ta.removeEventListener("scroll", syncScroll)
   }, [syncScroll])
 
+  const bg = isDark ? "var(--surface)" : "#ffffff"
+  const lineNumBg = isDark ? "var(--bg)" : "#f6f8fa"
+  const lineNumColor = isDark ? "#6e7681" : "#999"
+  const lineNumBorder = isDark ? "#30363d" : "#e2e4e7"
+  const prismTheme = isDark ? themes.oneDark : themes.github
+
   return (
-    <div className="relative flex h-[360px] md:h-[520px] overflow-hidden bg-[#1a1a2e]">
-      {/* Line numbers */}
+    <div
+      className="relative flex overflow-hidden"
+      style={{ minHeight: "230px", height: `${Math.max(230, lines.length * 21 + 40)}px` }}
+      style={{ background: bg }}
+    >
+      {/* Line numbers column */}
       <div
         ref={lineNumbersRef}
-        className="flex-shrink-0 overflow-hidden select-none pointer-events-none"
-        style={{ width: `${Math.max(lines.length.toString().length, 2) * 10 + 24}px` }}
+        className="flex-shrink-0 overflow-hidden select-none pointer-events-none border-r"
+        style={{
+          width: `${Math.max(lines.length.toString().length, 2) * 10 + 32}px`,
+          borderColor: lineNumBorder,
+          background: lineNumBg,
+        }}
       >
-        <div className="h-full py-4 pr-2 text-right">
+        <div className="h-full py-5 pr-3 text-right">
           {lines.map((_, i) => (
             <div
               key={i}
-              className="text-[13px] leading-[1.5] font-mono text-slate-500/70"
-              style={{ height: "1.5em" }}
+              className="font-mono text-[13px] leading-[1.625]"
+              style={{ color: lineNumColor }}
             >
               {i + 1}
             </div>
@@ -79,17 +96,17 @@ export default function CodeEditor({ value, onChange, language, placeholder }: P
 
       {/* Highlighted code underlay */}
       <div className="relative flex-1 overflow-hidden">
-        <Highlight theme={themes.dracula} code={value || " "} language={prismLang}>
+        <Highlight theme={prismTheme} code={value || " "} language={prismLang}>
           {({ tokens, getLineProps, getTokenProps }) => (
             <pre
               ref={preRef}
-              className="absolute inset-0 py-4 pl-2 pr-4 overflow-hidden pointer-events-none font-mono text-[13px] leading-[1.5] whitespace-pre m-0"
+              className="absolute inset-0 py-5 pl-5 pr-4 overflow-hidden pointer-events-none font-mono text-[13px] leading-[1.625] whitespace-pre m-0"
               style={{ background: "transparent" }}
             >
               {tokens.map((line, i) => {
                 const lineProps = getLineProps({ line })
                 return (
-                  <div key={i} {...lineProps} style={{ ...lineProps.style, height: "1.5em", background: "transparent" }}>
+                  <div key={i} {...lineProps} style={{ ...lineProps.style, background: "transparent" }}>
                     {line.map((token, key) => (
                       <span key={key} {...getTokenProps({ token })} />
                     ))}
@@ -108,17 +125,23 @@ export default function CodeEditor({ value, onChange, language, placeholder }: P
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           spellCheck={false}
-          className="absolute inset-0 w-full h-full py-4 pl-2 pr-4 font-mono text-[13px] leading-[1.5] bg-transparent text-transparent caret-rose-400 outline-none resize-none selection:bg-rose-500/25 overflow-auto"
-          placeholder={placeholder}
-          style={{ WebkitTextFillColor: isFocused || value ? "transparent" : undefined }}
+          className="absolute inset-0 w-full h-full py-5 pl-5 pr-4 font-mono text-[13px] leading-[1.625] bg-transparent text-transparent outline-none resize-none overflow-auto"
+          style={{
+            caretColor: isDark ? "#e6edf3" : "#1f2328",
+            WebkitTextFillColor: isFocused || value ? "transparent" : undefined,
+          }}
         />
 
-        {/* Placeholder */}
-        {!value && !isFocused && (
-          <div className="absolute top-4 left-2 font-mono text-[13px] text-slate-500/50 pointer-events-none">
-            {placeholder}
+        {/* Placeholder — заметный, явный */}
+        {!value && (
+          <div
+            className="absolute top-5 left-5 font-mono text-[13px] leading-[1.625] pointer-events-none select-none"
+            style={{ color: isDark ? "#484f58" : "#adb5bd" }}
+          >
+            {placeholder ?? (isDark ? "# вставьте или напишите код..." : "# вставьте или напишите код...")}
           </div>
         )}
+
       </div>
     </div>
   )

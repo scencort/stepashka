@@ -955,33 +955,38 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-[1400px] w-full mx-auto">
+        {/* Page content — pb-24 на мобиле чтобы контент не уходил под нижнюю навигацию */}
+        <main className="flex-1 p-4 pb-24 md:pb-6 md:p-6 lg:p-8 max-w-[1400px] w-full mx-auto">
           {children}
         </main>
 
         {/* Mobile bottom bar */}
         <div
           className="fixed bottom-0 left-0 right-0 z-30 md:hidden
-          bg-[var(--bg)]/90 backdrop-blur-md border-t border-[var(--border)]
-          grid grid-cols-4 px-2 py-1.5 safe-pb"
+          bg-[var(--bg)]/95 backdrop-blur-md border-t border-[var(--border)]
+          grid grid-cols-4"
+          style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           {[
-            { to: "/dashboard", label: "Панель", icon: LayoutDashboard },
-            { to: "/course", label: "Курсы", icon: BookOpen },
-            { to: "/task", label: "Review", icon: Code },
-            { to: "/ai-review", label: "AI-чат", icon: Brain },
+            { to: "/dashboard", label: "Панель",  icon: LayoutDashboard },
+            { to: "/course",    label: "Курсы",   icon: BookOpen },
+            { to: "/task",      label: "Review",  icon: Code },
+            { to: "/ai-review", label: "AI-чат",  icon: Brain },
           ].map(({ to, label, icon: Icon }) => {
             const active = isActive(to);
             return (
               <Link
                 key={to}
                 to={to}
-                className={`flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl text-[10px] font-medium transition-colors
-                  ${active ? "text-primary" : "text-[var(--muted)]"}`}
+                className="flex flex-col items-center justify-center gap-1 pt-2 pb-3 transition-colors"
               >
-                <Icon size={20} />
-                {label}
+                <div className={`flex items-center justify-center w-12 h-7 rounded-full transition-all
+                  ${active ? "bg-primary/10" : ""}`}>
+                  <Icon size={20} className={active ? "text-primary" : "text-[var(--muted)]"} />
+                </div>
+                <span className={`text-[10px] font-medium ${active ? "text-primary" : "text-[var(--muted)]"}`}>
+                  {label}
+                </span>
               </Link>
             );
           })}

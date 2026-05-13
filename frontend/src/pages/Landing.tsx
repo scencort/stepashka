@@ -670,61 +670,92 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
-            {[
-              { name: "Радкевич Роман",     role: "Разработчик", photo: "/developers/radkevich-roman.jpg",      link: "https://t.me/liiiiiliiiiiliiiiiliiiiiliiiiil", objectPosition: "center 22%", scale: 1.18 },
-              { name: "Поляков Ярослав",    role: "Разработчик", photo: "/developers/polyakov-yaroslav.jpg",    link: "https://t.me/scencort",                        objectPosition: "center 22%", scale: 1.18 },
-              { name: "Чеха Иван",          role: "Разработчик", photo: "/developers/chekha-ivan.jpg",          link: "https://t.me/aaaaaqiwi",                       objectPosition: "center 5%",  scale: 1.00 },
-              { name: "Вартанян Вячеслав",  role: "Разработчик", photo: "/developers/vartanyan-vyacheslav.jpg", link: "https://t.me/A597MP97",                        objectPosition: "center 5%",  scale: 1.00 },
-            ].map((dev, _i) => {
+          {(() => {
+            const members = [
+              { name: "Радкевич Роман",    role: "Разработчик", photo: "/developers/radkevich-roman.jpg",      link: "https://t.me/liiiiiliiiiiliiiiiliiiiiliiiiil", objectPosition: "center 22%", scale: 1.18 },
+              { name: "Виктория Кужелева", role: "Разработчик", photo: "",                                      link: "https://t.me/viktoriakuzheleva",                objectPosition: "center 50%", scale: 1.00 },
+              { name: "Поляков Ярослав",   role: "Разработчик", photo: "/developers/polyakov-yaroslav.jpg",    link: "https://t.me/scencort",                        objectPosition: "center 22%", scale: 1.18 },
+              { name: "Вероника Кужелева", role: "Разработчик", photo: "",                                      link: "https://t.me/veronika_vladislavovnaa",          objectPosition: "center 50%", scale: 1.00 },
+              { name: "Чеха Иван",         role: "Разработчик", photo: "/developers/chekha-ivan.jpg",          link: "https://t.me/aaaaaqiwi",                       objectPosition: "center 5%",  scale: 1.00 },
+              { name: "Вартанян Вячеслав", role: "Разработчик", photo: "/developers/vartanyan-vyacheslav.jpg", link: "https://t.me/A597MP97",                        objectPosition: "center 5%",  scale: 1.00 },
+            ];
+
+            const colStarts = ["lg:col-start-1","lg:col-start-3","lg:col-start-5","lg:col-start-2","lg:col-start-4","lg:col-start-6"];
+
+            const cardJsx = (dev: typeof members[0], i: number, extraClass = "") => {
               const [firstName, ...rest] = dev.name.split(" ");
               const lastName = rest.join(" ");
               return (
-              <motion.a
-                key={dev.name}
-                href={dev.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Telegram ${dev.name}`}
-                whileHover={{ y: -6 }}
-                className="group relative card p-8 overflow-hidden flex flex-col items-center text-center transition-all duration-300 hover:shadow-card-lg hover:border-primary/30 cursor-pointer no-underline"
-              >
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-burgundy-500 to-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                <div className="relative mb-6">
-                  <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-primary via-burgundy-500 to-primary-300 opacity-60 blur-md group-hover:opacity-90 group-hover:blur-lg transition-all" />
-                  <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-primary to-burgundy-500" />
-                  <div className="relative w-44 h-44 md:w-52 md:h-52 rounded-full overflow-hidden ring-4 ring-[var(--card)] bg-[var(--surface)]">
-                    <div className="w-full h-full transition-transform duration-500 group-hover:scale-[1.08]">
-                      <img
-                        src={dev.photo}
-                        alt={dev.name}
-                        className="w-full h-full object-cover"
-                        style={{
-                          objectPosition: dev.objectPosition,
-                          transform: `scale(${dev.scale})`,
-                          transformOrigin: "center center",
-                        }}
-                        loading="lazy"
-                      />
+                <motion.a
+                  key={dev.name}
+                  href={dev.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Telegram ${dev.name}`}
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.5, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
+                  whileHover={{ y: -6 }}
+                  className={`group relative card p-8 overflow-hidden flex flex-col items-center text-center transition-all duration-300 hover:shadow-card-lg hover:border-primary/30 cursor-pointer no-underline h-full ${extraClass}`}
+                >
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-burgundy-500 to-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative mb-6">
+                    <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-primary via-burgundy-500 to-primary-300 opacity-60 blur-md group-hover:opacity-90 group-hover:blur-lg transition-all" />
+                    <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-primary to-burgundy-500" />
+                    <div className="relative w-44 h-44 md:w-52 md:h-52 rounded-full overflow-hidden ring-4 ring-[var(--card)] bg-[var(--surface)]">
+                      {dev.photo ? (
+                        <div className="w-full h-full transition-transform duration-500 group-hover:scale-[1.08]">
+                          <img
+                            src={dev.photo}
+                            alt={dev.name}
+                            className="w-full h-full object-cover"
+                            style={{ objectPosition: dev.objectPosition, transform: `scale(${dev.scale})`, transformOrigin: "center center" }}
+                            loading="lazy"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-900/30 dark:to-primary-900/10">
+                          <svg viewBox="0 0 80 80" className="w-20 h-20 text-primary/25" fill="currentColor">
+                            <circle cx="40" cy="28" r="16" />
+                            <ellipse cx="40" cy="72" rx="26" ry="18" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
                   </div>
+                  <h3 className="font-display font-bold text-2xl md:text-3xl tracking-tight mb-2 text-[var(--text)] leading-tight min-h-[4.5rem] md:min-h-[5.25rem] flex flex-col justify-start">
+                    <span>{firstName}</span>
+                    {lastName && <span>{lastName}</span>}
+                  </h3>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary text-xs font-semibold uppercase tracking-wider mb-3">
+                    <Code size={12} /> {dev.role}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--muted)] group-hover:text-primary transition-colors">
+                    <Send size={14} /> Telegram
+                  </span>
+                </motion.a>
+              );
+            };
+
+            return (
+              <div className="max-w-5xl mx-auto">
+                {/* Мобилка: 2 колонки */}
+                <div className="grid grid-cols-2 gap-5 lg:hidden">
+                  {members.map((dev, i) => cardJsx(dev, i))}
                 </div>
 
-                <h3 className="font-display font-bold text-2xl md:text-3xl tracking-tight mb-2 text-[var(--text)] leading-tight min-h-[4.5rem] md:min-h-[5.25rem] flex flex-col justify-start">
-                  <span>{firstName}</span>
-                  {lastName && <span>{lastName}</span>}
-                </h3>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary text-xs font-semibold uppercase tracking-wider mb-3">
-                  <Code size={12} /> {dev.role}
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--muted)] group-hover:text-primary transition-colors">
-                  <Send size={14} /> Telegram
-                </span>
-              </motion.a>
-              );
-            })}
-          </div>
+                {/* Десктоп: шахматка — ряд 1 col 1,3,5 / ряд 2 col 2,4,6 */}
+                <div className="hidden lg:grid lg:grid-cols-7 gap-y-5">
+                  {members.map((dev, i) => (
+                    <div key={dev.name} className={`col-span-2 ${colStarts[i]} px-2.5`}>
+                      {cardJsx(dev, i)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </section>
 

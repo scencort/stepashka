@@ -3,7 +3,7 @@ import MainLayout from "../layout/MainLayout";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { api, getAccessToken, API_BASE_URL } from "../lib/api";
-import { Send, History, Code2, Bot, User } from "lucide-react";
+import { Send, History, Code2, Bot, User, ChevronDown, ChevronUp, AlertTriangle, Lightbulb, ThumbsUp, CheckCircle } from "lucide-react";
 
 type Verdict = {
   id?: number;
@@ -11,6 +11,11 @@ type Verdict = {
   correctness: number;
   style: number;
   summary: string;
+  issues?: string[];
+  improvements?: string[];
+  goodParts?: string[];
+  sourceCode?: string;
+  language?: string;
 };
 
 type ChatMessage = {
@@ -22,9 +27,8 @@ export default function AiReview() {
   const [code, setCode] = useState("");
   const [isChecking, setIsChecking] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
-  const [history, setHistory] = useState<
-    Array<{ id: number; quality: number; createdAt: string }>
-  >([]);
+  const [history, setHistory] = useState<Array<Verdict & { id: number; createdAt: string }>>([]);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -38,10 +42,7 @@ export default function AiReview() {
 
   const loadHistory = async () => {
     try {
-      const data =
-        await api.get<
-          Array<{ id: number; quality: number; createdAt: string }>
-        >("/ai/review/history");
+      const data = await api.get<Array<Verdict & { id: number; createdAt: string }>>("/ai/review/history");
       setHistory(data);
     } catch {
       setHistory([]);
@@ -194,9 +195,9 @@ export default function AiReview() {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
           {/* Main Chat Area */}
-          <Card className="xl:col-span-2 flex flex-col h-[60vh] md:h-[700px] !p-0 overflow-hidden border border-white/60 dark:border-slate-700/60 shadow-lg shadow-slate-200/20 dark:shadow-black/20">
+          <Card className="xl:col-span-2 flex flex-col h-[60vh] md:h-[700px] !p-0 overflow-hidden" style={{ border: "1px solid var(--border)" }}>
             {/* Chat Header */}
-            <div className="px-6 py-4 border-b border-slate-200/50 dark:border-slate-700/60 bg-white/40 dark:bg-zinc-900/40 flex items-center justify-between backdrop-blur-md z-10">
+            <div className="px-6 py-4 flex items-center justify-between z-10" style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center">
                   <Bot size={20} className="text-rose-600 dark:text-rose-400" />
@@ -217,7 +218,7 @@ export default function AiReview() {
             </div>
 
             {/* Chat Messages */}
-            <div className="flex-1 overflow-auto p-6 space-y-6 bg-slate-50/30 dark:bg-black/10">
+            <div className="flex-1 overflow-auto p-6 space-y-6" style={{ background: "var(--bg)" }}>
               {chatMessages.map((item, index) => {
                 const isAi = item.role === "assistant";
                 return (
@@ -243,14 +244,12 @@ export default function AiReview() {
                       )}
                     </div>
                     <div
-                      className={`p-4 rounded-2xl shadow-sm ${
-                        isAi
-                          ? "bg-white/80 dark:bg-zinc-800/80 border border-white/60 dark:border-slate-700/60 rounded-tl-none"
-                          : "bg-gradient-to-br from-rose-600 to-red-600 text-white rounded-tr-none shadow-rose-500/20"
-                      }`}
+                      className={`p-4 rounded-2xl ${isAi ? "rounded-tl-none border" : "bg-gradient-to-br from-rose-600 to-red-700 text-white rounded-tr-none"}`}
+                      style={isAi ? { background: "var(--surface)", borderColor: "var(--border)" } : undefined}
                     >
                       <p
-                        className={`text-sm whitespace-pre-wrap leading-relaxed ${isAi ? "text-slate-700 dark:text-slate-300" : "text-white/95"}`}
+                        className={`text-sm whitespace-pre-wrap leading-relaxed ${isAi ? "" : "text-white/95"}`}
+                        style={isAi ? { color: "var(--text)" } : undefined}
                       >
                         {item.content}
                       </p>
@@ -268,7 +267,7 @@ export default function AiReview() {
                       />
                     </div>
                   </div>
-                  <div className="p-4 rounded-2xl bg-white/80 dark:bg-zinc-800/80 border border-white/60 dark:border-slate-700/60 rounded-tl-none flex items-center gap-1.5 h-12">
+                  <div className="p-4 rounded-2xl rounded-tl-none border flex items-center gap-1.5 h-12" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
                     <span className="w-2 h-2 bg-rose-400 rounded-full animate-bounce"></span>
                     <span
                       className="w-2 h-2 bg-rose-400 rounded-full animate-bounce"
@@ -285,8 +284,8 @@ export default function AiReview() {
             </div>
 
             {/* Chat Input */}
-            <div className="p-4 bg-white/60 dark:bg-zinc-900/60 border-t border-white/60 dark:border-slate-700/60 backdrop-blur-xl">
-              <div className="relative flex items-end gap-2 bg-white/60 dark:bg-zinc-900/80 border border-slate-200 dark:border-slate-700/80 rounded-[1.5rem] p-2 shadow-inner focus-within:ring-2 focus-within:ring-rose-500/30 transition-all">
+            <div className="p-4 border-t" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+              <div className="relative flex items-center gap-2 rounded-[1.5rem] px-2 py-2 border focus-within:ring-2 focus-within:ring-rose-500/30 transition-all" style={{ background: "var(--bg)", borderColor: "var(--border)" }}>
                 <textarea
                   value={chatInput}
                   onChange={(event) => setChatInput(event.target.value)}
@@ -297,15 +296,15 @@ export default function AiReview() {
                     }
                   }}
                   placeholder="Спросите AI про код, архитектуру, паттерны..."
-                  className="w-full min-h-[44px] max-h-[160px] bg-transparent outline-none resize-none px-3 py-2.5 text-sm"
+                  className="w-full min-h-[44px] max-h-[160px] bg-transparent outline-none resize-none px-3 py-2 text-sm self-center"
                   rows={1}
                 />
                 <button
                   onClick={askAi}
                   disabled={chatLoading || !chatInput.trim()}
-                  className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white flex items-center justify-center shadow-md shadow-rose-500/25 disabled:opacity-50 disabled:pointer-events-none transition-all mb-0.5 mr-0.5"
+                  className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 text-white flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none transition-all"
                 >
-                  <Send size={18} className="ml-1" />
+                  <Send size={16} className="ml-0.5" />
                 </button>
               </div>
               <p className="text-[10px] text-center text-slate-400 mt-2 font-medium">
@@ -316,9 +315,9 @@ export default function AiReview() {
 
           {/* Sidebar */}
           <div className="space-y-6 lg:space-y-8">
-            <Card className="space-y-4 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 bg-white/40 dark:bg-zinc-900/40">
+            <Card className="space-y-4 !rounded-[2rem]" style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-2xl bg-white dark:bg-zinc-800 shadow-sm border border-slate-100 dark:border-zinc-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-rose-500" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                   <Code2 size={20} />
                 </div>
                 <h3 className="font-bold text-lg">Быстрая проверка кода</h3>
@@ -344,7 +343,7 @@ export default function AiReview() {
               </div>
 
               {verdict && !isChecking && (
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 mt-4">
+                <div className="pt-2 border-t mt-4" style={{ borderColor: "var(--border)" }}>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-semibold">Оценка:</span>
                     <span
@@ -365,35 +364,84 @@ export default function AiReview() {
               )}
             </Card>
 
-            <Card className="space-y-4 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 bg-white/40 dark:bg-zinc-900/40">
+            <Card className="space-y-4 !rounded-[2rem]" style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-white dark:bg-zinc-800 shadow-sm border border-slate-100 dark:border-zinc-700 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-rose-500" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                   <History size={20} />
                 </div>
                 <h3 className="font-bold text-lg">История проверок</h3>
               </div>
 
               {history.length === 0 ? (
-                <p className="text-sm text-slate-500 font-medium text-center py-4">
+                <p className="text-sm font-medium text-center py-4" style={{ color: "var(--muted)" }}>
                   Нет недавних проверок
                 </p>
               ) : (
-                <div className="space-y-2">
-                  {history.slice(0, 3).map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between p-3 rounded-2xl bg-white/50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-700"
-                    >
-                      <p className="text-xs font-semibold text-slate-500">
-                        Проверка #{item.id}
-                      </p>
-                      <span
-                        className={`text-sm font-bold ${item.quality >= 80 ? "text-emerald-500" : item.quality >= 50 ? "text-amber-500" : "text-rose-500"}`}
+                <div className="space-y-2 max-h-[500px] overflow-auto pr-1">
+                  {history.map((item) => {
+                    const avg = Math.round((item.quality + item.correctness + item.style) / 3);
+                    const scoreColor = avg >= 80 ? "text-emerald-500" : avg >= 50 ? "text-amber-500" : "text-rose-500";
+                    const isOpen = expandedId === item.id;
+                    return (
+                    <div key={item.id} className="rounded-2xl border overflow-hidden" style={{ borderColor: "var(--border)" }}>
+                      <button
+                        onClick={() => setExpandedId(isOpen ? null : item.id)}
+                        className="w-full text-left p-3 flex items-center justify-between gap-2 transition-colors"
+                        style={{ background: "var(--bg)" }}
                       >
-                        {item.quality}%
-                      </span>
+                        <div className="flex items-center gap-2">
+                          <p className={`text-lg font-black ${scoreColor}`}>{avg}%</p>
+                          <div className="flex gap-1.5 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>
+                            <span>Q:{item.quality}</span>
+                            <span>C:{item.correctness}</span>
+                            <span>S:{item.style}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ color: "var(--muted)", background: "var(--surface)" }}>
+                            {new Date(item.createdAt).toLocaleDateString("ru-RU")}
+                          </span>
+                          {isOpen ? <ChevronUp size={13} style={{ color: "var(--muted)" }} /> : <ChevronDown size={13} style={{ color: "var(--muted)" }} />}
+                        </div>
+                      </button>
+
+                      {isOpen && (
+                        <div className="px-3 pb-3 pt-2 space-y-3 border-t" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                          {item.sourceCode && (
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wide mb-1 flex items-center gap-1" style={{ color: "var(--muted)" }}><Code2 size={10} /> Код</p>
+                              <pre className="text-xs font-mono rounded-xl p-2.5 overflow-auto max-h-36 whitespace-pre-wrap break-words border" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }}>
+                                {item.sourceCode}
+                              </pre>
+                            </div>
+                          )}
+                          <div className="text-xs rounded-xl p-2.5 border border-blue-200/30 bg-blue-500/5">
+                            <p className="font-bold text-blue-400 mb-1 flex items-center gap-1"><CheckCircle size={10} /> Резюме</p>
+                            <p style={{ color: "var(--text)" }}>{item.summary}</p>
+                          </div>
+                          {item.issues && item.issues.length > 0 && (
+                            <div className="text-xs rounded-xl p-2.5 border border-rose-200/30 bg-rose-500/5 space-y-1">
+                              <p className="font-bold text-rose-400 flex items-center gap-1"><AlertTriangle size={10} /> Проблемы</p>
+                              {item.issues.map((s, i) => <p key={i} className="flex gap-1.5" style={{ color: "var(--text)" }}><span className="text-rose-400 shrink-0">•</span>{s}</p>)}
+                            </div>
+                          )}
+                          {item.improvements && item.improvements.length > 0 && (
+                            <div className="text-xs rounded-xl p-2.5 border border-amber-200/30 bg-amber-500/5 space-y-1">
+                              <p className="font-bold text-amber-400 flex items-center gap-1"><Lightbulb size={10} /> Улучшения</p>
+                              {item.improvements.map((s, i) => <p key={i} className="flex gap-1.5" style={{ color: "var(--text)" }}><span className="text-amber-400 shrink-0">•</span>{s}</p>)}
+                            </div>
+                          )}
+                          {item.goodParts && item.goodParts.length > 0 && (
+                            <div className="text-xs rounded-xl p-2.5 border border-emerald-200/30 bg-emerald-500/5 space-y-1">
+                              <p className="font-bold text-emerald-400 flex items-center gap-1"><ThumbsUp size={10} /> Что хорошо</p>
+                              {item.goodParts.map((s, i) => <p key={i} className="flex gap-1.5" style={{ color: "var(--text)" }}><span className="text-emerald-400 shrink-0">•</span>{s}</p>)}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </Card>
