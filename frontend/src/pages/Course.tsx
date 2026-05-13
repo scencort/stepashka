@@ -136,13 +136,14 @@ export default function Course() {
     name: string;
     passed: boolean;
   }> | null>(null);
+  const [stepAiComment, setStepAiComment] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [newCourseTitle, setNewCourseTitle] = useState("");
   const [newCourseType, setNewCourseType] = useState("Frontend");
   const [newCourseLevel, setNewCourseLevel] = useState("Начальный");
   const [attemptHistory, setAttemptHistory] = useState<AttemptEntry[]>([]);
-  const [autoAdvance, setAutoAdvance] = useState(true);
+  const [_autoAdvance] = useState(false);
   const [openModules, setOpenModules] = useState<Record<number, boolean>>({});
   const [enrollmentStatus, setEnrollmentStatus] =
     useState<EnrollmentStatus | null>(null);
@@ -203,7 +204,6 @@ export default function Course() {
   const loadCourseContent = async (cId: number) => {
     setContentLoading(true);
     setContentError("");
-    setStepError("");
     try {
       const data = await api.get<CourseContentResponse>(
         `/courses/${cId}/steps`,
@@ -351,30 +351,23 @@ export default function Course() {
     setStepError("");
     setStepMessage("");
     setStepCheckResults(null);
-    const currentStepIndex =
-      courseContent?.steps.findIndex((s) => s.id === selectedStepId) ?? -1;
-    const nextStepCandidateId =
-      currentStepIndex >= 0 &&
-      courseContent &&
-      currentStepIndex < courseContent.steps.length - 1
-        ? courseContent.steps[currentStepIndex + 1].id
-        : null;
     try {
       const response = await api.post<{
         passed: boolean;
         feedback: string;
         checkResults?: Array<{ name: string; passed: boolean }> | null;
+        aiComment?: string | null;
       }>(`/steps/${selectedStepId}/check`, { answer: stepAnswer });
-      const failedChecks = (response.checkResults ?? []).filter(
-        (c) => !c.passed,
-      );
-      const readableFailure =
-        !response.passed && failedChecks.length > 0
-          ? `Не пройдено ${failedChecks.length} тест(ов): ${failedChecks.map((c) => c.name).join(", ")}.`
-          : "";
-      setStepMessage(response.feedback);
-      setStepError(readableFailure);
+      // Color feedback by pass/fail — errors always red, success always green
+      if (response.passed) {
+        setStepMessage(response.feedback);
+        setStepError("");
+      } else {
+        setStepError(response.feedback);
+        setStepMessage("");
+      }
       setStepCheckResults(response.checkResults ?? null);
+      setStepAiComment(response.aiComment ?? null);
       setAttemptHistory((prev) => [
         {
           id: Date.now(),
@@ -388,10 +381,6 @@ export default function Course() {
       ]);
       if (response.passed) toast.success("Шаг принят");
       await Promise.all([loadCourseContent(selectedCourseId), loadCourses()]);
-      if (response.passed && autoAdvance && nextStepCandidateId) {
-        selectStep(nextStepCandidateId, "");
-        setStepMessage("Шаг принят. Перешли к следующему.");
-      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Не удалось проверить шаг";
@@ -408,6 +397,7 @@ export default function Course() {
     setStepError("");
     setStepMessage("");
     setStepCheckResults(null);
+    setStepAiComment(null);
   };
 
   const toggleModule = (moduleId: number) => {
@@ -432,8 +422,7 @@ export default function Course() {
           stepError={stepError}
           stepMessage={stepMessage}
           stepCheckResults={stepCheckResults}
-          autoAdvance={autoAdvance}
-          setAutoAdvance={setAutoAdvance}
+          stepAiComment={stepAiComment}
           attemptHistory={attemptHistory}
           activeTab={activeTab}
           setActiveTab={setActiveTab}

@@ -469,96 +469,6 @@ function StepEditor({
   )
 }
 
-function LessonEditor({
-  lesson,
-  onChange,
-  onDelete,
-}: {
-  lesson: Lesson
-  onChange: (l: Lesson) => void
-  onDelete: () => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-
-  const addStep = () => {
-    const next = emptyStep(lesson.steps.length + 1)
-    onChange({ ...lesson, steps: [...lesson.steps, next] })
-  }
-
-  const updateStep = (idx: number, step: Step) => {
-    const steps = lesson.steps.map((s, i) => (i === idx ? step : s))
-    onChange({ ...lesson, steps })
-  }
-
-  const deleteStep = (idx: number) => {
-    onChange({ ...lesson, steps: lesson.steps.filter((_, i) => i !== idx) })
-  }
-
-  return (
-    <div className="ml-4 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-      <div
-        className="flex items-center gap-2 px-3 py-2.5 bg-white/40 dark:bg-zinc-800/40 cursor-pointer select-none"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <GripVertical size={14} className="text-slate-400 shrink-0" />
-        <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded">
-          Урок
-        </span>
-        <input
-          value={lesson.title}
-          onChange={(e) => onChange({ ...lesson, title: e.target.value })}
-          onClick={(e) => e.stopPropagation()}
-          className="flex-1 bg-transparent text-sm font-medium outline-none"
-          placeholder="Название урока"
-        />
-        <span className="text-xs text-slate-400">{lesson.steps.length} шагов</span>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          className="shrink-0 text-slate-400 hover:text-rose-500 transition-colors"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
-
-
-        {expanded && (
-          <div
-
-
-
-            className="overflow-hidden"
-          >
-            <div className="p-3 space-y-2 border-t border-slate-100 dark:border-slate-700">
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">Вводный текст урока</label>
-                <textarea
-                  value={lesson.contentText}
-                  onChange={(e) => onChange({ ...lesson, contentText: e.target.value })}
-                  rows={3}
-                  placeholder="Краткое введение или аннотация урока..."
-                  className="input-field text-sm w-full"
-                />
-              </div>
-              <p className="text-xs text-slate-500 font-medium mt-2">Шаги урока</p>
-              {lesson.steps.map((step, idx) => (
-                <StepEditor
-                  key={idx}
-                  step={step}
-                  onChange={(s) => updateStep(idx, s)}
-                  onDelete={() => deleteStep(idx)}
-                />
-              ))}
-              <Button variant="outline" onClick={addStep}>
-                <Plus size={12} className="mr-1" /> Добавить шаг
-              </Button>
-            </div>
-          </div>
-        )}
-
-    </div>
-  )
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const STEPS = ["Основная информация", "Структура курса", "Публикация"]
@@ -788,7 +698,7 @@ export default function CourseEditor() {
     setSaving(true)
     try {
       await api.patch(`/teacher/courses/${savedCourseId}/publish`, { status: publishStatus })
-      toast.success(publishStatus === "published" ? "Курс отправлен на публикацию" : "Курс сохранён как черновик")
+      toast.success(publishStatus === "pending_review" ? "Курс отправлен на модерацию" : "Курс сохранён как черновик")
       navigate("/teacher")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Ошибка публикации")
@@ -824,16 +734,6 @@ export default function CourseEditor() {
       prev.map((m, i) =>
         i === modIdx
           ? { ...m, lessons: m.lessons.map((l, j) => (j === lesIdx ? lesson : l)) }
-          : m
-      )
-    )
-  }
-
-  const deleteLesson = (modIdx: number, lesIdx: number) => {
-    setModules((prev) =>
-      prev.map((m, i) =>
-        i === modIdx
-          ? { ...m, lessons: m.lessons.filter((_, j) => j !== lesIdx) }
           : m
       )
     )

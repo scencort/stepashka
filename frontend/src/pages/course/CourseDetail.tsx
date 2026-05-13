@@ -106,8 +106,7 @@ type Props = {
   stepError: string;
   stepMessage: string;
   stepCheckResults: Array<{ name: string; passed: boolean }> | null;
-  autoAdvance: boolean;
-  setAutoAdvance: (v: boolean) => void;
+  stepAiComment: string | null;
   attemptHistory: AttemptEntry[];
   activeTab: "content" | "discussion";
   setActiveTab: (v: "content" | "discussion") => void;
@@ -139,8 +138,7 @@ export default function CourseDetail(props: Props) {
     stepError,
     stepMessage,
     stepCheckResults,
-    autoAdvance,
-    setAutoAdvance,
+    stepAiComment,
     attemptHistory,
     activeTab,
     setActiveTab,
@@ -401,8 +399,7 @@ export default function CourseDetail(props: Props) {
               stepError={stepError}
               stepMessage={stepMessage}
               stepCheckResults={stepCheckResults}
-              autoAdvance={autoAdvance}
-              setAutoAdvance={setAutoAdvance}
+              stepAiComment={stepAiComment}
               attemptHistory={attemptHistory}
               selectedStepId={selectedStepId}
               submitLabel={submitLabel}

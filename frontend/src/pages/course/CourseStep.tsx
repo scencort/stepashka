@@ -10,7 +10,245 @@ import {
   Copy,
   CheckCheck,
 } from "lucide-react";
-import { useState as useStateLocal } from "react";
+import { useState as useStateLocal, useRef, useMemo, useEffect as useEffectLocal } from "react";
+
+// ── Dark mode detector ───────────────────────────────────────────
+function useIsDark() {
+  const [isDark, setIsDark] = useStateLocal(() =>
+    document.documentElement.classList.contains("dark")
+  );
+  useEffectLocal(() => {
+    const obs = new MutationObserver(() =>
+      setIsDark(document.documentElement.classList.contains("dark"))
+    );
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return isDark;
+}
+
+// ── Python syntax highlighter ────────────────────────────────────
+function escHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+const PY_KEYWORDS = new Set([
+  "def","class","import","from","return","if","elif","else","for","while",
+  "in","not","and","or","is","None","True","False","try","except","finally",
+  "with","as","raise","pass","break","continue","lambda","async","await",
+  "yield","global","nonlocal","del","assert","self","cls",
+]);
+const PY_BUILTINS = new Set([
+  "print","len","range","str","int","float","list","dict","set","tuple",
+  "bool","type","isinstance","hasattr","getattr","setattr","enumerate",
+  "zip","map","filter","sorted","reversed","sum","min","max","abs","round",
+  "open","super","input","repr","format","any","all","id","hex","bin","oct",
+  "staticmethod","classmethod","property","Exception","ValueError","TypeError",
+  "KeyError","IndexError","AttributeError","RuntimeError","StopIteration",
+  "BaseModel","Field","FastAPI","List","Optional","Dict","Union",
+]);
+
+function highlightLine(line: string, dark: boolean): string {
+  const c = dark
+    ? { kw:"#c084fc", str:"#4ade80", cmt:"#6b7280", num:"#fb923c", builtin:"#38bdf8", fn:"#60a5fa", op:"#818cf8", plain:"#e2e8f0" }
+    : { kw:"#7c3aed", str:"#15803d", cmt:"#6b7280", num:"#ea580c", builtin:"#0369a1", fn:"#1d4ed8", op:"#6366f1", plain:"#1e293b" };
+
+  let out = "";
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] === "#") {
+      out += `<span style="color:${c.cmt};font-style:italic">${escHtml(line.slice(i))}</span>`;
+      break;
+    }
+    // f/r/b prefix
+    let pfx = "";
+    if ("frbrb".includes(line[i]) && (line[i+1] === '"' || line[i+1] === "'")) {
+      pfx = line[i++];
+    }
+    // String
+    if (line[i] === '"' || line[i] === "'") {
+      const q = line[i];
+      const triple = line.slice(i, i+3) === q+q+q;
+      const end = triple ? q+q+q : q;
+      let j = i + (triple ? 3 : 1);
+      while (j < line.length) {
+        if (line[j] === "\\" ) { j += 2; continue; }
+        if (line.slice(j, j+end.length) === end) { j += end.length; break; }
+        j++;
+      }
+      out += `<span style="color:${c.str}">${escHtml(pfx + line.slice(i, j))}</span>`;
+      i = j; continue;
+    }
+    if (pfx) { out += escHtml(pfx); continue; }
+    // Decorator
+    if (line[i] === "@") {
+      let j = i+1;
+      while (j < line.length && /[\w.]/.test(line[j])) j++;
+      out += `<span style="color:#f59e0b">${escHtml(line.slice(i, j))}</span>`;
+      i = j; continue;
+    }
+    // Number
+    if (/[0-9]/.test(line[i]) && (i === 0 || !/\w/.test(line[i-1]))) {
+      let j = i;
+      while (j < line.length && /[0-9._xXbBoOeEjJ]/.test(line[j])) j++;
+      out += `<span style="color:${c.num}">${escHtml(line.slice(i, j))}</span>`;
+      i = j; continue;
+    }
+    // Identifier
+    if (/[a-zA-Z_]/.test(line[i])) {
+      let j = i;
+      while (j < line.length && /\w/.test(line[j])) j++;
+      const word = line.slice(i, j);
+      let k = j; while (k < line.length && line[k] === " ") k++;
+      const isCall = line[k] === "(";
+      if (PY_KEYWORDS.has(word))
+        out += `<span style="color:${c.kw};font-weight:600">${escHtml(word)}</span>`;
+      else if (PY_BUILTINS.has(word))
+        out += `<span style="color:${c.builtin}">${escHtml(word)}</span>`;
+      else if (isCall)
+        out += `<span style="color:${c.fn}">${escHtml(word)}</span>`;
+      else
+        out += `<span style="color:${c.plain}">${escHtml(word)}</span>`;
+      i = j; continue;
+    }
+    // Operator
+    if ("+-*/%=<>!&|^~".includes(line[i]))
+      out += `<span style="color:${c.op}">${escHtml(line[i++])}</span>`;
+    else
+      out += escHtml(line[i++]);
+  }
+  return out;
+}
+
+function highlightCode(code: string, dark: boolean): string {
+  return code.split("\n").map(l => highlightLine(l, dark)).join("\n");
+}
+
+// ── Code editor with syntax highlighting ─────────────────────────
+const FONT: React.CSSProperties = {
+  fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code','Consolas',monospace",
+  fontSize: "13px",
+  lineHeight: "22px",
+};
+const PAD = 14;
+const GUTTER = 46;
+
+function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const dark = useIsDark();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const preRef = useRef<HTMLPreElement>(null);
+
+  const lines = Math.max((value || "").split("\n").length, 10);
+  const highlighted = useMemo(() => highlightCode(value || "", dark), [value, dark]);
+
+  const syncScroll = () => {
+    if (textareaRef.current && preRef.current) {
+      preRef.current.scrollTop = textareaRef.current.scrollTop;
+      preRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  };
+
+  const bg    = dark ? "#18181b" : "#f8fafc";
+  const gutBg = dark ? "#1e1e24" : "#f1f5f9";
+  const gutBorder = dark ? "#3f3f46" : "#e2e8f0";
+  const gutColor  = dark ? "#52525b" : "#94a3b8";
+  const caret = dark ? "#e2e8f0" : "#1e293b";
+  const border = dark ? "#3f3f46" : "#e2e8f0";
+
+  return (
+    <div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${border}`, boxShadow: "0 1px 4px 0 rgba(0,0,0,0.06)" }}>
+      {/* Title bar */}
+      <div style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 12px", background: gutBg, borderBottom:`1px solid ${gutBorder}` }}>
+        <span style={{ width:10,height:10,borderRadius:"50%",background:"#f87171",display:"inline-block" }}/>
+        <span style={{ width:10,height:10,borderRadius:"50%",background:"#fbbf24",display:"inline-block" }}/>
+        <span style={{ width:10,height:10,borderRadius:"50%",background:"#34d399",display:"inline-block" }}/>
+        <span style={{ ...FONT, fontSize:11, color: gutColor, marginLeft:8 }}>solution.py</span>
+      </div>
+      {/* Editor body */}
+      <div style={{ display:"flex", background: bg, minHeight: lines*22 + PAD*2 }}>
+        {/* Gutter */}
+        <div style={{ width:GUTTER, flexShrink:0, background:gutBg, borderRight:`1px solid ${gutBorder}`, paddingTop:PAD, paddingBottom:PAD, userSelect:"none" }}>
+          {Array.from({ length: lines }, (_, i) => (
+            <div key={i} style={{ ...FONT, textAlign:"right", paddingRight:10, color: gutColor }}>{i+1}</div>
+          ))}
+        </div>
+        {/* Overlay area */}
+        <div style={{ position:"relative", flex:1, overflow:"hidden" }}>
+          <pre
+            ref={preRef}
+            aria-hidden
+            style={{ ...FONT, position:"absolute", top:0, left:0, right:0, bottom:0, margin:0, padding:PAD, overflow:"hidden", whiteSpace:"pre", pointerEvents:"none" }}
+            dangerouslySetInnerHTML={{ __html: highlighted + "\n" }}
+          />
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onScroll={syncScroll}
+            onKeyDown={(e) => {
+              if (e.key === "Tab") {
+                e.preventDefault();
+                const el = e.currentTarget;
+                const start = el.selectionStart;
+                const end = el.selectionEnd;
+                const TAB = "    "; // 4 spaces
+                if (start === end) {
+                  // Single cursor — insert 4 spaces
+                  const next = value.slice(0, start) + TAB + value.slice(end);
+                  onChange(next);
+                  requestAnimationFrame(() => {
+                    el.selectionStart = el.selectionEnd = start + TAB.length;
+                  });
+                } else {
+                  // Multi-line selection — indent/unindent each line
+                  const lines = value.split("\n");
+                  let charCount = 0;
+                  const startLine = lines.findIndex(l => { charCount += l.length + 1; return charCount > start; });
+                  charCount = 0;
+                  const endLine = lines.findIndex(l => { charCount += l.length + 1; return charCount > end; });
+                  const sl = Math.max(0, startLine);
+                  const el2 = Math.min(lines.length - 1, endLine < 0 ? lines.length - 1 : endLine);
+                  if (e.shiftKey) {
+                    for (let i = sl; i <= el2; i++) {
+                      if (lines[i].startsWith(TAB)) lines[i] = lines[i].slice(4);
+                      else if (lines[i].startsWith(" ")) lines[i] = lines[i].replace(/^ +/, "");
+                    }
+                  } else {
+                    for (let i = sl; i <= el2; i++) lines[i] = TAB + lines[i];
+                  }
+                  onChange(lines.join("\n"));
+                }
+              }
+              // Auto-close brackets
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const el = e.currentTarget;
+                const pos = el.selectionStart;
+                const before = value.slice(0, pos);
+                const after = value.slice(pos);
+                const lastLine = before.split("\n").pop() || "";
+                const indent = lastLine.match(/^(\s*)/)?.[1] ?? "";
+                const extraIndent = lastLine.trimEnd().endsWith(":") ? "    " : "";
+                const next = before + "\n" + indent + extraIndent + after;
+                onChange(next);
+                const newPos = pos + 1 + indent.length + extraIndent.length;
+                requestAnimationFrame(() => {
+                  el.selectionStart = el.selectionEnd = newPos;
+                });
+              }
+            }}
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            placeholder="# Напишите код здесь..."
+            style={{ ...FONT, position:"relative", width:"100%", minHeight: lines*22 + PAD*2, padding:PAD, margin:0, border:"none", outline:"none", resize:"none", background:"transparent", color:"transparent", caretColor:caret, overflowY:"auto", whiteSpace:"pre", overflowWrap:"normal", display:"block" }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+// ────────────────────────────────────────────────────────────────
 
 // ── Theory renderer ──────────────────────────────────────────────
 function isCodeLine(line: string): boolean {
@@ -157,8 +395,7 @@ type Props = {
   stepError: string;
   stepMessage: string;
   stepCheckResults: Array<{ name: string; passed: boolean }> | null;
-  autoAdvance: boolean;
-  setAutoAdvance: (v: boolean) => void;
+  stepAiComment: string | null;
   attemptHistory: AttemptEntry[];
   selectedStepId: number | null;
   submitLabel: string;
@@ -179,8 +416,7 @@ export default function CourseStep(props: Props) {
     stepError,
     stepMessage,
     stepCheckResults,
-    autoAdvance,
-    setAutoAdvance,
+    stepAiComment,
     attemptHistory,
     selectedStepId,
     submitLabel,
@@ -316,15 +552,24 @@ export default function CourseStep(props: Props) {
               {activeStep.theoryText && (
                 <TheoryRenderer text={activeStep.theoryText} />
               )}
-              <p className="text-xs text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl px-3 py-2">
-                🤖 Ваш ответ будет оценён нейросетью по критериям: содержание, творчество, ясность, глубина анализа
-              </p>
-              <textarea
-                value={stepAnswer}
-                onChange={(e) => setStepAnswer(e.target.value)}
-                placeholder="Напишите ваше эссе здесь..."
-                className="w-full h-64 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] p-4 text-sm outline-none focus:border-primary/50 transition-colors resize-none"
-              />
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/40">
+                <span className="text-base">🤖</span>
+                <p className="text-xs text-purple-700 dark:text-purple-300 leading-snug">
+                  Ответ оценит AI по критериям: <span className="font-semibold">содержание, творчество, ясность, глубина анализа</span>
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden focus-within:border-primary/50 transition-colors shadow-sm">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg)]">
+                  <span className="text-xs font-medium text-[var(--muted)]">✍️ Ваш ответ</span>
+                  <span className="text-xs text-[var(--muted)]">{stepAnswer.length} симв.</span>
+                </div>
+                <textarea
+                  value={stepAnswer}
+                  onChange={(e) => setStepAnswer(e.target.value)}
+                  placeholder="Начните писать здесь..."
+                  className="w-full h-60 bg-transparent text-[var(--text)] p-4 text-sm leading-relaxed outline-none resize-none placeholder:text-[var(--muted)]"
+                />
+              </div>
             </div>
           )}
 
@@ -354,46 +599,114 @@ export default function CourseStep(props: Props) {
                   ))}
                 </div>
               )}
-              <textarea
-                value={stepAnswer}
-                onChange={(e) => setStepAnswer(e.target.value)}
-                placeholder={activeStep.taskTypeLabel === "Свободный ответ" ? "Напишите ваш развёрнутый ответ здесь..." : "// Напишите код здесь..."}
-                className={`w-full h-52 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] p-4 text-sm outline-none focus:border-primary/50 transition-colors resize-none ${activeStep.taskTypeLabel === "Свободный ответ" ? "" : "font-mono"}`}
-              />
+              {activeStep.taskTypeLabel === "Свободный ответ" ? (
+                <textarea
+                  value={stepAnswer}
+                  onChange={(e) => setStepAnswer(e.target.value)}
+                  placeholder="Напишите ваш развёрнутый ответ здесь..."
+                  className="w-full h-52 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] p-4 text-sm outline-none focus:border-primary/50 transition-colors resize-none"
+                />
+              ) : (
+                <CodeEditor
+                  value={stepAnswer}
+                  onChange={setStepAnswer}
+                />
+              )}
             </div>
           )}
 
-          {/* Check results */}
-          {stepCheckResults && (
+          {/* Check results — show all tests */}
+          {stepCheckResults && stepCheckResults.length > 0 && (
             <div className="space-y-1.5">
-              {stepCheckResults.map((result, idx) => (
-                <div
-                  key={idx}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
-                    result.passed
-                      ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
-                      : "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
-                  }`}
-                >
-                  {result.passed ? <Check size={14} /> : <X size={14} />}
-                  {result.name}
-                </div>
-              ))}
+              <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">Проверки</p>
+              {stepCheckResults.map((result, idx) => {
+                const r = result as typeof result & { expected?: string; actual?: string; error?: string };
+                const hasIO = "expected" in r || "actual" in r;
+                return (
+                  <div
+                    key={idx}
+                    className={`rounded-xl border overflow-hidden ${
+                      r.passed
+                        ? "border-green-200 dark:border-green-800/40"
+                        : "border-red-200 dark:border-red-800/40"
+                    }`}
+                  >
+                    <div className={`flex items-center gap-2 px-3 py-2 text-xs font-medium ${
+                      r.passed
+                        ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
+                        : "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                    }`}>
+                      {r.passed ? <Check size={13} /> : <X size={13} />}
+                      <span>{r.name}</span>
+                    </div>
+                    {!r.passed && hasIO && (
+                      <div className="bg-[var(--surface)]">
+                        {r.error ? (
+                          <div className="px-3 py-2">
+                            <p className="text-[10px] text-[var(--muted)] mb-1 uppercase tracking-wider">Ошибка</p>
+                            <pre className="text-xs text-red-600 dark:text-red-400 font-mono whitespace-pre-wrap leading-relaxed">{r.error}</pre>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-px bg-[var(--border)]">
+                            <div className="bg-[var(--surface)] px-3 py-2">
+                              <p className="text-[10px] text-[var(--muted)] mb-1 uppercase tracking-wider">Ожидалось</p>
+                              <pre className="text-xs text-green-700 dark:text-green-400 font-mono whitespace-pre-wrap">{r.expected || "(пусто)"}</pre>
+                            </div>
+                            <div className="bg-[var(--surface)] px-3 py-2">
+                              <p className="text-[10px] text-[var(--muted)] mb-1 uppercase tracking-wider">Получено</p>
+                              <pre className="text-xs text-red-600 dark:text-red-400 font-mono whitespace-pre-wrap">{r.actual || "(пусто)"}</pre>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* AI Comment */}
+          {stepAiComment && (
+            <div className="rounded-2xl overflow-hidden border border-violet-200 dark:border-violet-700/40 shadow-sm">
+              <div className="flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600">
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-base leading-none shrink-0">🤖</div>
+                <span className="text-xs font-bold text-white tracking-wide uppercase">AI-наставник</span>
+                <span className="ml-auto text-[10px] text-white/60 font-medium">Gradus AI</span>
+              </div>
+              <div className="px-4 py-3.5 bg-violet-50 dark:bg-violet-950/30">
+                <p className="text-sm text-violet-900 dark:text-violet-200 leading-relaxed whitespace-pre-wrap">{stepAiComment}</p>
+              </div>
             </div>
           )}
 
           {/* Feedback */}
-          {(stepMessage || stepError) && (
-            <div
-              className={`px-4 py-3 rounded-xl text-sm font-medium ${
-                stepError
+          {(stepMessage || stepError) && (() => {
+            const msg = stepError || stepMessage;
+            const isError = !!stepError;
+            const isMultiline = msg.includes("\n");
+            if (isError && isMultiline) {
+              // Terminal-style error block
+              return (
+                <div className="rounded-xl overflow-hidden border border-red-200 dark:border-red-800/40">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-red-600 dark:bg-red-800">
+                    <X size={13} className="text-white/80 shrink-0" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wide">Ошибка выполнения</span>
+                  </div>
+                  <pre className="px-4 py-3 text-xs font-mono leading-relaxed bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 overflow-x-auto whitespace-pre-wrap">{msg}</pre>
+                </div>
+              );
+            }
+            return (
+              <div className={`px-4 py-3 rounded-xl text-sm font-medium ${
+                isError
                   ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400"
                   : "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40 text-green-700 dark:text-green-400"
-              }`}
-            >
-              {stepError || stepMessage}
-            </div>
-          )}
+              }`}>
+                {msg}
+              </div>
+            );
+          })()}
 
           {/* Actions */}
           <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border)]">
@@ -409,15 +722,6 @@ export default function CourseStep(props: Props) {
             </div>
 
             <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-xs text-[var(--muted)] cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={autoAdvance}
-                  onChange={(e) => setAutoAdvance(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded accent-primary"
-                />
-                Авто-переход
-              </label>
               <button
                 onClick={onSubmitStep}
                 disabled={

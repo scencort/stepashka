@@ -15,7 +15,6 @@ import {
   Code,
   GraduationCap,
   Brain,
-  Wrench,
   ChartColumn,
   ShieldCheck,
   MessageSquare,

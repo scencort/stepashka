@@ -181,12 +181,89 @@ def _run_code_with_input(code: str, stdin_data: str, timeout: float = 5.0) -> tu
         return "", str(exc), 1
 
 
+_ERROR_MAP = [
+    ("SyntaxError:",        "Синтаксическая ошибка:"),
+    ("NameError:",          "Имя не определено:"),
+    ("IndentationError:",   "Ошибка отступа:"),
+    ("ModuleNotFoundError:","Модуль не найден:"),
+    ("TypeError:",          "Ошибка типа:"),
+    ("AttributeError:",     "Атрибут не найден:"),
+    ("ValueError:",         "Ошибка значения:"),
+    ("ZeroDivisionError:",  "Деление на ноль:"),
+    ("IndexError:",         "Индекс за пределами:"),
+    ("KeyError:",           "Ключ не найден:"),
+    ("RecursionError:",     "Слишком глубокая рекурсия:"),
+    ("RuntimeError:",       "Ошибка выполнения:"),
+    ("ImportError:",        "Ошибка импорта:"),
+]
+
+
+def _format_python_error(stderr: str) -> str:
+    """Turn Python traceback into a clean, readable error message."""
+    lines = stderr.strip().splitlines()
+    if not lines:
+        return "Неизвестная ошибка"
+
+    # Find the last 'File "...", line N' in the traceback (the user's code, not stdlib)
+    last_file_idx = -1
+    for i, line in enumerate(lines):
+        if re.match(r'\s*File ".*", line \d+', line):
+            last_file_idx = i
+
+    parts: list[str] = []
+
+    if last_file_idx >= 0:
+        # Extract line number
+        m = re.search(r'line (\d+)', lines[last_file_idx])
+        if m:
+            parts.append(f"Строка {m.group(1)}:")
+        # Next line is the actual code (if present and not another File/Error line)
+        code_idx = last_file_idx + 1
+        if code_idx < len(lines) and not re.match(r'\s*File "|^\w.*Error:', lines[code_idx]):
+            code_text = lines[code_idx].rstrip()
+            parts.append(f"  {code_text}")
+            # Caret pointer?
+            ptr_idx = code_idx + 1
+            if ptr_idx < len(lines) and re.match(r'[\s~^]+$', lines[ptr_idx].strip()):
+                parts.append(f"  {lines[ptr_idx].rstrip()}")
+
+    # Last line = the error itself
+    error_line = lines[-1]
+    for en, ru in _ERROR_MAP:
+        if en in error_line:
+            error_line = error_line.replace(en, ru, 1)
+            break
+
+    parts.append(error_line)
+    return "\n".join(parts)
+
+
 def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
     answer = str(answer or "")
     tests = tests_raw if isinstance(tests_raw, list) else []
 
+    # Determine if any test is IO-based (will run code itself)
+    has_io = any(("expectedOutput" in t or "input" in t) for t in tests)
+
+    # For pattern-only tests: ALWAYS run code first.
+    # If it crashes → fail all checks immediately.
+    if not has_io:
+        _, run_stderr, run_rc = _run_code_with_input(answer, "")
+        if run_rc != 0:
+            err_detail = _format_python_error(run_stderr)
+            failed_results = [{"name": t.get("description") or t.get("name") or f"Проверка {i+1}", "passed": False}
+                              for i, t in enumerate(tests)] if tests else \
+                             [{"name": "Код выполняется без ошибок", "passed": False}]
+            return {
+                "passed": False,
+                "scorePercent": 0,
+                "passedCount": 0,
+                "totalChecks": len(failed_results),
+                "checkResults": failed_results,
+                "feedback": err_detail,
+            }
+
     if not tests:
-        # No test cases defined — just check the code runs without error
         stdout, stderr, rc = _run_code_with_input(answer, "")
         passed = rc == 0
         return {
@@ -194,7 +271,7 @@ def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
             "scorePercent": 100 if passed else 0,
             "passedCount": 1 if passed else 0,
             "totalChecks": 1,
-            "checkResults": [{"name": "Код выполняется без ошибок", "passed": passed, "output": stdout, "error": stderr}],
+            "checkResults": [{"name": "Код выполняется без ошибок", "passed": passed, "error": stderr[:200] if stderr else ""}],
             "feedback": "Код выполняется успешно" if passed else f"Ошибка выполнения: {stderr[:200]}",
         }
 
@@ -203,42 +280,70 @@ def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
 
     for idx, raw_test in enumerate(tests):
         test = raw_test or {}
-        # Support both {input, expectedOutput} and legacy {description, type, pattern, tokens}
         if "expectedOutput" in test or "input" in test:
             # IO-based test: run code, compare stdout
             test_input = str(test.get("input") or "")
             expected = str(test.get("expectedOutput") or "").strip()
-            name = test.get("description") or f"Тест {idx + 1}: вход={repr(test_input)[:30]}"
+            name = test.get("description") or f"Тест {idx + 1}"
             stdout, stderr, rc = _run_code_with_input(answer, test_input)
             actual = stdout.strip()
-            passed = rc == 0 and actual == expected
+            ok = rc == 0 and actual == expected
+            err_msg = _format_python_error(stderr) if stderr and rc != 0 else ""
             check_results.append({
                 "name": name,
-                "passed": passed,
+                "passed": ok,
                 "expected": expected,
                 "actual": actual,
-                "error": stderr[:200] if stderr else "",
+                "error": err_msg,
             })
         else:
-            # Legacy pattern-based checks
+            # Pattern-based or output-based (code already passed execution check above)
             name = str(test.get("description") or test.get("name") or f"Проверка {idx + 1}")
             ttype = str(test.get("type", ""))
             lowered = answer.lower()
-            passed = False
+            ok = False
             if ttype == "regex":
                 try:
-                    passed = bool(re.search(str(test.get("pattern", "")), answer, re.I))
+                    ok = bool(re.search(str(test.get("pattern", "")), answer, re.I | re.MULTILINE))
                 except re.error:
-                    passed = False
+                    ok = False
             elif ttype == "includesAny":
                 tokens = [str(t).lower() for t in (test.get("tokens") or [])]
-                passed = any(t and t in lowered for t in tokens)
+                ok = any(t and t in lowered for t in tokens)
             elif ttype == "includesAll":
                 tokens = [str(t).lower() for t in (test.get("tokens") or [])]
-                passed = len(tokens) > 0 and all(t and t in lowered for t in tokens)
+                ok = len(tokens) > 0 and all(t and t in lowered for t in tokens)
+            elif ttype == "minCountRegex":
+                try:
+                    matches = re.findall(str(test.get("pattern", "")), answer, re.I | re.MULTILINE)
+                    ok = len(matches) >= int(test.get("min", 1))
+                except (re.error, ValueError):
+                    ok = False
+            elif ttype == "outputContainsLine":
+                # Run code, check stdout has at least one line matching the pattern
+                _inp = str(test.get("input") or "")
+                _stdout, _stderr, _rc = _run_code_with_input(answer, _inp)
+                if _rc != 0:
+                    ok = False
+                else:
+                    _pat = str(test.get("pattern", ""))
+                    _lines = [l.rstrip() for l in _stdout.split("\n")]
+                    try:
+                        ok = any(re.fullmatch(_pat, line) for line in _lines if line)
+                    except re.error:
+                        ok = False
+            elif ttype == "outputLineCount":
+                # Run code, check stdout has >= min non-empty lines
+                _inp = str(test.get("input") or "")
+                _stdout, _stderr, _rc = _run_code_with_input(answer, _inp)
+                if _rc != 0:
+                    ok = False
+                else:
+                    _non_empty = [l for l in _stdout.split("\n") if l.strip()]
+                    ok = len(_non_empty) >= int(test.get("min", 1))
             else:
-                passed = len(answer.strip()) >= 20
-            check_results.append({"name": name, "passed": passed})
+                ok = len(answer.strip()) >= 20
+            check_results.append({"name": name, "passed": ok})
 
         if check_results[-1]["passed"]:
             passed_count += 1

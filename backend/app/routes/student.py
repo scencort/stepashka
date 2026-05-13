@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Request
 
-from app import db
+from app import db, cache
 from app.deps import CurrentUser, require_roles
 from app.schemas import EnrollmentRequestBody, SubmitBody, WeeklyGoalBody
 from app.services import evaluate_code_by_tests, estimate_essay, utcnow, write_audit
+from app.routes.ai import _ai_generate
+
+# Track AI rate limit: if we got 429 recently, skip AI calls for a cooldown period
+_ai_rate_limited_until: float = 0.0
+_AI_COOLDOWN_SECONDS = 120  # 2 minutes cooldown after 429
 
 router = APIRouter(prefix="/api/student", tags=["student"])
 
@@ -577,6 +583,7 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
     score = 0
     assignment_id = None
     check_results = None
+    evaluation: dict = {}
 
     if slot == 1:
         assignment = await db.fetchrow(
@@ -650,11 +657,80 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
 
             else:
                 kind = "code"
-                evaluation = evaluate_code_by_tests(answer, tests_data)
+
+                # --- Redis cache: cache only test evaluation (not AI comment) ---
+                step_cache_key = f"gradus:step:{step_id}:{cache.sha256_text(answer)}"
+                cached_eval = await cache.get_json(step_cache_key)
+                if cached_eval:
+                    evaluation = cached_eval
+                else:
+                    evaluation = evaluate_code_by_tests(answer, tests_data)
+                    # Cache test results for 1 hour (AI comment is NOT cached — fetched fresh)
+                    await cache.set_json(step_cache_key, evaluation, ttl_seconds=3600)
+
+                # AI review — cached separately so successful comments are reused
+                # but failed ones (e.g. 429) are retried on next submission
+                runs_code_types = {"expectedOutput", "outputContainsLine", "outputLineCount"}
+                has_io_tests = any(
+                    "expectedOutput" in t or t.get("type") in runs_code_types
+                    for t in tests_data
+                )
+                # "Complex" = IO tests OR code is substantial (>= 80 chars)
+                is_complex = has_io_tests or len(answer) >= 80
+                # Skip AI for syntax/runtime errors — the error message is already clear
+                has_execution_error = "\n" in evaluation.get("feedback", "")
+                evaluation["aiComment"] = None
+                if is_complex and len(answer) >= 30 and not has_execution_error:
+                    global _ai_rate_limited_until
+                    ai_cache_key = f"gradus:ai:{step_id}:{cache.sha256_text(answer)}"
+                    cached_ai = await cache.get_json(ai_cache_key)
+                    if cached_ai and cached_ai.get("comment"):
+                        evaluation["aiComment"] = cached_ai["comment"]
+                    elif time.monotonic() < _ai_rate_limited_until:
+                        # AI provider is in cooldown due to recent 429 — skip to avoid hammering
+                        evaluation["aiComment"] = None
+                    else:
+                        try:
+                            failed_checks = [r["name"] for r in (evaluation.get("checkResults") or []) if not r["passed"]]
+                            all_passed = evaluation.get("passed", False)
+                            if all_passed:
+                                ai_prompt = (
+                                    f"Задание: «{lesson['title']}»\n\n"
+                                    f"Код студента:\n```python\n{answer[:1500]}\n```\n\n"
+                                    "Все тесты пройдены. Дай короткий разбор этого конкретного кода:\n"
+                                    "— какие именно конструкции использованы правильно (назови их)\n"
+                                    "— можно ли что-то улучшить или написать иначе (конкретно)\n"
+                                    "2-3 предложения. Начни с похвалы за правильное решение."
+                                )
+                            else:
+                                ai_prompt = (
+                                    f"Задание: «{lesson['title']}»\n\n"
+                                    f"Код студента:\n```python\n{answer[:1500]}\n```\n\n"
+                                    f"Не пройдены тесты: {', '.join(failed_checks)}.\n\n"
+                                    "Разбери этот конкретный код:\n"
+                                    "— что написано верно (назови конкретные строки/конструкции)\n"
+                                    "— что именно не так и как исправить (конкретно, с примером)\n"
+                                    "2-3 предложения, по существу."
+                                )
+                            ai_comment = await _ai_generate(
+                                ai_prompt,
+                                "Ты ментор по программированию на Python. "
+                                "Смотришь ТОЛЬКО на предоставленный код, не придумываешь контекст. "
+                                "Отвечаешь кратко и по делу, на русском языке."
+                            )
+                            evaluation["aiComment"] = ai_comment.strip()
+                            # Cache successful AI responses for 24h
+                            await cache.set_json(ai_cache_key, {"comment": ai_comment.strip()}, ttl_seconds=86400)
+                        except Exception as exc:
+                            # Check if it's a rate limit error — enter cooldown
+                            if "429" in str(exc):
+                                _ai_rate_limited_until = time.monotonic() + _AI_COOLDOWN_SECONDS
+                            evaluation["aiComment"] = None  # Not cached → retried after cooldown
+
                 passed = evaluation["passed"]
-                score = 25 if passed else max(0, round(evaluation["scorePercent"] / 100 * 25))
+                score = 25 if passed else max(0, round(evaluation.get("scorePercent", 0) / 100 * 25))
                 feedback = evaluation["feedback"]
-                check_results = evaluation["checkResults"]
+                check_results = evaluation.get("checkResults")
         else:
             kind = "theory"
             passed = True
@@ -757,6 +833,7 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
         "passed": passed,
         "feedback": feedback,
         "checkResults": check_results,
+        "aiComment": evaluation.get("aiComment") if isinstance(evaluation, dict) else None,
         "progress": dict(cur) if cur else None,
         "courseSummary": {
             "total": total_val,
