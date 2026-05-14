@@ -1,11 +1,14 @@
 /* eslint-disable react-refresh/only-export-components */
+// система уведомлений (тостов) — провайдер и хук в одном файле
+// анимации через framer-motion, автоудаление через 3.2 секунды
 import { createContext, useCallback, useContext, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 
+// два типа тоста — успех и ошибка
 type ToastType = "success" | "error"
 
 type ToastItem = {
-  id: number
+  id: number       // уникальный id для AnimatePresence
   message: string
   type: ToastType
 }
@@ -24,6 +27,8 @@ type Props = {
 export function ToastProvider({ children }: Props) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
+  // push добавляет тост и через 3.2 секунды удаляет его по id
+  // id = Date.now + random чтобы избежать коллизий при частых вызовах
   const push = useCallback((type: ToastType, message: string) => {
     const id = Date.now() + Math.floor(Math.random() * 1000)
     setToasts((prev) => [...prev, { id, type, message }])
@@ -32,6 +37,7 @@ export function ToastProvider({ children }: Props) {
     }, 3200)
   }, [])
 
+  // мемоизируем value чтобы не перерендеривать всё дерево на каждый тост
   const value = useMemo<ToastContextValue>(
     () => ({
       success: (message: string) => push("success", message),
@@ -44,6 +50,7 @@ export function ToastProvider({ children }: Props) {
     <ToastContext.Provider value={value}>
       {children}
 
+      {/* фиксированный контейнер тостов — правый верхний угол */}
       <div className="fixed z-[120] top-4 right-4 space-y-2 w-[min(92vw,340px)]">
         <AnimatePresence>
           {toasts.map((toast) => (
@@ -52,12 +59,14 @@ export function ToastProvider({ children }: Props) {
               initial={{ opacity: 0, x: 20, y: -6 }}
               animate={{ opacity: 1, x: 0, y: 0 }}
               exit={{ opacity: 0, x: 14, y: -4 }}
+              // оба типа — красные, но ошибка темнее
               className={`relative overflow-hidden rounded-2xl border px-4 py-3.5 shadow-[0_10px_24px_rgba(26,10,10,0.18)] text-sm font-semibold ${
                 toast.type === "success"
                   ? "bg-gradient-to-r from-[#CD3036] to-[#7A171C] border-red-700/40 text-white"
                   : "bg-gradient-to-r from-[#8A1D24] to-[#4A1014] border-red-900/40 text-rose-50"
               }`}
             >
+              {/* декоративная полоска бликов сверху */}
               <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/45" />
               {toast.message}
             </motion.div>
@@ -68,6 +77,7 @@ export function ToastProvider({ children }: Props) {
   )
 }
 
+// хук для использования тостов — бросает ошибку если вызван вне провайдера
 export function useToast() {
   const ctx = useContext(ToastContext)
   if (!ctx) {

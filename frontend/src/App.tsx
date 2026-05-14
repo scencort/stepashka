@@ -1,9 +1,14 @@
+// корневой компонент приложения — оборачивает всё в BrowserRouter
+// и устанавливает title страницы при переходах между маршрутами
 import { BrowserRouter, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { Router } from "./router";
 
+// базовый заголовок — добавляется через | к каждому тайтлу
 const BASE_TITLE = "Gradus";
 
+// возвращает читабельный заголовок по pathname
+// отдельная обработка для /course/... — там путь динамический
 function getPageTitle(pathname: string) {
   if (pathname.startsWith("/course/")) {
     return "Прохождение курса";
@@ -28,12 +33,15 @@ function getPageTitle(pathname: string) {
     "/admin": "Админ-панель",
   };
 
+  // если маршрут не найден — показываем дефолтный заголовок
   return titles[pathname] || "Платформа обучения";
 }
 
+// внутренний компонент — нужен чтобы использовать useLocation внутри BrowserRouter
 function AppRoutes() {
   const location = useLocation();
 
+  // каждый раз при смене pathname обновляем title документа
   useEffect(() => {
     const pageTitle = getPageTitle(location.pathname);
     document.title = `${pageTitle} | ${BASE_TITLE}`;
@@ -44,6 +52,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
+    // BrowserRouter обязательно снаружи — иначе useLocation не работает
     <BrowserRouter>
       <AppRoutes />
     </BrowserRouter>

@@ -1,15 +1,19 @@
+// компонент пустого состояния — показывается когда нет данных для отображения
+// иконка + заголовок + описание — стандартный паттерн для пустых списков
 import Card from "./Card"
 import { FolderX } from "lucide-react"
 
 type Props = {
   title: string
   description: string
-  icon?: React.ReactNode
+  icon?: React.ReactNode  // можно передать свою иконку, по умолчанию FolderX
 }
 
 export default function EmptyState({ title, description, icon }: Props) {
   return (
+    // карточка по центру с вертикальным отступом
     <Card className="flex flex-col items-center justify-center py-12 text-center">
+      {/* иконка в кружке — кастомная или дефолтная */}
       <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-slate-400 dark:text-slate-500 mb-4 ring-8 ring-slate-50 dark:ring-slate-900/50">
         {icon || <FolderX size={32} strokeWidth={1.5} />}
       </div>
