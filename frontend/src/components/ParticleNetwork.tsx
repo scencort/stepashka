@@ -6,24 +6,20 @@ import { useEffect, useRef } from "react";
 
 interface Props {
   className?: string;
-  /** Number of floating particles. */
+  // количество плавающих частиц
   particleCount?: number;
-  /** Max distance between two particles to draw a connecting line, in CSS pixels. */
+  // максимальное расстояние (в css-пикселях) для соединения двух частиц линией
   maxLinkDistance?: number;
-  /** Radius around the cursor where particles repel + extra "rays" appear. */
+  // радиус вокруг курсора — частицы в этой зоне отталкиваются и рисуются "лучи"
   cursorRadius?: number;
-  /** Base hex color for particles and links (alpha is added per draw). */
+  // базовый hex-цвет частиц и линий (прозрачность добавляется при отрисовке)
   color?: string;
-  /** 0..1 multiplier for the overall opacity of the layer. */
+  // множитель общей прозрачности слоя (0..1)
   intensity?: number;
 }
 
-/**
- * Animated particle network background — floating dots that connect with thin lines
- * when close to each other, and react to the cursor (repel + draw extra rays).
- *
- * Pure canvas2D, no dependencies. Drop it inside any `relative` container — it fills it.
- */
+// фоновая сетка из частиц — точки соединяются линиями если близко, реагируют на курсор
+// чистый canvas2D без зависимостей — достаточно обернуть в relative-контейнер
 export default function ParticleNetwork({
   className = "",
   particleCount = 90,

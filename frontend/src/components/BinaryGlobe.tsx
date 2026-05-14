@@ -13,13 +13,13 @@ type Point = {
   x: number;
   y: number;
   z: number;
-  /** index into the palette for stable per-point color */
+  // индекс в палитре — определяет цвет точки, фиксируется при создании
   tone: number;
-  /** subtle per-point twinkle phase */
+  // фаза мерцания — у каждой точки своя, создаёт эффект "дыхания"
   phase: number;
-  /** rendered digit: 0 or 1 (mutable so we can flip occasionally) */
+  // отображаемая цифра: 0 или 1 — иногда переключается (matrix-эффект)
   char: 0 | 1;
-  /** if true, this point uses the bright "highlight" palette[0] color */
+  // если true — точка рисуется ярким акцентным цветом palette[0]
   hot: boolean;
 };
 
@@ -29,11 +29,11 @@ type FloatDigit = {
   vx: number;
   vy: number;
   char: 0 | 1;
-  /** 0..1 base alpha */
+  // базовая прозрачность 0..1
   alpha: number;
-  /** twinkle phase */
+  // фаза мерцания
   phase: number;
-  /** if true this floating digit uses palette[0] color (rare "bright" ones) */
+  // если true — плавающая цифра рисуется ярким palette[0] (редкий акцент)
   hot: boolean;
 };
 
@@ -49,7 +49,7 @@ type Arc = {
   start: Vec3;
   end: Vec3;
   mid: Vec3;
-  /** pre-sampled bezier points (in object space); projected per frame */
+  // предсчитанные точки кривой безье (в объектном пространстве) — проецируются каждый кадр
   samples: Vec3[];
   life: number;
   maxLife: number;
@@ -59,9 +59,9 @@ interface Props {
   size?: number;
   pointCount?: number;
   className?: string;
-  /** Palette of dot colors. First entry is used for front-most highlights and the halo. */
+  // палитра цветов точек — первый цвет идёт на яркие акценты и glow-ореол
   palette?: string[];
-  /** Color for the pulsing rings (active "students") */
+  // цвет пульсирующих колец (активные студенты)
   pulseColor?: string;
 }
 
@@ -70,7 +70,7 @@ interface Props {
 const VIEWBOX_W = 1000;
 const VIEWBOX_H = 500;
 
-/** Hand-crafted continent polygons in a 1000×500 equirectangular viewbox. */
+// полигоны континентов вручную, в системе координат 1000×500 (equirectangular проекция)
 const CONTINENTS: Array<Array<[number, number]>> = [
   // North America (Canada + USA)
   [
@@ -177,7 +177,7 @@ function isLand(mx: number, my: number): boolean {
 
 /* ---------------- Cities ---------------- */
 
-/** Real lat/lng coordinates of major cities — used for pulse spawn points and arc endpoints. */
+// реальные координаты крупных городов — точки появления пульсов и дуг между городами
 const CITIES: Array<[string, number, number]> = [
   ["Moscow",         55.75,   37.62],
   ["Saint Petersburg", 59.93, 30.34],
@@ -251,12 +251,10 @@ function latLngToVec3(lat: number, lng: number): Vec3 {
 
 /* ---------------- Component ---------------- */
 
-/**
- * 3D-globe rendered on canvas as a cloud of dots in the site's red/burgundy palette.
- * Pure canvas2D — no 3D library — manual sphere projection + depth-driven color/size.
- * Dots are constrained to land via a polygon mask, pulses spawn at major-city coords,
- * and Stripe-style arc connections travel between random city pairs.
- */
+// 3D-глобус на canvas — облако точек в красно-бордовой палитре проекта
+// чистый canvas2D, без 3D-библиотек — ручная проекция сферы + глубина через цвет/размер
+// точки ограничены сушей через полигонную маску, пульсы появляются в координатах городов
+// дуги соединяют случайные пары городов (как у Stripe)
 export default function BinaryGlobe({
   size = 480,
   pointCount = 1100,
@@ -353,7 +351,7 @@ export default function BinaryGlobe({
     const SPRITE_PAD = 2;
     const spriteCss = SPRITE_FONT_PX + SPRITE_PAD * 2;
 
-    /** Render a single bold monospace char into an offscreen canvas. */
+    // рисует один жирный моноширинный символ в offscreen-canvas (для кеша спрайтов)
     const makeCharSprite = (
       ch: 0 | 1,
       color: string,
@@ -394,7 +392,7 @@ export default function BinaryGlobe({
     let arcs: Arc[] = [];
 
     const ARC_STEPS = 32;
-    /** Quadratic Bézier sample in 3D. */
+    // вычисляет точку квадратичной кривой Безье в 3D по параметру tt (0..1)
     const bezier3 = (s: Vec3, m: Vec3, e: Vec3, tt: number): Vec3 => {
       const it = 1 - tt;
       const it2 = it * it;
@@ -473,7 +471,7 @@ export default function BinaryGlobe({
       return `${hex}${aa}`;
     };
 
-    /** Rotate a 3D point by the current camera and return projected screen coords + z. */
+    // поворачивает 3D-точку на текущий угол камеры и возвращает экранные координаты + z
     const project = (
       px: number,
       py: number,
