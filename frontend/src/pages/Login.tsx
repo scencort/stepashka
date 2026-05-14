@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
 import AuthScreenShell from "../components/auth/AuthScreenShell"
-import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, ShieldCheck } from "lucide-react"
 import { useAppStore } from "../store/AppStore"
 import { useToast } from "../hooks/useToast"
 import BrandLogo from "../components/BrandLogo"
@@ -10,7 +10,7 @@ import BrandLogo from "../components/BrandLogo"
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login } = useAppStore()
+  const { login, verifyTwoFactor } = useAppStore()
   const toast = useToast()
 
   const [email, setEmail] = useState("")
@@ -18,6 +18,9 @@ export default function Login() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [passwordVisible, setPasswordVisible] = useState(false)
+
+  const [twoFactorPending, setTwoFactorPending] = useState<string | null>(null)
+  const [twoFactorCode, setTwoFactorCode] = useState("")
 
   const validate = () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) return "Введите корректный email"
@@ -30,7 +33,13 @@ export default function Login() {
     if (err) { setError(err); return }
     setLoading(true); setError("")
     try {
-      await login(email, password)
+      const result = await login(email, password)
+      if (result.kind === "twoFactorRequired") {
+        setTwoFactorPending(result.pendingToken)
+        setTwoFactorCode("")
+        toast.success("Введите код из приложения-аутентификатора")
+        return
+      }
       toast.success("Вход выполнен")
       navigate("/dashboard")
     } catch (e) {
@@ -39,8 +48,35 @@ export default function Login() {
     } finally { setLoading(false) }
   }
 
+  const handleTwoFactorVerify = async () => {
+    const code = twoFactorCode.trim()
+    if (!/^\d{6}$/.test(code)) {
+      setError("Код должен содержать 6 цифр")
+      return
+    }
+    if (!twoFactorPending) return
+    setLoading(true); setError("")
+    try {
+      await verifyTwoFactor(twoFactorPending, code)
+      toast.success("Вход выполнен")
+      navigate("/dashboard")
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Неверный код"
+      setError(msg); toast.error(msg)
+    } finally { setLoading(false) }
+  }
+
+  const cancelTwoFactor = () => {
+    setTwoFactorPending(null)
+    setTwoFactorCode("")
+    setError("")
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") void handleLogin()
+    if (e.key === "Enter") {
+      if (twoFactorPending) void handleTwoFactorVerify()
+      else void handleLogin()
+    }
   }
 
   return (
@@ -72,52 +108,75 @@ export default function Login() {
                 textClassName="text-2xl font-bold font-display text-[var(--text)]"
               />
               <h1 className="font-display font-bold text-2xl mt-4 mb-1 text-[var(--text)]">
-                Добро пожаловать
+                {twoFactorPending ? "Подтверждение входа" : "Добро пожаловать"}
               </h1>
               <p className="text-sm text-[var(--muted)]">
-                Войдите в свой аккаунт
+                {twoFactorPending
+                  ? "Введите 6-значный код из Google Authenticator"
+                  : "Войдите в свой аккаунт"}
               </p>
             </div>
 
             {/* Form */}
             <div className="space-y-3" onKeyDown={handleKeyDown}>
-              {/* Email */}
-              <div className="relative">
-                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-field pl-10 pr-4 py-3 text-sm"
-                />
-              </div>
+              {!twoFactorPending && (
+                <>
+                  {/* Email */}
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                    <input
+                      type="email"
+                      placeholder="Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="input-field pl-10 pr-4 py-3 text-sm"
+                    />
+                  </div>
 
-              {/* Password */}
-              <div className="relative">
-                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
-                <input
-                  type={passwordVisible ? "text" : "password"}
-                  placeholder="Пароль"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input-field pl-10 pr-11 py-3 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => setPasswordVisible((p) => !p)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--text)] transition-colors"
-                >
-                  {passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+                  {/* Password */}
+                  <div className="relative">
+                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                    <input
+                      type={passwordVisible ? "text" : "password"}
+                      placeholder="Пароль"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="input-field pl-10 pr-11 py-3 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPasswordVisible((p) => !p)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+                    >
+                      {passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
 
-              {/* Forgot */}
-              <div className="text-right">
-                <Link to="/forgot-password" className="text-xs font-semibold text-primary hover:text-primary-700 transition-colors">
-                  Забыли пароль?
-                </Link>
-              </div>
+                  {/* Forgot */}
+                  <div className="text-right">
+                    <Link to="/forgot-password" className="text-xs font-semibold text-primary hover:text-primary-700 transition-colors">
+                      Забыли пароль?
+                    </Link>
+                  </div>
+                </>
+              )}
+
+              {twoFactorPending && (
+                <div className="relative">
+                  <ShieldCheck size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={twoFactorCode}
+                    onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    className="input-field pl-10 pr-4 py-3 text-base tracking-[0.4em] text-center font-mono"
+                    autoFocus
+                  />
+                </div>
+              )}
 
               {/* Error */}
               {error && (
@@ -129,25 +188,49 @@ export default function Login() {
               )}
 
               {/* Submit */}
-              <button
-                onClick={handleLogin}
-                disabled={loading}
-                className="btn-primary w-full py-3 text-sm mt-2 gap-2"
-              >
-                {loading
-                  ? <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  : <><span>Войти</span><ArrowRight size={16} /></>
-                }
-              </button>
+              {!twoFactorPending ? (
+                <button
+                  onClick={handleLogin}
+                  disabled={loading}
+                  className="btn-primary w-full py-3 text-sm mt-2 gap-2"
+                >
+                  {loading
+                    ? <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : <><span>Войти</span><ArrowRight size={16} /></>
+                  }
+                </button>
+              ) : (
+                <div className="space-y-2 mt-2">
+                  <button
+                    onClick={handleTwoFactorVerify}
+                    disabled={loading || twoFactorCode.length !== 6}
+                    className="btn-primary w-full py-3 text-sm gap-2"
+                  >
+                    {loading
+                      ? <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      : <><ShieldCheck size={16} /><span>Подтвердить</span></>
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelTwoFactor}
+                    className="btn-ghost w-full py-2.5 text-xs"
+                  >
+                    Назад
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
-            <p className="text-sm text-center mt-6 text-[var(--muted)]">
-              Нет аккаунта?{" "}
-              <Link to="/register" className="font-semibold text-primary hover:text-primary-700 transition-colors">
-                Зарегистрироваться
-              </Link>
-            </p>
+            {!twoFactorPending && (
+              <p className="text-sm text-center mt-6 text-[var(--muted)]">
+                Нет аккаунта?{" "}
+                <Link to="/register" className="font-semibold text-primary hover:text-primary-700 transition-colors">
+                  Зарегистрироваться
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </div>

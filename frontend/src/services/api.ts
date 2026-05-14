@@ -65,6 +65,23 @@ type AiReview = {
   createdAt: string;
 };
 
+type LoginResult =
+  | { kind: "authenticated"; user: PublicUser }
+  | { kind: "twoFactorRequired"; pendingToken: string };
+
+type TwoFactorSetup = {
+  secret: string;
+  otpauthUrl: string;
+  qrCodeDataUrl: string;
+  issuer: string;
+  accountEmail: string;
+};
+
+type TwoFactorStatus = {
+  enabled: boolean;
+  pending: boolean;
+};
+
 /* ── Token management ── */
 
 const ACCESS_TOKEN_KEY = "gradus_access_token";
@@ -317,10 +334,38 @@ const routeMappings: RouteMapping[] = [
     method: "POST",
     transform: async <T>(_p: string, _m: string, rawBody?: unknown) => {
       const payload = rawBody as { email: string; password: string };
-      const auth = await backendRequest<BackendAuthResponse>("/auth/login", {
+      const raw = await backendRequest<
+        BackendAuthResponse | { twoFactorRequired: true; pendingToken: string }
+      >("/auth/login", {
         method: "POST",
         body: JSON.stringify(payload),
       });
+      if ("twoFactorRequired" in raw && raw.twoFactorRequired) {
+        return {
+          kind: "twoFactorRequired",
+          pendingToken: raw.pendingToken,
+        } as T;
+      }
+      const auth = raw as BackendAuthResponse;
+      setTokens(auth.accessToken, auth.refreshToken);
+      return {
+        kind: "authenticated",
+        user: toPublicUser(auth.user),
+      } as T;
+    },
+  },
+  {
+    pattern: "/auth/2fa/verify",
+    method: "POST",
+    transform: async <T>(_p: string, _m: string, rawBody?: unknown) => {
+      const payload = rawBody as { pendingToken: string; code: string };
+      const auth = await backendRequest<BackendAuthResponse>(
+        "/auth/2fa/verify",
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+      );
       setTokens(auth.accessToken, auth.refreshToken);
       return toPublicUser(auth.user) as T;
     },
@@ -536,6 +581,33 @@ const routeMappings: RouteMapping[] = [
         keepCurrentRefreshToken: refreshToken,
       });
     },
+  },
+  {
+    pattern: "/account/2fa/status",
+    method: "GET",
+    transform: <T>() => backendRequest<T>("/account/2fa/status"),
+  },
+  {
+    pattern: "/account/2fa/setup",
+    method: "POST",
+    transform: <T>() => passthrough<T>("/account/2fa/setup", "POST", {}),
+  },
+  {
+    pattern: "/account/2fa/verify",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/account/2fa/verify", m, rawBody),
+  },
+  {
+    pattern: "/account/2fa/disable",
+    method: "POST",
+    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
+      passthrough<T>("/account/2fa/disable", m, rawBody),
+  },
+  {
+    pattern: "/account/2fa/cancel",
+    method: "POST",
+    transform: <T>() => passthrough<T>("/account/2fa/cancel", "POST", {}),
   },
   // ── AI ──
   {
@@ -893,4 +965,7 @@ export type {
   StepProgress,
   NotificationItem,
   AiReview,
+  LoginResult,
+  TwoFactorSetup,
+  TwoFactorStatus,
 };

@@ -4,13 +4,20 @@ from fastapi import APIRouter
 
 from app import db
 from app.deps import CurrentUser
+from fastapi import HTTPException
+
 from app.schemas import (
     ProfilePatchBody, ChangePasswordBody, ConfirmEmailBody,
+    TwoFactorVerifyBody, TwoFactorDisableBody,
 )
 from app.services import (
     hash_token, create_reset_code, write_audit,
     get_or_create_profile, utcnow,
     hash_password, verify_password,
+)
+from app.two_factor import (
+    generate_totp_secret, build_otpauth_uri, build_qr_data_uri,
+    verify_totp_code, TOTP_ISSUER,
 )
 from app.config import settings
 
@@ -40,6 +47,7 @@ async def get_profile(user: CurrentUser):
         "language": p["language"] or "ru",
         "emailNotifications": bool(p["email_notifications"]),
         "marketingNotifications": bool(p["marketing_notifications"]),
+        "twoFactorEnabled": bool(p["two_factor_enabled"]),
         "pendingEmail": p["pending_email"] or None,
     }
 
@@ -239,4 +247,108 @@ async def logout_all(user: CurrentUser):
         user["id"],
     )
     await write_audit(user["id"], "account.logout_all", "user", user["id"])
+    return {"success": True}
+
+
+# ---------- Two-factor authentication (TOTP / Google Authenticator) ----------
+
+
+@router.get("/2fa/status")
+async def two_factor_status(user: CurrentUser):
+    p = await get_or_create_profile(user["id"])
+    return {
+        "enabled": bool(p["two_factor_enabled"]),
+        "pending": bool(p["two_factor_pending_secret"]),
+    }
+
+
+@router.post("/2fa/setup")
+async def two_factor_setup(user: CurrentUser):
+    p = await get_or_create_profile(user["id"])
+    if p["two_factor_enabled"]:
+        raise HTTPException(status_code=400, detail="Двухфакторная аутентификация уже включена")
+
+    u = await db.fetchrow("SELECT email FROM users WHERE id=$1 LIMIT 1", user["id"])
+    if not u:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    secret = generate_totp_secret()
+    await db.execute(
+        """UPDATE account_profiles
+           SET two_factor_pending_secret=$1, updated_at=NOW()
+           WHERE user_id=$2""",
+        secret, user["id"],
+    )
+    uri = build_otpauth_uri(secret, u["email"])
+    qr = build_qr_data_uri(uri)
+    await write_audit(user["id"], "account.2fa.setup_started", "user", user["id"])
+    return {
+        "secret": secret,
+        "otpauthUrl": uri,
+        "qrCodeDataUrl": qr,
+        "issuer": TOTP_ISSUER,
+        "accountEmail": u["email"],
+    }
+
+
+@router.post("/2fa/verify")
+async def two_factor_verify(body: TwoFactorVerifyBody, user: CurrentUser):
+    p = await get_or_create_profile(user["id"])
+    if p["two_factor_enabled"]:
+        raise HTTPException(status_code=400, detail="Двухфакторная аутентификация уже включена")
+
+    pending = p["two_factor_pending_secret"]
+    if not pending:
+        raise HTTPException(status_code=400, detail="Сначала начните настройку 2FA")
+
+    if not verify_totp_code(pending, body.code):
+        raise HTTPException(status_code=400, detail="Неверный код подтверждения")
+
+    await db.execute(
+        """UPDATE account_profiles
+           SET two_factor_enabled=TRUE,
+               two_factor_secret=$1,
+               two_factor_pending_secret=NULL,
+               updated_at=NOW()
+           WHERE user_id=$2""",
+        pending, user["id"],
+    )
+    await write_audit(user["id"], "account.2fa.enabled", "user", user["id"])
+    return {"success": True, "enabled": True}
+
+
+@router.post("/2fa/disable")
+async def two_factor_disable(body: TwoFactorDisableBody, user: CurrentUser):
+    p = await get_or_create_profile(user["id"])
+    if not p["two_factor_enabled"] or not p["two_factor_secret"]:
+        raise HTTPException(status_code=400, detail="Двухфакторная аутентификация не включена")
+
+    row = await db.fetchrow("SELECT password_hash FROM users WHERE id=$1 LIMIT 1", user["id"])
+    if not row or not verify_password(body.password, row["password_hash"]):
+        raise HTTPException(status_code=400, detail="Неверный пароль")
+
+    if not verify_totp_code(p["two_factor_secret"], body.code):
+        raise HTTPException(status_code=400, detail="Неверный код подтверждения")
+
+    await db.execute(
+        """UPDATE account_profiles
+           SET two_factor_enabled=FALSE,
+               two_factor_secret=NULL,
+               two_factor_pending_secret=NULL,
+               updated_at=NOW()
+           WHERE user_id=$1""",
+        user["id"],
+    )
+    await write_audit(user["id"], "account.2fa.disabled", "user", user["id"])
+    return {"success": True, "enabled": False}
+
+
+@router.post("/2fa/cancel")
+async def two_factor_cancel(user: CurrentUser):
+    await db.execute(
+        """UPDATE account_profiles
+           SET two_factor_pending_secret=NULL, updated_at=NOW()
+           WHERE user_id=$1""",
+        user["id"],
+    )
     return {"success": True}

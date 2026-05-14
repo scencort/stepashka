@@ -35,6 +35,20 @@ class LogoutBody(BaseModel):
     refreshToken: str = ""
 
 
+class TwoFactorVerifyBody(BaseModel):
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class TwoFactorDisableBody(BaseModel):
+    password: str = Field(min_length=1)
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class TwoFactorLoginBody(BaseModel):
+    pendingToken: str = Field(min_length=10)
+    code: str = Field(pattern=r"^\d{6}$")
+
+
 # ---- Account ----
 
 class ProfilePatchBody(BaseModel):

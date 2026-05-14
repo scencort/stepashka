@@ -7,7 +7,7 @@ from app import db
 from app.deps import CurrentUser, get_request_meta
 from app.schemas import (
     RegisterBody, LoginBody, ForgotPasswordBody, ResetPasswordBody,
-    RefreshBody, LogoutBody,
+    RefreshBody, LogoutBody, TwoFactorLoginBody,
 )
 from app.services import (
     hash_token, create_reset_code, create_reset_token_in_db,
@@ -15,6 +15,11 @@ from app.services import (
     store_refresh_token, revoke_refresh_token,
     write_audit, sanitize_user,
     hash_password, verify_password,
+)
+from app.two_factor import (
+    sign_two_factor_pending_token,
+    verify_two_factor_pending_token,
+    verify_totp_code,
 )
 from app.config import settings
 
@@ -63,11 +68,53 @@ async def login(body: LoginBody, request: Request):
     if not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
 
+    profile = await db.fetchrow(
+        "SELECT two_factor_enabled, two_factor_secret FROM account_profiles WHERE user_id=$1 LIMIT 1",
+        user["id"],
+    )
+    if profile and profile["two_factor_enabled"] and profile["two_factor_secret"]:
+        pending = sign_two_factor_pending_token(user["id"])
+        await write_audit(user["id"], "auth.login.2fa_required", "user", user["id"])
+        return {"twoFactorRequired": True, "pendingToken": pending}
+
     ua, ip = get_request_meta(request)
     access = sign_access_token(dict(user))
     refresh = sign_refresh_token(dict(user))
     await store_refresh_token(user["id"], refresh, ua, ip)
     await write_audit(user["id"], "auth.login", "user", user["id"])
+
+    return {"user": sanitize_user(user), "accessToken": access, "refreshToken": refresh}
+
+
+@router.post("/2fa/verify")
+async def two_factor_login_verify(body: TwoFactorLoginBody, request: Request):
+    user_id = verify_two_factor_pending_token(body.pendingToken)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Сессия 2FA истекла, войдите заново")
+
+    user = await db.fetchrow(
+        "SELECT id, email, password_hash, full_name, role, status, avatar_url FROM users WHERE id=$1 LIMIT 1",
+        user_id,
+    )
+    if not user or user["status"] != "active":
+        raise HTTPException(status_code=401, detail="Пользователь недоступен")
+
+    profile = await db.fetchrow(
+        "SELECT two_factor_enabled, two_factor_secret FROM account_profiles WHERE user_id=$1 LIMIT 1",
+        user_id,
+    )
+    if not profile or not profile["two_factor_enabled"] or not profile["two_factor_secret"]:
+        raise HTTPException(status_code=400, detail="Двухфакторная аутентификация не включена")
+
+    if not verify_totp_code(profile["two_factor_secret"], body.code):
+        await write_audit(user_id, "auth.login.2fa_failed", "user", user_id)
+        raise HTTPException(status_code=401, detail="Неверный код подтверждения")
+
+    ua, ip = get_request_meta(request)
+    access = sign_access_token(dict(user))
+    refresh = sign_refresh_token(dict(user))
+    await store_refresh_token(user["id"], refresh, ua, ip)
+    await write_audit(user["id"], "auth.login.2fa_success", "user", user["id"])
 
     return {"user": sanitize_user(user), "accessToken": access, "refreshToken": refresh}
 

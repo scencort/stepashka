@@ -7,10 +7,11 @@ import { useToast } from "../hooks/useToast"
 import { useAppStore } from "../store/AppStore"
 import {
   User, Mail, Phone, Globe, Languages, Camera, Trash2, Lock,
-  Shield, Monitor, LogOut, Clock,
-  ChevronRight, Bell, X, Check, AlertCircle,
-  KeyRound, Eye, EyeOff,
+  Shield, ShieldCheck, ShieldOff, Monitor, LogOut, Clock,
+  ChevronRight, Bell, X, Check, AlertCircle, Copy,
+  KeyRound, Eye, EyeOff, Smartphone,
 } from "lucide-react"
+import type { TwoFactorSetup } from "../services/api"
 
 type AccountProfile = {
   id: number
@@ -24,6 +25,7 @@ type AccountProfile = {
   language: string
   emailNotifications: boolean
   marketingNotifications: boolean
+  twoFactorEnabled?: boolean
   pendingEmail?: string | null
 }
 
@@ -79,6 +81,11 @@ export default function AccountSettings() {
   const [showNewPw, setShowNewPw] = useState(false)
   const [emailConfirmCode, setEmailConfirmCode] = useState("")
   const avatarInputRef = useRef<HTMLInputElement | null>(null)
+
+  const [twoFactorSetup, setTwoFactorSetup] = useState<TwoFactorSetup | null>(null)
+  const [twoFactorCode, setTwoFactorCode] = useState("")
+  const [twoFactorBusy, setTwoFactorBusy] = useState(false)
+  const [disableForm, setDisableForm] = useState<{ open: boolean; password: string; code: string }>({ open: false, password: "", code: "" })
 
   const onCropComplete = useCallback((_croppedArea: Area, croppedPixels: Area) => {
     setCroppedAreaPixels(croppedPixels)
@@ -287,6 +294,61 @@ export default function AccountSettings() {
       toast.success("Другие сессии завершены"); await refreshSessions()
     } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка") }
     finally { setSaving(false) }
+  }
+
+  const startTwoFactorSetup = async () => {
+    setTwoFactorBusy(true)
+    try {
+      const data = await api.post<TwoFactorSetup>("/account/2fa/setup", {})
+      setTwoFactorSetup(data)
+      setTwoFactorCode("")
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Не удалось начать настройку") }
+    finally { setTwoFactorBusy(false) }
+  }
+
+  const cancelTwoFactorSetup = async () => {
+    setTwoFactorSetup(null)
+    setTwoFactorCode("")
+    try { await api.post<{ success: boolean }>("/account/2fa/cancel", {}) } catch { /* ignore */ }
+  }
+
+  const confirmTwoFactor = async () => {
+    if (!/^\d{6}$/.test(twoFactorCode)) { toast.error("Введите 6-значный код"); return }
+    setTwoFactorBusy(true)
+    try {
+      await api.post<{ success: boolean; enabled: boolean }>("/account/2fa/verify", { code: twoFactorCode })
+      toast.success("Двухфакторная аутентификация включена")
+      setTwoFactorSetup(null)
+      setTwoFactorCode("")
+      setProfile((prev) => prev ? { ...prev, twoFactorEnabled: true } : prev)
+      setInitialSnapshot((prev) => prev ? JSON.stringify({ ...JSON.parse(prev), twoFactorEnabled: true }) : prev)
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Неверный код") }
+    finally { setTwoFactorBusy(false) }
+  }
+
+  const openDisableTwoFactor = () => setDisableForm({ open: true, password: "", code: "" })
+  const closeDisableTwoFactor = () => setDisableForm({ open: false, password: "", code: "" })
+
+  const submitDisableTwoFactor = async () => {
+    if (!disableForm.password) { toast.error("Введите текущий пароль"); return }
+    if (!/^\d{6}$/.test(disableForm.code)) { toast.error("Введите 6-значный код"); return }
+    setTwoFactorBusy(true)
+    try {
+      await api.post<{ success: boolean; enabled: boolean }>("/account/2fa/disable", { password: disableForm.password, code: disableForm.code })
+      toast.success("Двухфакторная аутентификация отключена")
+      setProfile((prev) => prev ? { ...prev, twoFactorEnabled: false } : prev)
+      setInitialSnapshot((prev) => prev ? JSON.stringify({ ...JSON.parse(prev), twoFactorEnabled: false }) : prev)
+      closeDisableTwoFactor()
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Не удалось отключить") }
+    finally { setTwoFactorBusy(false) }
+  }
+
+  const copyTwoFactorSecret = async () => {
+    if (!twoFactorSetup) return
+    try {
+      await navigator.clipboard.writeText(twoFactorSetup.secret)
+      toast.success("Ключ скопирован")
+    } catch { toast.error("Не удалось скопировать") }
   }
 
   const roleLabel = profile?.role === "admin" ? "Администратор" : profile?.role === "teacher" ? "Преподаватель" : "Студент"
@@ -509,6 +571,184 @@ export default function AccountSettings() {
               {/* ═════ SECURITY TAB ═════ */}
               {activeTab === "security" && (
                 <div className="space-y-5">
+                  {/* Two-factor authentication */}
+                  <div className="card p-5 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        {profile.twoFactorEnabled
+                          ? <ShieldCheck size={16} className="text-emerald-500" />
+                          : <Shield size={16} className="text-[var(--muted)]" />}
+                        <div>
+                          <p className="font-semibold text-sm text-[var(--text)]">Двухфакторная аутентификация</p>
+                          <p className="text-xs text-[var(--muted)] mt-0.5">Google Authenticator, Authy и другие TOTP-приложения</p>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full ${
+                        profile.twoFactorEnabled
+                          ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400"
+                          : "bg-[var(--surface)] text-[var(--muted)] border border-[var(--border)]"
+                      }`}>
+                        {profile.twoFactorEnabled ? "включена" : "выключена"}
+                      </span>
+                    </div>
+
+                    {!profile.twoFactorEnabled && !twoFactorSetup && (
+                      <div className="flex flex-col gap-3">
+                        <p className="text-xs text-[var(--muted)] leading-relaxed">
+                          Дополнительная защита аккаунта: при входе потребуется 6-значный код из приложения-аутентификатора.
+                        </p>
+                        <div className="flex justify-end">
+                          <button
+                            onClick={startTwoFactorSetup}
+                            disabled={twoFactorBusy}
+                            className="btn-primary px-5 py-2.5 text-sm gap-2"
+                          >
+                            <Smartphone size={14} />Включить 2FA
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {twoFactorSetup && (
+                      <div className="space-y-4">
+                        <div className="text-xs text-[var(--muted)] space-y-1">
+                          <p>1. Откройте Google Authenticator или другое TOTP-приложение.</p>
+                          <p>2. Отсканируйте QR-код или введите ключ вручную.</p>
+                          <p>3. Введите 6-значный код из приложения ниже.</p>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-4 items-start">
+                          <div className="bg-white rounded-xl p-3 border border-[var(--border)] shrink-0">
+                            <img
+                              src={twoFactorSetup.qrCodeDataUrl}
+                              alt="QR-код для Google Authenticator"
+                              width={176}
+                              height={176}
+                              className="block"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0 space-y-3 w-full">
+                            <div>
+                              <label className="text-xs font-medium text-[var(--muted)] mb-1.5 flex items-center gap-1">
+                                <KeyRound size={12} />Секретный ключ
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <code className="flex-1 min-w-0 truncate text-xs font-mono px-3 py-2 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--text)]">
+                                  {twoFactorSetup.secret}
+                                </code>
+                                <button
+                                  type="button"
+                                  onClick={copyTwoFactorSecret}
+                                  className="btn-ghost shrink-0 px-3 py-2 text-xs gap-1"
+                                  title="Скопировать"
+                                >
+                                  <Copy size={12} />
+                                </button>
+                              </div>
+                              <p className="text-[11px] text-[var(--muted)] mt-1">Аккаунт: {twoFactorSetup.accountEmail} · {twoFactorSetup.issuer}</p>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-[var(--muted)] mb-1.5 flex items-center gap-1">
+                                <Smartphone size={12} />Код из приложения
+                              </label>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={6}
+                                value={twoFactorCode}
+                                onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                placeholder="123456"
+                                className="input-field w-full px-4 py-2.5 text-base text-center font-mono tracking-[0.4em]"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={cancelTwoFactorSetup}
+                            disabled={twoFactorBusy}
+                            className="btn-ghost px-4 py-2 text-sm"
+                          >
+                            Отмена
+                          </button>
+                          <button
+                            type="button"
+                            onClick={confirmTwoFactor}
+                            disabled={twoFactorBusy || twoFactorCode.length !== 6}
+                            className="btn-primary px-5 py-2 text-sm gap-2"
+                          >
+                            <ShieldCheck size={14} />Подтвердить
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {profile.twoFactorEnabled && !disableForm.open && (
+                      <div className="flex flex-col gap-3">
+                        <p className="text-xs text-[var(--muted)] leading-relaxed">
+                          При входе потребуется код из вашего приложения-аутентификатора. Чтобы отключить, подтвердите действие паролем и текущим кодом.
+                        </p>
+                        <div className="flex justify-end">
+                          <button
+                            onClick={openDisableTwoFactor}
+                            disabled={twoFactorBusy}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 border border-red-200 dark:border-red-800/30 transition-colors font-medium"
+                          >
+                            <ShieldOff size={14} />Отключить 2FA
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {profile.twoFactorEnabled && disableForm.open && (
+                      <div className="space-y-3 rounded-xl border border-red-200 dark:border-red-800/30 bg-red-50/40 dark:bg-red-900/10 p-4">
+                        <div className="flex items-center gap-2 text-red-500">
+                          <AlertCircle size={14} />
+                          <p className="text-xs font-semibold">Подтвердите отключение 2FA</p>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-medium text-[var(--muted)] mb-1.5 flex items-center gap-1">
+                              <Lock size={12} />Текущий пароль
+                            </label>
+                            <input
+                              type="password"
+                              value={disableForm.password}
+                              onChange={(e) => setDisableForm((f) => ({ ...f, password: e.target.value }))}
+                              className="input-field w-full px-4 py-2.5 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-[var(--muted)] mb-1.5 flex items-center gap-1">
+                              <Smartphone size={12} />Код из приложения
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={6}
+                              value={disableForm.code}
+                              onChange={(e) => setDisableForm((f) => ({ ...f, code: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                              placeholder="123456"
+                              className="input-field w-full px-4 py-2.5 text-sm text-center font-mono tracking-[0.3em]"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button onClick={closeDisableTwoFactor} disabled={twoFactorBusy} className="btn-ghost px-4 py-2 text-sm">
+                            Отмена
+                          </button>
+                          <button
+                            onClick={submitDisableTwoFactor}
+                            disabled={twoFactorBusy || !disableForm.password || disableForm.code.length !== 6}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                          >
+                            <ShieldOff size={14} />Отключить
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Change password */}
                   <div className="card p-5 space-y-4">
                     <div className="flex items-center gap-2 mb-1">

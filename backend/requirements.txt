@@ -11,3 +11,5 @@ aiosmtplib>=3.0
 email-validator>=2.2
 slowapi>=0.1.9
 redis[asyncio]>=5.0
+pyotp>=2.9
+qrcode[pil]>=7.4

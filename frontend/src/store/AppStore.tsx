@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from "react"
-import { api, type Course, type PublicUser } from "../services/api"
+import { api, type Course, type LoginResult, type PublicUser } from "../services/api"
 
 type AppStoreContextValue = {
   user: PublicUser | null
@@ -8,7 +8,8 @@ type AppStoreContextValue = {
   loadingUser: boolean
   loadingCourses: boolean
   refreshUser: () => Promise<void>
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<LoginResult>
+  verifyTwoFactor: (pendingToken: string, code: string) => Promise<PublicUser>
   register: (name: string, email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   refreshCourses: () => Promise<void>
@@ -52,9 +53,19 @@ export function AppStoreProvider({ children }: Props) {
   }, [])
 
   const login = async (email: string, password: string) => {
-    const auth = await api.post<PublicUser>("/auth/login", { email, password })
-    setUser(auth)
+    const result = await api.post<LoginResult>("/auth/login", { email, password })
+    if (result.kind === "authenticated") {
+      setUser(result.user)
+      await refreshCourses()
+    }
+    return result
+  }
+
+  const verifyTwoFactor = async (pendingToken: string, code: string) => {
+    const user = await api.post<PublicUser>("/auth/2fa/verify", { pendingToken, code })
+    setUser(user)
     await refreshCourses()
+    return user
   }
 
   const register = async (name: string, email: string, password: string) => {
@@ -75,6 +86,7 @@ export function AppStoreProvider({ children }: Props) {
     loadingCourses,
     refreshUser,
     login,
+    verifyTwoFactor,
     register,
     logout,
     refreshCourses,

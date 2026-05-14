@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS account_profiles (
   marketing_notifications BOOLEAN NOT NULL DEFAULT FALSE,
   avatar_url TEXT NOT NULL DEFAULT '',
   two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  two_factor_secret TEXT,
+  two_factor_pending_secret TEXT,
   two_factor_temp_code_hash TEXT,
   two_factor_temp_expires_at TIMESTAMP,
   pending_email TEXT,
@@ -267,6 +269,8 @@ ALTER TABLE ai_reviews ADD COLUMN IF NOT EXISTS issues JSONB NOT NULL DEFAULT '[
 ALTER TABLE ai_reviews ADD COLUMN IF NOT EXISTS improvements JSONB NOT NULL DEFAULT '[]';
 ALTER TABLE ai_reviews ADD COLUMN IF NOT EXISTS good_parts JSONB NOT NULL DEFAULT '[]';
 ALTER TABLE account_profiles ADD COLUMN IF NOT EXISTS weekly_goal INTEGER NOT NULL DEFAULT 10;
+ALTER TABLE account_profiles ADD COLUMN IF NOT EXISTS two_factor_secret TEXT;
+ALTER TABLE account_profiles ADD COLUMN IF NOT EXISTS two_factor_pending_secret TEXT;
 
 CREATE TABLE IF NOT EXISTS support_tickets (
     id SERIAL PRIMARY KEY,
