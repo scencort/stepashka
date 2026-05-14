@@ -1,3 +1,8 @@
+// редактор курсов — трёхшаговый wizard для создания и редактирования курсов
+// шаг 1: основная информация (название, уровень, цена, обложка)
+// шаг 2: структура курса (модули → уроки → шаги)
+// шаг 3: публикация (черновик или отправить на модерацию)
+// при редактировании загружает существующую структуру курса с бэкенда
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 
@@ -111,6 +116,7 @@ const STEP_LABELS: Record<StepType, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// преобразует строку в url-slug — убирает спецсимволы, пробелы → тире
 function slugify(str: string) {
   return str
     .toLowerCase()
@@ -140,7 +146,8 @@ function emptyLesson(order: number): Lesson {
   }
 }
 
-// Virtual lesson is just a container; id < 0 = virtual (not saved to DB)
+// виртуальный урок — контейнер для шагов, не сохраняется в БД напрямую
+// id < 0 — признак что это виртуальный объект, не из базы
 function virtualLesson(): Lesson {
   return {
     id: -1,
@@ -162,6 +169,8 @@ function emptyModule(order: number): Module {
 
 // ─── Custom Select ────────────────────────────────────────────────────────────
 
+// кастомный выпадающий список с иконками и описаниями опций
+// закрывается при клике вне компонента через mousedown listener
 function CustomSelect<T extends string>({
   value,
   onChange,
@@ -396,6 +405,8 @@ function RegexField({ value, onChange }: { value: string; onChange: (v: string) 
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
+// редактор одного шага — аккордеон с выбором типа и содержимым
+// типы: theory (текст markdown), quiz (вопрос + варианты), code (задача + тесты), essay (сочинение)
 function StepEditor({
   step,
   onChange,
@@ -832,6 +843,7 @@ function StepEditor({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+// названия шагов визарда — отображаются в индикаторе прогресса сверху
 const STEPS = ["Основная информация", "Структура курса", "Публикация"]
 
 export default function CourseEditor() {
@@ -863,6 +875,8 @@ export default function CourseEditor() {
   const [coverUploading, setCoverUploading] = useState(false)
   const coverInputRef = useRef<HTMLInputElement | null>(null)
 
+  // загрузка обложки курса — отправляем файл на /api/upload/cover
+  // максимальный размер 5 МБ, поддерживаются jpg/png/webp/svg/gif
   const onCoverFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -1003,6 +1017,8 @@ export default function CourseEditor() {
     }
   }
 
+  // сохраняем структуру курса — модули и шаги
+  // удаляем шаги которые были в БД но сейчас удалены из редактора
   const saveStructure = async (cid: number) => {
     // Collect all step IDs currently in the editor
     const currentStepIds = new Set<number>()
