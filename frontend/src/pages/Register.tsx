@@ -1,3 +1,5 @@
+// страница регистрации — три поля: имя, email, пароль
+// после регистрации сразу логинит и отправляет на дашборд
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
@@ -18,8 +20,9 @@ export default function Register() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-  const [passwordVisible, setPasswordVisible] = useState(false)
+  const [passwordVisible, setPasswordVisible] = useState(false) // показать/скрыть пароль
 
+  // проверяем поля перед отправкой — минимальная валидация на клиенте
   const validate = () => {
     if (name.trim().length < 2) return "Имя — минимум 2 символа"
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) return "Введите корректный email"
@@ -27,6 +30,7 @@ export default function Register() {
     return ""
   }
 
+  // отправляем данные на сервер — при успехе сразу на дашборд
   const handleRegister = async () => {
     const err = validate()
     if (err) { setError(err); return }
@@ -41,6 +45,7 @@ export default function Register() {
     } finally { setLoading(false) }
   }
 
+  // enter в любом поле отправляет форму
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") void handleRegister()
   }
@@ -51,10 +56,10 @@ export default function Register() {
         className="w-full max-w-[420px] relative z-10"
       >
         <div className="bg-white/95 dark:bg-[#140808]/95 border border-[var(--border)] rounded-3xl shadow-card-lg backdrop-blur-xl overflow-hidden relative">
-          {/* Accent bar */}
+          {/* цветная полоска вверху карточки */}
           <div className="h-1 w-full bg-gradient-to-r from-primary via-primary-700 to-burgundy" />
 
-          {/* Back button - absolute positioned in top-left corner */}
+          {/* кнопка назад на лендинг */}
           <Link
             to="/"
             className="btn-ghost absolute top-4 left-4 px-3 py-1.5 text-xs inline-flex items-center gap-1 z-10"
@@ -64,7 +69,7 @@ export default function Register() {
           </Link>
 
           <div className="p-8">
-            {/* Logo + heading */}
+            {/* лого и заголовок */}
             <div className="flex flex-col items-center mb-8 mt-12">
               <BrandLogo
                 showText
@@ -78,9 +83,9 @@ export default function Register() {
               <p className="text-sm text-[var(--muted)]">Начните обучение бесплатно</p>
             </div>
 
-            {/* Form */}
+            {/* форма регистрации — три поля */}
             <div className="space-y-3" onKeyDown={handleKeyDown}>
-              {/* Name */}
+              {/* поле имени — автофокус чтобы сразу начать вводить */}
               <div className="relative">
                 <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
                 <input
@@ -93,7 +98,7 @@ export default function Register() {
                 />
               </div>
 
-              {/* Email */}
+              {/* поле email */}
               <div className="relative">
                 <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
                 <input
@@ -105,7 +110,7 @@ export default function Register() {
                 />
               </div>
 
-              {/* Password */}
+              {/* поле пароля с кнопкой показать/скрыть */}
               <div className="relative">
                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
                 <input
@@ -124,12 +129,12 @@ export default function Register() {
                 </button>
               </div>
 
-              {/* Role notice */}
+              {/* подсказка о роли — новые пользователи всегда студенты */}
               <p className="text-xs text-[var(--muted)] px-1">
                 Аккаунт создаётся с ролью студента. Роль преподавателя — через администратора.
               </p>
 
-              {/* Error */}
+              {/* ошибка валидации или серверная ошибка */}
               {error && (
                 <p
                   className="text-xs font-medium text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 px-3 py-2 rounded-lg"
@@ -138,7 +143,7 @@ export default function Register() {
                 </p>
               )}
 
-              {/* Submit */}
+              {/* кнопка регистрации со спиннером во время загрузки */}
               <button
                 onClick={handleRegister}
                 disabled={loading}
@@ -151,7 +156,7 @@ export default function Register() {
               </button>
             </div>
 
-            {/* Footer */}
+            {/* ссылка на страницу входа */}
             <p className="text-sm text-center mt-6 text-[var(--muted)]">
               Уже есть аккаунт?{" "}
               <Link to="/login" className="font-semibold text-primary hover:text-primary-700 transition-colors">

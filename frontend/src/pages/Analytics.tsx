@@ -1,3 +1,5 @@
+// страница аналитики — графики прогресса и AI-рекомендации
+// доступна только преподавателям и администраторам (ProtectedRoute ограничивает)
 import { useEffect, useState } from "react"
 import MainLayout from "../layout/MainLayout"
 import Skeleton from "../components/ui/Skeleton"
@@ -5,14 +7,18 @@ import { api } from "../lib/api"
 import { TrendingUp, TrendingDown, BookOpen, CheckSquare, Star, Sparkles } from "lucide-react"
 
 export default function Analytics() {
+  // период: неделя или месяц — влияет на запрос к серверу
   const [period, setPeriod] = useState<"week" | "month">("week")
+  // массив значений для построения графика (по дням или неделям)
   const [values, setValues] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ averageScore: "0%", solvedTasks: 0, completedCourses: 0 })
   const [error, setError] = useState("")
+  // ai-инсайты грузятся отдельно — могут быть медленными
   const [insights, setInsights] = useState<Array<{ label: string; text: string }>>([])
   const [insightsLoading, setInsightsLoading] = useState(false)
 
+  // при смене периода перезагружаем всё
   useEffect(() => {
     const load = async () => {
       setError("")
@@ -25,6 +31,7 @@ export default function Analytics() {
         setValues(data.values)
         setStats(data.stats)
 
+        // ai-инсайты запрашиваем отдельно — отправляем данные графика и ждём анализ
         setInsightsLoading(true)
         try {
           const ins = await api.post<{ insights: Array<{ label: string; text: string }> }>("/ai/insights", {
@@ -39,10 +46,11 @@ export default function Analytics() {
     void load()
   }, [period])
 
+  // вычисляем дельту — разница между последним и первым значением
   const last = values[values.length - 1] ?? 0
   const first = values[0] ?? 0
   const delta = last - first
-  const max = Math.max(...values, 1)
+  const max = Math.max(...values, 1) // нужен для нормировки ширины полосок графика
 
   const statCards = [
     {
@@ -75,7 +83,7 @@ export default function Analytics() {
     <MainLayout>
       <div className="space-y-6 lg:space-y-8">
 
-        {/* Header */}
+        {/* заголовок + переключатель периода */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight font-display">Аналитика</h1>
@@ -98,7 +106,7 @@ export default function Analytics() {
           </div>
         </div>
 
-        {/* Stat cards */}
+        {/* карточки статистики — скелетон пока грузятся */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[1,2,3].map(i => <Skeleton key={i} className="h-28 rounded-2xl" />)}
@@ -119,7 +127,7 @@ export default function Analytics() {
           </div>
         )}
 
-        {/* Chart */}
+        {/* график динамики прогресса */}
         <div className="card p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
             <div>
@@ -128,6 +136,7 @@ export default function Analytics() {
                 {period === "week" ? "По дням за последние 7 дней" : "По неделям за последний месяц"}
               </p>
             </div>
+            {/* бейдж с дельтой — зелёный если рост, красный если падение */}
             {!loading && values.length > 0 && (
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm font-semibold ${
                 delta >= 0
@@ -152,6 +161,7 @@ export default function Analytics() {
             </div>
           )}
 
+          {/* заглушка если данных ещё нет */}
           {!loading && values.length === 0 && !error && (
             <div className="py-12 flex flex-col items-center gap-3 text-center">
               <div className="w-14 h-14 rounded-2xl bg-[var(--bg-tint)] border border-primary/20 flex items-center justify-center">
@@ -164,6 +174,7 @@ export default function Analytics() {
             </div>
           )}
 
+          {/* горизонтальные полоски — нормированы относительно максимального значения */}
           {!loading && values.length > 0 && (
             <div className="space-y-3">
               {values.map((v, i) => (
@@ -187,7 +198,7 @@ export default function Analytics() {
           )}
         </div>
 
-        {/* AI insights */}
+        {/* блок ai-рекомендаций — появляется только если есть данные */}
         {!loading && values.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -195,6 +206,7 @@ export default function Analytics() {
               <p className="text-sm font-bold font-display text-[var(--text)]">AI-рекомендации</p>
             </div>
 
+            {/* пока ai думает — показываем скелетоны */}
             {insightsLoading && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
@@ -212,6 +224,7 @@ export default function Analytics() {
               </div>
             )}
 
+            {/* ai недоступен или вернул пустой ответ */}
             {!insightsLoading && insights.length === 0 && (
               <div className="card p-4 text-sm text-[var(--muted)]">
                 AI-инсайты недоступны — попробуйте позже

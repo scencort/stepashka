@@ -1,3 +1,4 @@
+// страница входа — email + пароль, с поддержкой двухфакторной аутентификации
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
@@ -19,15 +20,18 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [passwordVisible, setPasswordVisible] = useState(false)
 
-  const [twoFactorPending, setTwoFactorPending] = useState<string | null>(null)
+  // если сервер вернул twoFactorRequired — переходим в режим ввода кода
+  const [twoFactorPending, setTwoFactorPending] = useState<string | null>(null) // pending токен для 2fa
   const [twoFactorCode, setTwoFactorCode] = useState("")
 
+  // базовая валидация перед отправкой
   const validate = () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) return "Введите корректный email"
     if (password.trim().length < 8) return "Пароль — минимум 8 символов"
     return ""
   }
 
+  // основной логин — после успеха либо редиректим либо переключаемся на 2fa экран
   const handleLogin = async () => {
     const err = validate()
     if (err) { setError(err); return }
@@ -35,6 +39,7 @@ export default function Login() {
     try {
       const result = await login(email, password)
       if (result.kind === "twoFactorRequired") {
+        // сервер хочет второй фактор — показываем поле ввода кода
         setTwoFactorPending(result.pendingToken)
         setTwoFactorCode("")
         toast.success("Введите код из приложения-аутентификатора")
@@ -48,6 +53,7 @@ export default function Login() {
     } finally { setLoading(false) }
   }
 
+  // подтверждение 2fa — отправляем pendingToken + 6-значный код
   const handleTwoFactorVerify = async () => {
     const code = twoFactorCode.trim()
     if (!/^\d{6}$/.test(code)) {
@@ -66,12 +72,14 @@ export default function Login() {
     } finally { setLoading(false) }
   }
 
+  // отменить 2fa — вернуться к форме email/пароля
   const cancelTwoFactor = () => {
     setTwoFactorPending(null)
     setTwoFactorCode("")
     setError("")
   }
 
+  // enter отправляет форму — или логин или 2fa в зависимости от текущего экрана
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       if (twoFactorPending) void handleTwoFactorVerify()
@@ -84,12 +92,12 @@ export default function Login() {
       <div
         className="w-full max-w-[420px] relative z-10"
       >
-        {/* Card */}
+        {/* карточка с формой */}
         <div className="bg-white/95 dark:bg-[#140808]/95 border border-[var(--border)] rounded-3xl shadow-card-lg backdrop-blur-xl overflow-hidden relative">
-          {/* Top accent bar */}
+          {/* цветная полоска сверху */}
           <div className="h-1 w-full bg-gradient-to-r from-primary via-primary-700 to-burgundy" />
 
-          {/* Back button - absolute positioned in top-left corner */}
+          {/* кнопка назад на лендинг — абсолютно позиционирована */}
           <Link
             to="/"
             className="btn-ghost absolute top-4 left-4 px-3 py-1.5 text-xs inline-flex items-center gap-1 z-10"
@@ -99,7 +107,7 @@ export default function Login() {
           </Link>
 
           <div className="p-8">
-            {/* Logo + heading */}
+            {/* лого + заголовок — меняется в зависимости от режима (логин / 2fa) */}
             <div className="flex flex-col items-center mb-8 mt-12">
               <BrandLogo
                 showText
@@ -117,11 +125,11 @@ export default function Login() {
               </p>
             </div>
 
-            {/* Form */}
+            {/* форма — содержимое меняется в зависимости от режима */}
             <div className="space-y-3" onKeyDown={handleKeyDown}>
               {!twoFactorPending && (
                 <>
-                  {/* Email */}
+                  {/* поле email */}
                   <div className="relative">
                     <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
                     <input
@@ -133,7 +141,7 @@ export default function Login() {
                     />
                   </div>
 
-                  {/* Password */}
+                  {/* поле пароля с кнопкой показать/скрыть */}
                   <div className="relative">
                     <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
                     <input
@@ -152,7 +160,7 @@ export default function Login() {
                     </button>
                   </div>
 
-                  {/* Forgot */}
+                  {/* ссылка на сброс пароля */}
                   <div className="text-right">
                     <Link to="/forgot-password" className="text-xs font-semibold text-primary hover:text-primary-700 transition-colors">
                       Забыли пароль?
@@ -161,6 +169,7 @@ export default function Login() {
                 </>
               )}
 
+              {/* экран ввода кода двухфакторной аутентификации */}
               {twoFactorPending && (
                 <div className="relative">
                   <ShieldCheck size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
@@ -171,6 +180,7 @@ export default function Login() {
                     maxLength={6}
                     placeholder="123456"
                     value={twoFactorCode}
+                    // разрешаем только цифры, максимум 6 штук
                     onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     className="input-field pl-10 pr-4 py-3 text-base tracking-[0.4em] text-center font-mono"
                     autoFocus
@@ -178,7 +188,7 @@ export default function Login() {
                 </div>
               )}
 
-              {/* Error */}
+              {/* ошибка — показываем прямо в форме */}
               {error && (
                 <p
                   className="text-xs font-medium text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 px-3 py-2 rounded-lg"
@@ -187,7 +197,7 @@ export default function Login() {
                 </p>
               )}
 
-              {/* Submit */}
+              {/* основная кнопка — "Войти" или "Подтвердить" */}
               {!twoFactorPending ? (
                 <button
                   onClick={handleLogin}
@@ -211,6 +221,7 @@ export default function Login() {
                       : <><ShieldCheck size={16} /><span>Подтвердить</span></>
                     }
                   </button>
+                  {/* кнопка отмены 2fa — возвращает к форме email/пароля */}
                   <button
                     type="button"
                     onClick={cancelTwoFactor}
@@ -222,7 +233,7 @@ export default function Login() {
               )}
             </div>
 
-            {/* Footer */}
+            {/* ссылка на регистрацию — только на основном экране */}
             {!twoFactorPending && (
               <p className="text-sm text-center mt-6 text-[var(--muted)]">
                 Нет аккаунта?{" "}
