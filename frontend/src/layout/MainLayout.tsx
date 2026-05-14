@@ -1,3 +1,5 @@
+// главный лейаут — сайдбар + хедер + основной контент
+// оборачивает все защищённые страницы
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/theme";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,8 +37,10 @@ import {
 type MainLayoutProps = { children: ReactNode };
 type NotificationItem = { id: number; title: string; time: string };
 
+// ключ в localStorage где храним список прочитанных уведомлений
 const READ_NOTIFICATIONS_KEY = "gradus_read_notifications_v1";
 
+// грузим прочитанные id из localStorage — чтобы не показывать красную точку повторно
 function loadReadIds(): Set<number> {
   try {
     const raw = localStorage.getItem(READ_NOTIFICATIONS_KEY);
@@ -49,6 +53,7 @@ function loadReadIds(): Set<number> {
   }
 }
 
+// сохраняем обновлённый список в localStorage
 function persistReadIds(ids: Set<number>) {
   try {
     localStorage.setItem(
@@ -56,10 +61,11 @@ function persistReadIds(ids: Set<number>) {
       JSON.stringify(Array.from(ids)),
     );
   } catch {
-    /* ignore */
+    /* если localStorage недоступен — просто игнорируем */
   }
 }
 
+// русские короткие названия дней недели и месяцев для календаря активности
 const RU_WEEKDAYS_SHORT = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
 const RU_MONTHS_FULL = [
   "января",
@@ -76,6 +82,7 @@ const RU_MONTHS_FULL = [
   "декабря",
 ];
 
+// конвертируем дату в строку вида "2024-05-10" (ISO формат без времени)
 function toIsoDay(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -83,11 +90,12 @@ function toIsoDay(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+// находим начало текущей недели (понедельник) по ISO стандарту
 function startOfIsoWeek(d: Date): Date {
   const copy = new Date(d);
   copy.setHours(0, 0, 0, 0);
-  const dow = copy.getDay(); // 0=Sun..6=Sat
-  const diff = dow === 0 ? -6 : 1 - dow; // shift to Monday
+  const dow = copy.getDay(); // 0=вс..6=сб
+  const diff = dow === 0 ? -6 : 1 - dow; // сдвиг до понедельника
   copy.setDate(copy.getDate() + diff);
   return copy;
 }
@@ -99,28 +107,34 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const { user, logout } = useAppStore();
   const toast = useToast();
 
+  // состояние сайдбара — свёрнут или нет
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // три разных дропдауна в хедере — только один может быть открыт
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState("");
+  // прочитанные id берём сразу из localStorage
   const [readNotificationIds, setReadNotificationIds] = useState<Set<number>>(
     () => loadReadIds(),
   );
   const notificationsListRef = useRef<HTMLDivElement | null>(null);
+  // панель со стриком и календарём активности
   const [showStreakPanel, setShowStreakPanel] = useState(false);
   const [streakDays, setStreakDays] = useState(0);
   const [weeklyCompleted, setWeeklyCompleted] = useState(0);
   const [weeklyGoal, setWeeklyGoal] = useState(10);
-  const [activeDays, setActiveDays] = useState<string[]>([]);
+  const [activeDays, setActiveDays] = useState<string[]>([]); // список дат когда была активность
 
+  // считаем непрочитанные — те что не в readNotificationIds
   const unreadNotificationsCount = useMemo(
     () => notifications.filter((n) => !readNotificationIds.has(n.id)).length,
     [notifications, readNotificationIds],
   );
 
+  // пометить все как прочитанные и сохранить в localStorage
   const markAllNotificationsRead = () => {
     if (notifications.length === 0) return;
     const next = new Set(readNotificationIds);
@@ -129,6 +143,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     persistReadIds(next);
   };
 
+  // если пользователь долистал список до конца — помечаем всё прочитанным
   const handleNotificationsScroll = (
     event: React.UIEvent<HTMLDivElement>,
   ) => {
@@ -138,6 +153,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
   };
 
+  // запрос уведомлений с сервера
   const loadNotifications = async () => {
     setNotificationsLoading(true);
     setNotificationsError("");
@@ -157,11 +173,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   useEffect(() => {
     void loadNotifications();
+    // слушаем кастомное событие — например когда где-то в приложении появилось новое уведомление
     const handler = () => void loadNotifications();
     window.addEventListener("gradus:notifications:refresh", handler);
     return () => window.removeEventListener("gradus:notifications:refresh", handler);
   }, []);
 
+  // грузим стрик и активные дни из дашборда — нужно для календаря в хедере
   useEffect(() => {
     if (!user) {
       setStreakDays(0);
@@ -188,6 +206,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     void load();
   }, [user]);
 
+  // при открытии одной панели — закрываем остальные
   const toggleNotifications = () => {
     setShowNotifications((p) => !p);
     setShowProfile(false);
@@ -209,6 +228,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     setMobileMenuOpen(false);
   };
 
+  // выход из аккаунта — очищаем токены и редиректим на логин
   const handleLogout = async () => {
     try {
       await logout();
@@ -219,6 +239,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
   };
 
+  // инициалы для аватара — берём первые буквы имени и фамилии
   const initials = user
     ? user.name
         .split(" ")
@@ -237,11 +258,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
         ? "Преподаватель"
         : "Студент";
 
+  // для курсов активным считается и /course и /course/:id
   const isActive = (path: string) =>
     path === "/course"
       ? pathname === "/course" || pathname.startsWith("/course/")
       : pathname === path;
 
+  // компонент ссылки в сайдбаре — подсвечивает активную страницу
   const NavLink = ({
     to,
     label,
@@ -255,11 +278,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return (
       <Link to={to} className={active ? "nav-item-active" : "nav-item"}>
         <Icon size={17} className="shrink-0" />
+        {/* текст прячем когда сайдбар свёрнут */}
         {!collapsed && <span className="truncate">{label}</span>}
       </Link>
     );
   };
 
+  // аналогичная ссылка для мобильного меню — закрывает меню после перехода
   const MobileNavLink = ({
     to,
     label,
@@ -282,6 +307,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     );
   };
 
+  // процент выполнения недельного плана — для прогресс-бара в сайдбаре
   const weekPercent = Math.min(
     100,
     Math.round((weeklyCompleted / weeklyGoal) * 100),
@@ -289,13 +315,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] md:flex">
-      {/* ── Sidebar ── */}
+      {/* ── десктопный сайдбар ── */}
       <aside
         className={`${collapsed ? "w-[68px]" : "w-[260px]"} hidden md:flex flex-col shrink-0
           bg-[var(--bg)] border-r border-[var(--border)] transition-[width] duration-300 ease-in-out
           sticky top-0 h-screen overflow-y-auto overflow-x-hidden`}
       >
-        {/* Logo row */}
+        {/* строка с лого и кнопкой сворачивания */}
         <div className="flex items-center justify-between px-4 h-16 border-b border-[var(--border)] shrink-0">
           {!collapsed && (
             <BrandLogo
@@ -314,7 +340,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </button>
         </div>
 
-        {/* Progress block */}
+        {/* блок прогресса недели — только когда сайдбар развёрнут */}
         {!collapsed && (
           <div className="mx-3 mt-4 p-4 rounded-xl bg-[var(--bg-tint)] border border-primary/10">
             <div className="flex items-center justify-between mb-2">
@@ -337,7 +363,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         )}
 
-        {/* Nav */}
+        {/* навигационные ссылки */}
         <nav className="flex flex-col gap-0.5 p-3 flex-1 mt-2">
           {!collapsed && (
             <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted)] px-3 py-1 mb-1">
@@ -349,6 +375,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <NavLink to="/task" label="AI Code Review" icon={Code} />
           <NavLink to="/ai-review" label="AI-чат" icon={Brain} />
 
+          {/* раздел для преподавателей и администраторов */}
           {isTeacherOrAdmin && (
             <>
               {!collapsed && (
@@ -368,6 +395,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </>
           )}
 
+          {/* раздел только для администраторов */}
           {isAdmin && (
             <>
               {!collapsed && (
@@ -391,7 +419,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <NavLink to="/help-center" label="Справка" icon={LifeBuoy} />
         </nav>
 
-        {/* Bottom: theme + user */}
+        {/* нижняя часть сайдбара — переключатель темы и профиль */}
         <div className="p-3 border-t border-[var(--border)] space-y-1 shrink-0">
           <button onClick={toggleTheme} className="nav-item w-full">
             {theme === "light" ? (
@@ -425,9 +453,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </div>
       </aside>
 
-      {/* ── Mobile drawer ── */}
+      {/* ── мобильное боковое меню (выезжает слева) ── */}
       {mobileMenuOpen && (
           <>
+            {/* затемнение под меню — клик закрывает */}
             <div
               className="fixed inset-0 z-40 bg-black/40 md:hidden"
               onClick={() => setMobileMenuOpen(false)}
@@ -449,7 +478,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 </button>
               </div>
 
-              {/* Progress mini */}
+              {/* мини-прогресс в мобильном меню */}
               <div className="mx-3 mt-4 p-3 rounded-xl bg-[var(--bg-tint)] border border-primary/10">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-semibold text-[var(--muted)]">
@@ -533,14 +562,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </>
         )}
 
-      {/* ── Main column ── */}
+      {/* ── основная колонка с хедером и контентом ── */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        {/* Header */}
+        {/* шапка — прилипает к верху при скролле */}
         <header
           className="sticky top-0 z-30 h-16 flex items-center justify-between px-4 md:px-6
           bg-[var(--bg)]/90 backdrop-blur-md border-b border-[var(--border)] shrink-0"
         >
-          {/* Mobile: hamburger + logo */}
+          {/* мобиле: гамбургер + лого */}
           <div className="flex items-center gap-3 md:hidden">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -560,9 +589,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
             />
           </div>
 
-          {/* Right side */}
+          {/* правая часть хедера — стрик, кнопка создания, уведомления, аватар */}
           <div className="relative flex items-center gap-2 ml-auto">
-            {/* Streak badge */}
+            {/* бейдж со стриком — открывает календарь активности */}
             <button
               onClick={toggleStreakPanel}
               title="Календарь активности"
@@ -573,10 +602,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
               }`}
             >
               <Flame size={13} />
+              {/* правильное склонение дней */}
               {streakDays} {streakDays === 1 ? "день" : streakDays >= 2 && streakDays <= 4 ? "дня" : "дней"}
             </button>
 
-            {/* Add course — teachers only */}
+            {/* кнопка создания курса — только для преподавателей и администраторов */}
             {isTeacherOrAdmin && (
               <Link
                 to="/teacher/courses/new"
@@ -587,7 +617,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               </Link>
             )}
 
-            {/* Notifications */}
+            {/* колокольчик уведомлений с красной точкой если есть непрочитанные */}
             <button
               onClick={toggleNotifications}
               className="relative w-9 h-9 flex items-center justify-center rounded-lg
@@ -600,7 +630,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               )}
             </button>
 
-            {/* Avatar / profile */}
+            {/* аватар пользователя — открывает профиль */}
             <button
               onClick={toggleProfile}
               className="w-9 h-9 rounded-full overflow-hidden
@@ -619,7 +649,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               )}
             </button>
 
-            {/* Notifications panel */}
+            {/* дропдаун уведомлений */}
                           {showNotifications && (
                 <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] card shadow-card-lg z-50 overflow-hidden"
                 >
@@ -641,6 +671,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                           Прочитать всё
                         </button>
                       )}
+                      {/* кнопка очистки всех уведомлений */}
                       {notifications.length > 0 && (
                         <button
                           title="Очистить уведомления"
@@ -665,6 +696,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       </button>
                     </div>
                   </div>
+                  {/* список уведомлений — при скролле до конца помечает всё прочитанным */}
                   <div
                     ref={notificationsListRef}
                     onScroll={handleNotificationsScroll}
@@ -694,6 +726,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                           <div
                             key={item.id}
                             onClick={() => {
+                              // клик по непрочитанному — помечаем его прочитанным
                               if (!isUnread) return;
                               const next = new Set(readNotificationIds);
                               next.add(item.id);
@@ -704,6 +737,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                               isUnread ? "bg-primary/5" : ""
                             }`}
                           >
+                            {/* цветная точка — красная для непрочитанных */}
                             <span
                               className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
                                 isUnread ? "bg-red-500" : "bg-transparent"
@@ -730,11 +764,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
               )}
 
 
-            {/* Profile panel */}
+            {/* дропдаун профиля */}
                           {showProfile && (
                 <div className="absolute right-0 top-12 w-64 card shadow-card-lg z-50 overflow-hidden"
                 >
-                  {/* User info */}
+                  {/* информация о пользователе */}
                   <div className="px-4 py-4 border-b border-[var(--border)] flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-primary-200 to-burgundy-200 dark:from-primary-800 dark:to-burgundy-700 flex items-center justify-center text-xs font-bold text-primary-800 dark:text-primary-200 shrink-0">
                       {user?.avatarUrl ? (
@@ -788,7 +822,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               )}
 
 
-            {/* Streak panel */}
+            {/* панель стрика и календаря активности */}
                           {showStreakPanel && (
                 <div className="absolute right-0 top-12 w-[420px] max-w-[calc(100vw-2rem)] card shadow-card-lg z-50 overflow-hidden"
                 >
@@ -816,7 +850,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     </button>
                   </div>
                   <div className="p-5 space-y-4">
-                    {/* Current week */}
+                    {/* текущая неделя — 7 ячеек с датами */}
                     {(() => {
                       const today = new Date();
                       const todayIso = toIsoDay(today);
@@ -831,7 +865,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                           dayNumber: d.getDate(),
                           isFuture: iso > todayIso,
                           isToday: iso === todayIso,
-                          isActive: activeDays.includes(iso),
+                          isActive: activeDays.includes(iso), // было ли что-то сделано в этот день
                         };
                       });
                       const monthLabel = `${RU_MONTHS_FULL[today.getMonth()]} ${today.getFullYear()}`;
@@ -850,6 +884,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                                 <span className="text-[11px] uppercase text-[var(--muted)] font-medium">
                                   {d.label}
                                 </span>
+                                {/* ячейка дня: зелёная если активный, пунктир если будущий */}
                                 <div
                                   className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-semibold border transition-colors ${
                                     d.isFuture
@@ -870,7 +905,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       );
                     })()}
 
-                    {/* Last 9 weeks heatmap */}
+                    {/* тепловая карта за последние 9 недель — маленькие квадратики */}
                     <div className="pt-2 border-t border-[var(--border)]">
                       <p className="text-[11px] uppercase tracking-wide text-[var(--muted)] font-semibold mb-2">
                         Последние 9 недель
@@ -915,12 +950,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         </header>
 
-        {/* Page content — pb-24 на мобиле чтобы контент не уходил под нижнюю навигацию */}
+        {/* основной контент страницы — pb-24 на мобиле чтобы не уходить под нижнюю навигацию */}
         <main className="flex-1 p-4 pb-24 md:pb-6 md:p-6 lg:p-8 max-w-[1400px] w-full mx-auto">
           {children}
         </main>
 
-        {/* Mobile bottom bar */}
+        {/* нижняя навигация для мобильных — 4 основных раздела */}
         <div
           className="fixed bottom-0 left-0 right-0 z-30 md:hidden
           bg-[var(--bg)]/95 backdrop-blur-md border-t border-[var(--border)]
@@ -954,7 +989,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
       </div>
 
-      {/* Dismiss overlays on outside click */}
+      {/* прозрачный оверлей — клик закрывает любой открытый дропдаун */}
       {(showNotifications || showProfile || showStreakPanel) && (
         <div
           className="fixed inset-0 z-20"
