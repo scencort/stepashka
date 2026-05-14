@@ -1,6 +1,8 @@
+// настройки аккаунта — четыре вкладки: профиль, безопасность, уведомления, сессии
+// вкладка хранится в url-параметре ?tab= чтобы можно было шарить ссылку
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
-import Cropper, { type Area, type Point } from "react-easy-crop"
+import Cropper, { type Area, type Point } from "react-easy-crop" // для обрезки аватара
 import MainLayout from "../layout/MainLayout"
 import { api } from "../lib/api"
 import { useToast } from "../hooks/useToast"
@@ -56,11 +58,11 @@ type Tab = typeof TABS[number]["key"]
 
 export default function AccountSettings() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeTab = (searchParams.get("tab") || "profile") as Tab
+  const activeTab = (searchParams.get("tab") || "profile") as Tab // читаем вкладку из url
   const toast = useToast()
   const { refreshUser, logout } = useAppStore()
   const [profile, setProfile] = useState<AccountProfile | null>(null)
-  const [initialSnapshot, setInitialSnapshot] = useState("")
+  const [initialSnapshot, setInitialSnapshot] = useState("") // json-снимок для отслеживания изменений
   const [sessions, setSessions] = useState<AccountSession[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -82,9 +84,11 @@ export default function AccountSettings() {
   const [emailConfirmCode, setEmailConfirmCode] = useState("")
   const avatarInputRef = useRef<HTMLInputElement | null>(null)
 
+  // данные для настройки двухфакторной аутентификации (qr-код, секрет)
   const [twoFactorSetup, setTwoFactorSetup] = useState<TwoFactorSetup | null>(null)
   const [twoFactorCode, setTwoFactorCode] = useState("")
   const [twoFactorBusy, setTwoFactorBusy] = useState(false)
+  // форма отключения 2fa — требует текущий пароль и код
   const [disableForm, setDisableForm] = useState<{ open: boolean; password: string; code: string }>({ open: false, password: "", code: "" })
 
   const onCropComplete = useCallback((_croppedArea: Area, croppedPixels: Area) => {
@@ -162,6 +166,7 @@ export default function AccountSettings() {
     return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey) }
   }, [pendingAvatarSrc, closeCropModal, resetCrop])
 
+  // есть ли несохранённые изменения — сравниваем с начальным снимком
   const isDirty = useMemo(() => {
     if (!profile || !initialSnapshot) return false
     return JSON.stringify(profile) !== initialSnapshot
@@ -184,6 +189,7 @@ export default function AccountSettings() {
     })
   }
 
+  // обработчик выбора файла аватара — читает как dataUrl и открывает кроппер
   const onAvatarFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !profile) return
@@ -206,6 +212,7 @@ export default function AccountSettings() {
     finally { setAvatarUploading(false); event.target.value = "" }
   }
 
+  // обрезаем изображение через canvas и кладём результат в поле avatarUrl профиля
   const applyAvatarCrop = async () => {
     if (!pendingAvatarSrc || !croppedAreaPixels) return
     setAvatarUploading(true)
@@ -230,6 +237,7 @@ export default function AccountSettings() {
     finally { setAvatarUploading(false) }
   }
 
+  // сохранить профиль — патчим только нужные поля, не весь объект
   const saveProfile = async () => {
     if (!profile) return
     const nextErrors = validateProfile(profile)
@@ -266,6 +274,7 @@ export default function AccountSettings() {
     finally { setSaving(false) }
   }
 
+  // сменить пароль — после успеха разлогиниваемся и перекидываем на логин
   const changePassword = async () => {
     setSaving(true); setError("")
     try {
@@ -956,8 +965,9 @@ export default function AccountSettings() {
   )
 }
 
-// ─── Reusable subcomponents ─────────────────────────────────────────────────
+// ─── переиспользуемые компоненты ────────────────────────────────────────────
 
+// список часовых поясов для дропдауна — в основном СНГ + несколько мировых
 const TIMEZONES = [
   { value: "Europe/Moscow", label: "Москва (UTC+3)" },
   { value: "Europe/Kaliningrad", label: "Калининград (UTC+2)" },
@@ -1001,6 +1011,7 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (v: stri
   )
 }
 
+// форматируем номер телефона по мере ввода — результат вида +7 (999) 123-45-67
 function formatPhoneValue(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 11)
   if (!digits) return ""
