@@ -1,3 +1,4 @@
+// кабинет преподавателя — управление своими курсами и заявками на запись
 import { useEffect, useMemo, useState } from "react"
 import MainLayout from "../layout/MainLayout"
 import Skeleton from "../components/ui/Skeleton"
@@ -6,27 +7,31 @@ import { useToast } from "../hooks/useToast"
 import { Link } from "react-router-dom"
 import { BookOpen, Users, BarChart2, FileText, Plus, Send, UserCheck, ChevronDown, ChevronUp, Check, X } from "lucide-react"
 
+// общая статистика по курсам преподавателя
 type TeacherOverview = {
   courses: Array<{ id: number; title: string; progress: number; students: string; level: string; price: string }>
   stats: { assignments: number; reviews: number; avgProgress: number; publishedCount: number; draftCount: number }
 }
 
+// один курс в списке
 type TeacherCourse = {
   id: number; title: string; type: string; level: string
   students: string; progress: number; published: boolean; status?: string
 }
 
+// заявка студента на запись в курс
 type EnrollmentRequest = {
   id: number
   userId: number
   userName: string
   userEmail: string
   status: "pending" | "approved" | "rejected"
-  message: string
-  teacherComment: string | null
+  message: string // сообщение от студента при подаче заявки
+  teacherComment: string | null // комментарий преподавателя при решении
   createdAt: string
 }
 
+// заявки сгруппированные по курсу — удобнее показывать аккордеоном
 type CourseRequests = {
   courseId: number
   courseTitle: string
@@ -39,10 +44,10 @@ export default function TeacherStudio() {
   const [courses, setCourses] = useState<TeacherCourse[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | "published" | "draft">("all")
-  const [actionId, setActionId] = useState<number | null>(null)
-  const [courseRequests, setCourseRequests] = useState<CourseRequests[]>([])
-  const [expandedCourse, setExpandedCourse] = useState<number | null>(null)
-  const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({})
+  const [actionId, setActionId] = useState<number | null>(null) // id запроса над которым идёт действие
+  const [courseRequests, setCourseRequests] = useState<CourseRequests[]>([]) // заявки на запись
+  const [expandedCourse, setExpandedCourse] = useState<number | null>(null) // какой курс раскрыт в аккордеоне
+  const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({}); // комментарии по каждой заявке
 
   const load = async () => {
     setLoading(true)
@@ -53,7 +58,7 @@ export default function TeacherStudio() {
       ])
       setData(overview)
       setCourses(list)
-      // Load pending enrollment requests for all courses
+      // грузим заявки параллельно для всех курсов
       const allRequests = await Promise.all(
         list.map(async (c) => {
           try {
@@ -62,17 +67,20 @@ export default function TeacherStudio() {
           } catch { return { courseId: c.id, courseTitle: c.title, requests: [] } }
         })
       )
+      // показываем только курсы где есть хоть одна заявка
       setCourseRequests(allRequests.filter(cr => cr.requests.length > 0))
-    } catch { /* silent */ } finally { setLoading(false) }
+    } catch { /* тихо */ } finally { setLoading(false) }
   }
 
   useEffect(() => { void load() }, [])
 
+  // суммарное количество ожидающих заявок — для счётчика в заголовке блока
   const pendingTotal = useMemo(() =>
     courseRequests.reduce((sum, cr) => sum + cr.requests.filter(r => r.status === "pending").length, 0),
     [courseRequests]
   )
 
+  // одобрить или отклонить заявку — отправляем статус и комментарий
   const decide = async (requestId: number, status: "approved" | "rejected") => {
     setActionId(requestId)
     try {
@@ -80,19 +88,23 @@ export default function TeacherStudio() {
         status,
         teacherComment: commentDrafts[requestId] || "",
       })
+      // обновляем статус заявки в локальном стейте
       setCourseRequests(prev => prev.map(cr => ({
         ...cr,
         requests: cr.requests.map(r => r.id === requestId ? { ...r, status } : r),
       })))
+      // очищаем черновик комментария для этой заявки
       setCommentDrafts(prev => { const n = { ...prev }; delete n[requestId]; return n })
       toast.success(status === "approved" ? "Заявка одобрена" : "Заявка отклонена")
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
+  // фильтруем список курсов по вкладке
   const visible = filter === "all" ? courses
     : filter === "published" ? courses.filter(c => c.published)
     : courses.filter(c => !c.published)
 
+  // отправить курс на модерацию — переводит в статус pending_review
   const sendToModeration = async (course: TeacherCourse) => {
     setActionId(course.id)
     try {
@@ -106,7 +118,7 @@ export default function TeacherStudio() {
     <MainLayout>
       <div className="space-y-6 lg:space-y-8">
 
-        {/* Header */}
+        {/* заголовок с кнопкой создания нового курса */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight font-display">Кабинет преподавателя</h1>
@@ -121,6 +133,7 @@ export default function TeacherStudio() {
           </Link>
         </div>
 
+        {/* скелетон при загрузке */}
         {loading && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -130,7 +143,7 @@ export default function TeacherStudio() {
           </div>
         )}
 
-        {/* Enrollment requests */}
+        {/* блок заявок на запись — виден только если есть pending заявки */}
         {!loading && pendingTotal > 0 && (
           <div className="card p-5 border-l-4 border-l-primary space-y-4">
             <div className="flex items-center gap-2">
@@ -141,13 +154,15 @@ export default function TeacherStudio() {
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse ml-1" />
             </div>
 
+            {/* аккордеон — один элемент на каждый курс у которого есть заявки */}
             <div className="space-y-2">
               {courseRequests.map(cr => {
                 const pending = cr.requests.filter(r => r.status === "pending")
-                if (pending.length === 0) return null
+                if (pending.length === 0) return null // пропускаем курсы без pending заявок
                 const isOpen = expandedCourse === cr.courseId
                 return (
                   <div key={cr.courseId} className="rounded-xl border border-[var(--border)] overflow-hidden">
+                    {/* шапка аккордеона — название курса + количество заявок */}
                     <button
                       onClick={() => setExpandedCourse(isOpen ? null : cr.courseId)}
                       className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-[var(--surface)] hover:bg-[var(--border)]/30 transition-colors text-left"
@@ -161,6 +176,7 @@ export default function TeacherStudio() {
                       {isOpen ? <ChevronUp size={15} className="text-[var(--muted)] shrink-0" /> : <ChevronDown size={15} className="text-[var(--muted)] shrink-0" />}
                     </button>
 
+                    {/* список заявок внутри раскрытого аккордеона */}
                     {isOpen && (
                       <div className="divide-y divide-[var(--border)]">
                         {pending.map(req => (
@@ -169,6 +185,7 @@ export default function TeacherStudio() {
                               <div>
                                 <p className="text-sm font-semibold text-[var(--text)]">{req.userName}</p>
                                 <p className="text-xs text-[var(--muted)]">{req.userEmail}</p>
+                                {/* сообщение от студента — показываем в кавычках */}
                                 {req.message && (
                                   <p className="text-xs text-[var(--text)] mt-1.5 bg-[var(--surface)] px-3 py-2 rounded-lg border border-[var(--border)] italic">
                                     «{req.message}»
@@ -179,6 +196,7 @@ export default function TeacherStudio() {
                                 {new Date(req.createdAt).toLocaleDateString("ru-RU")}
                               </p>
                             </div>
+                            {/* комментарий + кнопки принять/отклонить */}
                             <div className="flex flex-col sm:flex-row gap-2">
                               <input
                                 value={commentDrafts[req.id] ?? ""}
@@ -218,7 +236,7 @@ export default function TeacherStudio() {
 
         {!loading && data && (
           <>
-            {/* Stats */}
+            {/* карточки статистики */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 {
@@ -266,10 +284,11 @@ export default function TeacherStudio() {
               ))}
             </div>
 
-            {/* Courses */}
+            {/* список курсов с фильтром */}
             <div className="card p-6 space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <h2 className="text-base font-bold font-display">Мои курсы</h2>
+                {/* переключатель фильтра — все/опубликованные/черновики */}
                 <div className="flex gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] self-start sm:self-auto">
                   {([
                     { v: "all", l: "Все" },
@@ -291,6 +310,7 @@ export default function TeacherStudio() {
                 </div>
               </div>
 
+              {/* заглушка когда курсов нет */}
               {visible.length === 0 && (
                 <div className="py-12 flex flex-col items-center gap-3 text-center">
                   <div className="w-14 h-14 rounded-2xl bg-[var(--bg-tint)] border border-primary/20 flex items-center justify-center">
@@ -309,12 +329,14 @@ export default function TeacherStudio() {
 
               <div className="divide-y divide-[var(--border)]">
                 {visible.map(course => {
+                  // нормализуем статус — может прийти и как поле status и как published boolean
                   const status = course.status || (course.published ? "published" : "draft")
                   return (
                     <div key={course.id} className="flex flex-col sm:flex-row sm:items-center gap-4 py-4 first:pt-0 last:pb-0">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-semibold text-[var(--text)] truncate">{course.title}</p>
+                          {/* бейдж статуса курса */}
                           <span className={`shrink-0 text-xs px-2.5 py-0.5 rounded-full font-semibold ${
                             status === "published"
                               ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
@@ -326,6 +348,7 @@ export default function TeacherStudio() {
                           </span>
                         </div>
                         <p className="text-xs text-[var(--muted)] mt-1">{course.level} · {course.students} студентов</p>
+                        {/* полоска прогресса — средний прогресс студентов */}
                         {course.progress > 0 && (
                           <div className="mt-2 h-1.5 rounded-full bg-[var(--surface)] border border-[var(--border)] overflow-hidden w-40">
                             <div
@@ -345,6 +368,7 @@ export default function TeacherStudio() {
                         >
                           Редактировать
                         </Link>
+                        {/* отправить на модерацию — только для черновиков */}
                         {status === "draft" && (
                           <button
                             onClick={() => sendToModeration(course)}

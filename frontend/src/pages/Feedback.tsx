@@ -1,3 +1,5 @@
+// страница обратной связи — обычный пользователь пишет обращение и видит ответы
+// никакого управления статусами — это только в AdminPanel
 import { useEffect, useMemo, useState } from "react"
 
 import MainLayout from "../layout/MainLayout"
@@ -6,16 +8,18 @@ import { MessageSquare, Clock, CheckCircle2, Loader2, Send } from "lucide-react"
 
 type FeedbackStatus = "new" | "in_progress" | "closed"
 
+// одно обращение из списка
 type FeedbackItem = {
   id: number
   message: string
   status: FeedbackStatus
   subject?: string
-  adminReply?: string
+  adminReply?: string // ответ администратора если есть
   repliedAt?: string | null
   createdAt?: string | null
 }
 
+// метаданные статусов — лейбл, иконка и цвет бейджа
 const STATUS_META: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
   new: {
     label: "Новое",
@@ -23,7 +27,7 @@ const STATUS_META: Record<string, { label: string; icon: React.ReactNode; cls: s
     cls: "bg-primary/10 text-primary border-primary/20",
   },
   in_progress: {
-    label: "В работе",
+    label: "В работе", // переведено с in_progress
     icon: <Loader2 size={12} className="animate-spin" />,
     cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/40",
   },
@@ -34,6 +38,7 @@ const STATUS_META: Record<string, { label: string; icon: React.ReactNode; cls: s
   },
 }
 
+// форматируем дату для отображения — "15 мая, 14:30"
 const formatDate = (iso?: string | null) => {
   if (!iso) return ""
   return new Date(iso).toLocaleString("ru-RU", {
@@ -48,8 +53,9 @@ export default function Feedback() {
   const [filter, setFilter] = useState<"all" | FeedbackStatus>("all")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState(false)
+  const [success, setSuccess] = useState(false) // временный флаг успешной отправки
 
+  // загружаем список своих обращений
   const loadFeedback = async () => {
     try {
       const data = await api.get<FeedbackItem[]>("/feedback")
@@ -61,6 +67,7 @@ export default function Feedback() {
 
   useEffect(() => { void loadFeedback() }, [])
 
+  // отправить новое обращение
   const submit = async () => {
     if (!text.trim()) return
     setSubmitting(true)
@@ -68,13 +75,14 @@ export default function Feedback() {
     try {
       const created = await api.post<FeedbackItem>("/feedback", {
         message: text.trim(),
-        subject: subject.trim() || undefined,
+        subject: subject.trim() || undefined, // тема необязательна
       })
+      // добавляем новое обращение в начало списка без перезагрузки
       setItems((prev) => [created, ...prev])
       setText("")
       setSubject("")
       setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      setTimeout(() => setSuccess(false), 3000) // убираем уведомление через 3 секунды
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось отправить обращение")
     } finally {
@@ -82,11 +90,13 @@ export default function Feedback() {
     }
   }
 
+  // фильтруем список по выбранному статусу
   const visibleItems = useMemo(() => {
     if (filter === "all") return items
     return items.filter((item) => item.status === filter)
   }, [items, filter])
 
+  // счётчики для таблеток фильтра
   const counts = useMemo(() => ({
     all: items.length,
     new: items.filter(i => i.status === "new").length,
@@ -97,13 +107,13 @@ export default function Feedback() {
   return (
     <MainLayout>
       <div className="max-w-2xl mx-auto space-y-6">
-        {/* Header */}
+        {/* заголовок */}
         <div>
           <h1 className="text-2xl font-bold font-display tracking-tight">Обратная связь</h1>
           <p className="text-sm text-[var(--muted)] mt-1">Напишите нам — мы ответим как можно скорее</p>
         </div>
 
-        {/* New message form */}
+        {/* форма нового обращения */}
         <div className="card p-5 space-y-3">
           <div className="flex items-center gap-2.5 mb-1">
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -112,12 +122,14 @@ export default function Feedback() {
             <p className="font-bold text-sm">Новое обращение</p>
           </div>
 
+          {/* тема — необязательное поле */}
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Тема (необязательно)"
             className="input-field px-3 py-2.5 text-sm"
           />
+          {/* текст обращения */}
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -127,6 +139,7 @@ export default function Feedback() {
           />
 
           {error && <p className="text-xs text-red-500">{error}</p>}
+          {/* сообщение об успешной отправке — исчезает через 3 сек */}
           {success && (
             <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
               <CheckCircle2 size={13} /> Обращение отправлено — ждите ответа!
@@ -143,10 +156,10 @@ export default function Feedback() {
           </button>
         </div>
 
-        {/* My tickets */}
+        {/* список обращений — только если есть хоть одно */}
         {items.length > 0 && (
           <div className="space-y-3">
-            {/* Filter pills */}
+            {/* таблетки-фильтры — показываем только те у которых count > 0 */}
             <div className="flex gap-2 flex-wrap">
               {([
                 { v: "all", l: `Все (${counts.all})` },
@@ -172,7 +185,7 @@ export default function Feedback() {
               ))}
             </div>
 
-            {/* Ticket list */}
+            {/* карточки обращений */}
             <div className="space-y-3">
               {visibleItems.map((item) => {
                 const meta = STATUS_META[item.status] ?? STATUS_META["new"]
@@ -182,11 +195,11 @@ export default function Feedback() {
                     key={item.id}
                     className={`card p-5 space-y-3 transition-all ${
                       item.status === "new" && !hasReply
-                        ? "border-primary/25 bg-[var(--bg-tint)]"
+                        ? "border-primary/25 bg-[var(--bg-tint)]" // новые без ответа — выделяем
                         : ""
                     }`}
                   >
-                    {/* Header row */}
+                    {/* шапка карточки: тема + текст */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         {item.subject && (
@@ -200,12 +213,13 @@ export default function Feedback() {
                       </div>
                     </div>
 
-                    {/* Status + date */}
+                    {/* строка статуса + дата */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full font-semibold border ${meta.cls}`}>
                         {meta.icon}
                         {meta.label}
                       </span>
+                      {/* бейдж "получен ответ" если есть adminReply */}
                       {hasReply && (
                         <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full font-semibold border bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40">
                           <CheckCircle2 size={11} />
@@ -219,7 +233,7 @@ export default function Feedback() {
                       )}
                     </div>
 
-                    {/* Admin reply */}
+                    {/* блок ответа администратора */}
                     {hasReply && (
                       <div className="rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 space-y-1">
                         <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
@@ -240,6 +254,7 @@ export default function Feedback() {
           </div>
         )}
 
+        {/* заглушка если обращений ещё нет */}
         {items.length === 0 && !submitting && (
           <div className="card p-10 text-center space-y-2">
             <MessageSquare size={32} className="mx-auto text-[var(--border)]" />
