@@ -1,3 +1,4 @@
+// главная страница после входа — показывает статистику, прогресс и активность
 import { useEffect, useState } from "react";
 import MainLayout from "../layout/MainLayout";
 import { useNavigate } from "react-router-dom";
@@ -5,6 +6,7 @@ import { Flame, Award, CalendarDays, ArrowRight, BookOpen, Clock, TrendingUp } f
 import { api } from "../lib/api";
 import { useAppStore } from "../store/AppStore";
 
+// всё что приходит с сервера для дашборда
 type DashboardPayload = {
   stats: { activeCourses: number; streakDays: number; averageScore: string; tasksWeek: number };
   continue: { courseId: number; courseTitle: string; stepId: number; stepTitle: string; stepOrder: number } | null;
@@ -19,6 +21,7 @@ export default function Dashboard() {
   const { user } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // недельная цель — можно менять прямо на странице, синхронизируется с сервером
   const [weeklyGoal, setWeeklyGoal] = useState(10);
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
 
@@ -39,6 +42,7 @@ export default function Dashboard() {
     void load();
   }, []);
 
+  // сохраняем новую цель на сервере — clamp чтобы не поставили 0 или 9999
   const updateWeeklyGoal = (next: number) => {
     const safe = Math.max(3, Math.min(50, Math.round(next)));
     setWeeklyGoal(safe);
@@ -47,8 +51,10 @@ export default function Dashboard() {
 
   const completedSteps = payload?.weeklyPlan.completedSteps ?? 0;
   const weeklyPercent = weeklyGoal ? Math.min(100, Math.round((completedSteps / weeklyGoal) * 100)) : 0;
+  // шаг с которого можно продолжить обучение
   const continueStep = payload?.continue;
 
+  // карточки статистики — каждая с иконкой и цветом
   const statCards = [
     { label: "Активные курсы", value: String(payload?.stats.activeCourses ?? 0), icon: BookOpen, color: "text-primary", bg: "bg-primary-50 dark:bg-primary-900/20" },
     { label: "Серия дней", value: `${payload?.stats.streakDays ?? 0}`, icon: Flame, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/20" },
@@ -56,12 +62,13 @@ export default function Dashboard() {
     { label: "Задач за неделю", value: String(payload?.stats.tasksWeek ?? 0), icon: TrendingUp, color: "text-green-500", bg: "bg-green-50 dark:bg-green-900/20" },
   ];
 
+  // берём только имя чтобы обращаться "Привет, Иван" вместо "Привет, Иван Петров"
   const firstName = user?.name?.split(" ")[0] || "студент";
 
   return (
     <MainLayout>
       <div className="space-y-6 max-w-7xl">
-        {/* Page header */}
+        {/* приветствие с именем */}
         <div>
           <h1 className="font-display font-bold text-3xl md:text-4xl text-[var(--text)] mb-1">
             Привет, {firstName}
@@ -69,6 +76,7 @@ export default function Dashboard() {
           <p className="text-[var(--muted)]">Вот ваш прогресс на сегодня</p>
         </div>
 
+        {/* скелетон во время загрузки */}
         {loading && (
           <div className="space-y-4">
             {[1,2,3].map(i => (
@@ -85,7 +93,7 @@ export default function Dashboard() {
 
         {!loading && !error && (
           <div className="space-y-5">
-            {/* Stats row */}
+            {/* ряд карточек со статистикой */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {statCards.map((s) => {
                 const Icon = s.icon;
@@ -101,10 +109,11 @@ export default function Dashboard() {
               })}
             </div>
 
-            {/* Main grid: weekly plan + continue */}
+            {/* большой блок: план на неделю + кнопка продолжить */}
             <div className="grid lg:grid-cols-5 gap-4">
-              {/* Weekly plan */}
+              {/* план на неделю — цветной блок с прогресс-баром */}
               <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-primary p-6 text-white">
+                {/* декоративный круг в углу */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/4" />
                 <div className="relative z-10">
                   <p className="text-xs font-semibold uppercase tracking-widest text-white/60 mb-4">План на неделю</p>
@@ -119,6 +128,7 @@ export default function Dashboard() {
                       style={{ width: `${weeklyPercent}%` }}
                     />
                   </div>
+                  {/* инпут для изменения цели — сразу сохраняет на сервере */}
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-white/60">Цель:</span>
                     <input
@@ -133,7 +143,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Continue learning */}
+              {/* блок "продолжить обучение" — показывает последний незавершённый шаг */}
               <div className="lg:col-span-3 card p-6 flex flex-col">
                 <p className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)] mb-4">Я прохожу</p>
 
@@ -153,6 +163,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ) : (
+                  // заглушка если всё пройдено или курсов нет
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="w-12 h-12 rounded-2xl bg-[var(--surface)] flex items-center justify-center text-[var(--muted)] mb-3">
                       <BookOpen size={22} />
@@ -167,9 +178,9 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Courses + Activity */}
+            {/* нижняя строка: список курсов + лента активности */}
             <div className="grid lg:grid-cols-3 gap-4">
-              {/* My courses */}
+              {/* мои курсы с прогрессом */}
               <div className="lg:col-span-2 card p-6">
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="font-display font-semibold text-lg text-[var(--text)]">Мои курсы</h2>
@@ -215,11 +226,11 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Activity feed */}
+              {/* лента последних действий на платформе */}
               <div className="card p-6">
                 <h2 className="font-display font-semibold text-lg text-[var(--text)] mb-5">Активность</h2>
 
-                {/* Deadline alert */}
+                {/* дедлайн если есть — выводим отдельным блоком наверху */}
                 {payload?.deadline.title && !payload.deadline.title.includes("Ожидание") && (
                   <div className="mb-4 p-3 rounded-xl border border-primary/20 bg-primary-50 dark:bg-primary-900/10 flex items-start gap-3">
                     <CalendarDays size={16} className="text-primary mt-0.5 shrink-0" />
@@ -236,11 +247,13 @@ export default function Dashboard() {
                     <p className="text-xs text-[var(--muted)]">Активность появится после первых шагов</p>
                   </div>
                 ) : (
+                  // timeline с вертикальной линией между точками
                   <div className="space-y-3">
                     {(payload?.activities ?? []).map((a, i) => (
                       <div key={a.id} className="flex gap-3">
                         <div className="relative flex flex-col items-center">
                           <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
+                          {/* вертикальная линия — только не у последнего элемента */}
                           {i < (payload?.activities?.length ?? 0) - 1 && (
                             <div className="w-px flex-1 bg-[var(--border)] mt-1" />
                           )}

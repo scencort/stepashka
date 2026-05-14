@@ -1,3 +1,4 @@
+// панель администратора — управление курсами, пользователями и обращениями
 import { useEffect, useMemo, useState } from "react"
 import MainLayout from "../layout/MainLayout"
 import Skeleton from "../components/ui/Skeleton"
@@ -6,15 +7,19 @@ import { useToast } from "../hooks/useToast"
 import { useAppStore } from "../store/AppStore"
 import { Users, BookOpen, CheckCircle, MessageSquare, AlertTriangle, Search, Send, ChevronDown, ChevronUp } from "lucide-react"
 
+// тип данных с общей статистикой платформы
 type AdminOverview = {
   users: number; students: number; teachers: number; admins: number
   courses: number; publishedCourses: number; estimatedRevenue: number; moderationQueue: number
 }
+// курс в таблице админа — чуть больше полей чем в каталоге
 type AdminCourse = {
   id: number; title: string; author: string; students: string
   level: string; type: string; price: string; published: boolean; status: string
 }
+// пользователь в таблице
 type AdminUser = { id: number; name: string; email: string; role: "student" | "teacher" | "admin" }
+// обращение из обратной связи
 type FeedbackItem = {
   id: number; subject?: string; message: string
   status: "new" | "in_progress" | "closed"
@@ -29,17 +34,21 @@ export default function AdminPanel() {
   const [courses, setCourses] = useState<AdminCourse[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>([])
+  // фильтры для таблицы курсов
   const [filter, setFilter] = useState<"all" | "published" | "draft" | "pending_review">("all")
   const [courseQuery, setCourseQuery] = useState("")
+  // фильтры для таблицы пользователей
   const [userFilter, setUserFilter] = useState<"all" | AdminUser["role"]>("all")
   const [userQuery, setUserQuery] = useState("")
   const [loading, setLoading] = useState(true)
-  const [actionId, setActionId] = useState<number | null>(null)
+  const [actionId, setActionId] = useState<number | null>(null) // id сущности над которой сейчас идёт действие
+  // активная вкладка внутри панели
   const [tab, setTab] = useState<"courses" | "users" | "feedback">("courses")
-  const [expandedTicket, setExpandedTicket] = useState<number | null>(null)
-  const [replyText, setReplyText] = useState<Record<number, string>>({})
+  const [expandedTicket, setExpandedTicket] = useState<number | null>(null) // развёрнутое обращение
+  const [replyText, setReplyText] = useState<Record<number, string>>({}); // текст ответа по id обращения
   const [replyLoading, setReplyLoading] = useState<number | null>(null)
 
+  // загружаем все данные параллельно — быстрее
   const load = async () => {
     setLoading(true)
     try {
@@ -50,13 +59,15 @@ export default function AdminPanel() {
         api.get<FeedbackItem[]>("/feedback"),
       ])
       setData(overview); setCourses(adminCourses); setUsers(adminUsers); setFeedbackItems(feedback)
-    } catch { /* silent */ } finally { setLoading(false) }
+    } catch { /* тихо игнорируем — покажем что осталось */ } finally { setLoading(false) }
   }
 
   useEffect(() => { void load() }, [])
 
+  // курсы ожидающие одобрения модератора
   const pendingCourses = useMemo(() => courses.filter(c => c.status === "pending_review"), [courses])
 
+  // фильтрация курсов по статусу и строке поиска
   const visibleCourses = useMemo(() => {
     const base = filter === "all" ? courses
       : filter === "published" ? courses.filter(c => c.status === "published")
@@ -66,14 +77,17 @@ export default function AdminPanel() {
     return q ? base.filter(c => `${c.title} ${c.author}`.toLowerCase().includes(q)) : base
   }, [courses, filter, courseQuery])
 
+  // фильтрация пользователей по роли и строке поиска
   const visibleUsers = useMemo(() => {
     const base = userFilter === "all" ? users : users.filter(u => u.role === userFilter)
     const q = userQuery.trim().toLowerCase()
     return q ? base.filter(u => `${u.name} ${u.email}`.toLowerCase().includes(q)) : base
   }, [users, userFilter, userQuery])
 
+  // количество новых обращений — для счётчика в заголовке вкладки
   const feedbackNew = feedbackItems.filter(f => f.status === "new").length
 
+  // одобрить или отклонить курс на модерации
   const moderateCourse = async (course: AdminCourse, action: "approve" | "reject") => {
     setActionId(course.id)
     try {
@@ -83,6 +97,7 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
+  // переключить публикацию курса (published/draft)
   const togglePublish = async (course: AdminCourse) => {
     setActionId(course.id)
     try {
@@ -92,6 +107,7 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
+  // удалить курс — с подтверждением
   const removeCourse = async (id: number) => {
     if (!confirm("Удалить курс?")) return
     setActionId(id)
@@ -102,6 +118,7 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
+  // изменить роль пользователя — выбирается из дропдауна
   const changeUserRole = async (u: AdminUser, role: AdminUser["role"]) => {
     setActionId(u.id)
     try {
@@ -111,12 +128,15 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
+  // отправить ответ на обращение — closeAfter=true закрывает тикет
   const sendReply = async (ticketId: number, closeAfter: boolean) => {
     const reply = (replyText[ticketId] || "").trim()
     if (!reply) return
     setReplyLoading(ticketId)
     try {
       const body: Record<string, string> = { reply }
+      // если нажали "ответить и закрыть" — передаём статус closed
+      // если просто "ответить" — статус не меняем, остаётся как есть
       if (closeAfter) body.status = "closed"
       const updated = await api.post<FeedbackItem & { adminReply?: string; status: string }>(
         `/feedback/${ticketId}/reply`,
@@ -128,6 +148,7 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка отправки ответа") } finally { setReplyLoading(null) }
   }
 
+  // явно установить статус обращения — три кнопки в интерфейсе
   const setStatus = async (ticketId: number, status: "new" | "in_progress" | "closed") => {
     setActionId(ticketId)
     try {
@@ -137,6 +158,7 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
+  // удалить обращение — с подтверждением
   const deleteFeedback = async (id: number) => {
     if (!confirm("Удалить обращение?")) return
     setActionId(id)
@@ -147,6 +169,7 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
+  // удалить пользователя — с подтверждением
   const removeUser = async (id: number) => {
     if (!confirm("Удалить пользователя?")) return
     setActionId(id)
@@ -157,6 +180,7 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
+  // инициалы для аватара в таблице пользователей
   const getInitials = (name: string) =>
     name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()
 
@@ -164,12 +188,13 @@ export default function AdminPanel() {
     <MainLayout>
       <div className="space-y-6 lg:space-y-8">
 
-        {/* Header */}
+        {/* заголовок страницы */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight font-display">Панель администратора</h1>
           <p className="text-[var(--muted)] mt-1">Управление платформой</p>
         </div>
 
+        {/* скелетон при первичной загрузке */}
         {loading && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -181,7 +206,7 @@ export default function AdminPanel() {
 
         {!loading && data && (
           <>
-            {/* Stats */}
+            {/* карточки с общей статистикой платформы */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { label: "Пользователей", value: data.users, icon: Users, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20", border: "border-blue-200/60 dark:border-blue-800/40" },
@@ -194,7 +219,7 @@ export default function AdminPanel() {
                   color: "text-primary",
                   bg: "bg-[var(--bg-tint)]",
                   border: "border-primary/20",
-                  badge: feedbackNew > 0 ? feedbackNew : null,
+                  badge: feedbackNew > 0 ? feedbackNew : null, // показываем красный счётчик если есть новые
                 },
               ].map(s => (
                 <div key={s.label} className="card p-5 flex items-center gap-4">
@@ -214,7 +239,7 @@ export default function AdminPanel() {
               ))}
             </div>
 
-            {/* Moderation queue */}
+            {/* блок модерации — только если есть курсы на рассмотрении */}
             {pendingCourses.length > 0 && (
               <div className="card p-5 border-l-4 border-l-amber-400 space-y-4">
                 <div className="flex items-center gap-2">
@@ -253,7 +278,7 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* Tabs */}
+            {/* основная таблица с тремя вкладками */}
             <div className="card p-6 space-y-5">
               <div className="flex gap-1 border-b border-[var(--border)] -mx-6 px-6">
                 {([
@@ -275,7 +300,7 @@ export default function AdminPanel() {
                 ))}
               </div>
 
-              {/* Courses tab */}
+              {/* вкладка управления курсами */}
               {tab === "courses" && (
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -288,6 +313,7 @@ export default function AdminPanel() {
                         className="input-field pl-9 pr-4 py-2.5 text-sm"
                       />
                     </div>
+                    {/* фильтры по статусу курса */}
                     <div className="flex gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] self-start">
                       {([
                         { v: "all", l: "Все" },
@@ -320,6 +346,7 @@ export default function AdminPanel() {
                           <p className="text-xs text-[var(--muted)] mt-0.5">{course.author} · {course.level} · {course.students} студентов</p>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
+                          {/* цветной бейдж статуса */}
                           <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
                             course.status === "published"
                               ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
@@ -329,6 +356,7 @@ export default function AdminPanel() {
                           }`}>
                             {course.status === "published" ? "Опубликован" : course.status === "pending_review" ? "Модерация" : "Черновик"}
                           </span>
+                          {/* для курсов на модерации — принять/отклонить, иначе — снять/опубликовать */}
                           {course.status === "pending_review" ? (
                             <div className="flex gap-2">
                               <button onClick={() => moderateCourse(course, "approve")} disabled={actionId === course.id} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 px-2 py-1 rounded-lg transition-colors disabled:opacity-50">Принять</button>
@@ -347,7 +375,7 @@ export default function AdminPanel() {
                 </div>
               )}
 
-              {/* Users tab */}
+              {/* вкладка управления пользователями */}
               {tab === "users" && (
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -386,10 +414,11 @@ export default function AdminPanel() {
 
                   <div className="divide-y divide-[var(--border)]">
                     {visibleUsers.map(u => {
-                      const isCurrent = currentUser?.id === u.id
+                      const isCurrent = currentUser?.id === u.id // запрещаем менять роль самому себе
                       return (
                         <div key={u.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
                           <div className="flex items-center gap-3 min-w-0">
+                            {/* аватар из инициалов */}
                             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-200 to-burgundy-200 dark:from-primary-800 dark:to-burgundy-700 flex items-center justify-center text-xs font-bold text-primary-800 dark:text-primary-200 shrink-0">
                               {getInitials(u.name)}
                             </div>
@@ -402,6 +431,7 @@ export default function AdminPanel() {
                             </div>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
+                            {/* дропдаун выбора роли — отключён для самого себя */}
                             <select
                               value={u.role}
                               onChange={e => changeUserRole(u, e.target.value as AdminUser["role"])}
@@ -412,6 +442,7 @@ export default function AdminPanel() {
                               <option value="teacher">Преподаватель</option>
                               <option value="admin">Администратор</option>
                             </select>
+                            {/* себя нельзя удалить */}
                             {!isCurrent && (
                               <button
                                 onClick={() => removeUser(u.id)}
@@ -428,7 +459,7 @@ export default function AdminPanel() {
                   </div>
                 </div>
               )}
-              {/* Feedback tab */}
+              {/* вкладка обращений от пользователей */}
               {tab === "feedback" && (
                 <div className="space-y-3">
                   {feedbackItems.length === 0 && (
@@ -439,6 +470,7 @@ export default function AdminPanel() {
                   )}
                   {feedbackItems.map(ticket => {
                     const isExpanded = expandedTicket === ticket.id
+                    // цвет и лейбл бейджа статуса
                     const statusMeta = {
                       new: { label: "Новое", cls: "bg-primary/10 text-primary border-primary/20" },
                       in_progress: { label: "В работе", cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/40" },
@@ -449,7 +481,7 @@ export default function AdminPanel() {
                       <div key={ticket.id} className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
                         ticket.status === "new" ? "border-primary/30 bg-[var(--bg-tint)]" : "border-[var(--border)] bg-[var(--bg)]"
                       }`}>
-                        {/* Ticket header */}
+                        {/* заголовок тикета — кнопка для раскрытия/скрытия */}
                         <button
                           className="w-full flex items-start gap-3 px-5 py-4 text-left hover:bg-[var(--surface)] transition-colors"
                           onClick={() => setExpandedTicket(isExpanded ? null : ticket.id)}
@@ -475,10 +507,10 @@ export default function AdminPanel() {
                           </div>
                         </button>
 
-                        {/* Expanded content */}
+                        {/* развёрнутый контент — полное сообщение, статус, форма ответа */}
                         {isExpanded && (
                           <div className="px-5 pb-5 space-y-4 border-t border-[var(--border)]">
-                            {/* Full message */}
+                            {/* полный текст сообщения */}
                             <div className="pt-4">
                               <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide mb-2">Сообщение</p>
                               <p className="text-sm text-[var(--text)] bg-[var(--surface)] rounded-xl px-4 py-3 border border-[var(--border)] leading-relaxed whitespace-pre-wrap break-words">
@@ -486,7 +518,7 @@ export default function AdminPanel() {
                               </p>
                             </div>
 
-                            {/* Status switcher */}
+                            {/* переключатель статуса — три кнопки, активная подсвечена */}
                             <div>
                               <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide mb-2">Статус</p>
                               <div className="flex gap-2 flex-wrap">
@@ -511,7 +543,7 @@ export default function AdminPanel() {
                               </div>
                             </div>
 
-                            {/* Existing reply */}
+                            {/* текущий ответ если уже есть */}
                             {ticket.adminReply && (
                               <div>
                                 <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide mb-2">Текущий ответ</p>
@@ -521,7 +553,7 @@ export default function AdminPanel() {
                               </div>
                             )}
 
-                            {/* Reply form */}
+                            {/* форма ответа — две кнопки: просто ответить или ответить и закрыть */}
                             <div className="space-y-2">
                               <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">
                                 {ticket.adminReply ? "Обновить ответ" : "Ответить"}
@@ -534,6 +566,7 @@ export default function AdminPanel() {
                                 className="input-field px-4 py-3 text-sm resize-none"
                               />
                               <div className="flex gap-2 flex-wrap items-center">
+                                {/* просто ответить — статус не меняется */}
                                 <button
                                   onClick={() => sendReply(ticket.id, false)}
                                   disabled={!replyText[ticket.id]?.trim() || replyLoading === ticket.id}
@@ -542,6 +575,7 @@ export default function AdminPanel() {
                                   <Send size={12} />
                                   {replyLoading === ticket.id ? "Отправка…" : "Ответить"}
                                 </button>
+                                {/* ответить и закрыть — статус меняется на closed */}
                                 <button
                                   onClick={() => sendReply(ticket.id, true)}
                                   disabled={!replyText[ticket.id]?.trim() || replyLoading === ticket.id}
