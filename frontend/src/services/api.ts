@@ -1,3 +1,7 @@
+// центральный API-слой — вся работа с бэкендом через этот файл
+// логика: routeMappings перехватывают маршруты и трансформируют данные,
+// backendRequest делает fetch с авторизацией и автоматическим refresh токенов при 401
+// нормализаторы toCourse и toPublicUser приводят данные бэкенда к формату фронтенда
 type Role = "student" | "teacher" | "admin";
 
 type PublicUser = {
@@ -82,8 +86,9 @@ type TwoFactorStatus = {
   pending: boolean;
 };
 
-/* ── Token management ── */
+/* ── Token management — токены хранятся в localStorage ── */
 
+// ключи хранения токенов — используем везде через эти константы
 const ACCESS_TOKEN_KEY = "gradus_access_token";
 const REFRESH_TOKEN_KEY = "gradus_refresh_token";
 const API_BASE_URL = String(import.meta.env.VITE_API_URL || "").replace(
@@ -126,6 +131,7 @@ type BackendAuthResponse = {
   refreshToken: string;
 };
 
+// нормализует пользователя из бэкенда — fullName → name
 function toPublicUser(user: BackendUser): PublicUser {
   return {
     id: user.id,
@@ -195,6 +201,9 @@ function toCourse(catalogItem: {
 
 /* ── HTTP client with token refresh ── */
 
+// базовый fetch с авторизацией и автообновлением токена
+// при 401 пробует refresh — если не вышло, редиректит на /login
+// исключения: auth-маршруты и /auth/refresh не триггерят повторный refresh
 async function backendRequest<T>(
   path: string,
   init: RequestInit = {},
@@ -297,7 +306,12 @@ async function tryRefreshToken() {
   }
 }
 
-/* ── Route mapping table ── */
+/* ── Route mapping table — таблица маршрутов с трансформациями ──
+   каждый маппинг перехватывает запрос по pattern+method и может:
+   - переадресовать на другой URL бэкенда
+   - нормализовать данные (toCourse, toPublicUser)
+   - реализовать особую логику (например авторизация возвращает LoginResult)
+*/
 
 type RouteMapping = {
   pattern: string | RegExp;
