@@ -22,7 +22,10 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [passwordVisible, setPasswordVisible] = useState(false) // показать/скрыть пароль
 
-  // проверяем поля перед отправкой — минимальная валидация на клиенте
+  // валидирует три поля перед отправкой запроса
+  // @returns строка с ошибкой или пустая строка если всё ок
+  // проверяет: имя ≥2 символов, email соответствует формату, пароль ≥8 символов
+  // regex email: [^\s@]+@[^\s@]+\.[^\s@]+ — простая проверка без RFC-перегибов
   const validate = () => {
     if (name.trim().length < 2) return "Имя — минимум 2 символа"
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) return "Введите корректный email"
@@ -30,7 +33,10 @@ export default function Register() {
     return ""
   }
 
-  // отправляем данные на сервер — при успехе сразу на дашборд
+  // обработчик кнопки "Зарегистрироваться"
+  // сначала клиентская валидация (validate), потом store.register()
+  // store.register() → POST /auth/register → бэк создаёт юзера и выдаёт токены
+  // при успехе: токены сохраняются в localStorage через api.ts, user ставится в стор
   const handleRegister = async () => {
     const err = validate()
     if (err) { setError(err); return }
@@ -40,12 +46,14 @@ export default function Register() {
       toast.success("Аккаунт создан!")
       navigate("/dashboard")
     } catch (e) {
+      // e.message — строка из бэкенда, например "Email already in use"
       const msg = e instanceof Error ? e.message : "Ошибка регистрации"
       setError(msg); toast.error(msg)
     } finally { setLoading(false) }
   }
 
-  // enter в любом поле отправляет форму
+  // перехватываем Enter чтобы форму можно было сабмитить клавиатурой
+  // @param e — KeyboardEvent от любого поля ввода в форме
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") void handleRegister()
   }

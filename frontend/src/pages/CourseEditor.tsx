@@ -116,16 +116,23 @@ const STEP_LABELS: Record<StepType, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// преобразует строку в url-slug — убирает спецсимволы, пробелы → тире
+// превращает произвольный заголовок в url-совместимый slug
+// @param str — любая строка, например "Мой первый курс по Python!"
+// @returns slug вида "moi-pervyi-kurs-po-python", максимум 64 символа
+// шаги: toLowerCase → убрать спецсимволы → пробелы/подчёркивания → тире → trim тире
 function slugify(str: string) {
   return str
     .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64)
+    .replace(/[^\w\s-]/g, "")   // убираем всё кроме букв, цифр, пробелов, тире
+    .replace(/[\s_]+/g, "-")    // пробелы и _ заменяем на тире
+    .replace(/^-+|-+$/g, "")   // убираем тире в начале и конце
+    .slice(0, 64)               // ограничиваем длину
 }
 
+// создаёт пустой шаг с дефолтными значениями
+// @param order — порядковый номер шага в уроке (начиная с 1)
+// @returns Step с типом "theory", 10 xp, пустым текстом
+// вызывается при добавлении нового шага кнопкой "Добавить шаг"
 function emptyStep(order: number): Step {
   return {
     title: `Шаг ${order}`,
@@ -136,6 +143,9 @@ function emptyStep(order: number): Step {
   }
 }
 
+// создаёт пустой урок с одним пустым шагом внутри
+// @param order — порядковый номер урока в модуле
+// @returns Lesson типа "text" с одним emptyStep(1) внутри
 function emptyLesson(order: number): Lesson {
   return {
     title: `Урок ${order}`,
@@ -146,8 +156,10 @@ function emptyLesson(order: number): Lesson {
   }
 }
 
-// виртуальный урок — контейнер для шагов, не сохраняется в БД напрямую
-// id < 0 — признак что это виртуальный объект, не из базы
+// виртуальный урок — контейнер для шагов без явного урока
+// id: -1 означает что это не реальная запись в БД, а UI-обёртка
+// используется когда преподаватель хочет добавить шаги напрямую в модуль без уроков
+// @returns Lesson-подобный объект с id=-1 и пустым массивом шагов
 function virtualLesson(): Lesson {
   return {
     id: -1,
@@ -159,6 +171,9 @@ function virtualLesson(): Lesson {
   }
 }
 
+// создаёт пустой модуль с одним виртуальным уроком внутри
+// @param order — порядковый номер модуля в курсе
+// @returns Module с одним virtualLesson() — готов к добавлению шагов
 function emptyModule(order: number): Module {
   return {
     title: `Модуль ${order}`,
@@ -169,8 +184,14 @@ function emptyModule(order: number): Module {
 
 // ─── Custom Select ────────────────────────────────────────────────────────────
 
-// кастомный выпадающий список с иконками и описаниями опций
-// закрывается при клике вне компонента через mousedown listener
+// кастомный дропдаун с иконками — заменяет нативный <select>
+// дженерик T extends string чтобы тип value и onChange совпадали с типом опций
+// закрывается при клике вне компонента через mousedown на document
+//
+// @param value — текущее выбранное значение (например "beginner")
+// @param onChange(v: T) — колбек вызывается когда пользователь выбирает опцию
+// @param options — массив { value, label, icon?, desc?, color? }
+// @param label — подпись над кнопкой (опционально)
 function CustomSelect<T extends string>({
   value,
   onChange,

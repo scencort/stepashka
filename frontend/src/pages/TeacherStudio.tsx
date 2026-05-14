@@ -49,16 +49,22 @@ export default function TeacherStudio() {
   const [expandedCourse, setExpandedCourse] = useState<number | null>(null) // какой курс раскрыт в аккордеоне
   const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({}); // комментарии по каждой заявке
 
+  // загружает все данные для кабинета преподавателя
+  // этап 1: параллельно грузим overview (статистику) и список курсов
+  // этап 2: для каждого курса параллельно запрашиваем заявки на запись
+  //   GET /teacher/courses/:id/enrollment-requests → массив EnrollmentRequest
+  //   если запрос упал — возвращаем пустой массив для этого курса (не блокируем всё)
+  // в итоге показываем только курсы где есть хотя бы одна заявка
   const load = async () => {
     setLoading(true)
     try {
       const [overview, list] = await Promise.all([
-        api.get<TeacherOverview>("/teacher/overview"),
-        api.get<TeacherCourse[]>("/teacher/courses"),
+        api.get<TeacherOverview>("/teacher/overview"),  // статистика по всем курсам преподавателя
+        api.get<TeacherCourse[]>("/teacher/courses"),   // список его курсов
       ])
       setData(overview)
       setCourses(list)
-      // грузим заявки параллельно для всех курсов
+      // грузим заявки на запись параллельно для всех курсов сразу
       const allRequests = await Promise.all(
         list.map(async (c) => {
           try {
@@ -67,7 +73,7 @@ export default function TeacherStudio() {
           } catch { return { courseId: c.id, courseTitle: c.title, requests: [] } }
         })
       )
-      // показываем только курсы где есть хоть одна заявка
+      // отфильтровываем курсы без заявок — нет смысла показывать пустые
       setCourseRequests(allRequests.filter(cr => cr.requests.length > 0))
     } catch { /* тихо */ } finally { setLoading(false) }
   }

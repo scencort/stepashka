@@ -38,7 +38,10 @@ export function AppStoreProvider({ children }: Props) {
   const [loadingUser, setLoadingUser] = useState(true)
   const [loadingCourses, setLoadingCourses] = useState(true)
 
-  // перезагружаем список курсов с бэка
+  // перезагружает список всех курсов каталога с бэкенда
+  // вызывается при старте приложения и после логина/регистрации
+  // маршрут: GET /courses → routeMappings → GET /catalog → toCourse() на каждый элемент
+  // не возвращает ничего — результат пишет в setCourses()
   const refreshCourses = async () => {
     setLoadingCourses(true)
     try {
@@ -49,7 +52,10 @@ export function AppStoreProvider({ children }: Props) {
     }
   }
 
-  // проверяем кто сейчас залогинен — спрашиваем бэк /auth/me
+  // проверяет кто сейчас залогинен — спрашивает бэк /auth/me
+  // если токена нет — api.ts вернёт null без запроса к серверу
+  // если токен есть и валиден — возвращает PublicUser
+  // если 401 — tryRefreshToken, если не помогло — вернёт null (setUser(null))
   const refreshUser = async () => {
     setLoadingUser(true)
     try {

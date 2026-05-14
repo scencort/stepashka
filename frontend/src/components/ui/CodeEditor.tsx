@@ -1,6 +1,16 @@
-// редактор кода с подсветкой синтаксиса — прозрачная textarea поверх подсвеченного pre
-// prism-react-renderer рендерит подсветку, textarea принимает ввод
-// номера строк, синхронизация скролла, тема меняется вместе с темой приложения
+// редактор кода с подсветкой синтаксиса
+// архитектура: два слоя в одном контейнере
+//   нижний слой — <pre> с подсвеченным кодом (prism-react-renderer), pointer-events:none
+//   верхний слой — <textarea> с прозрачным текстом, colour: transparent, caret виден
+//   пользователь пишет в textarea, видит подсветку из pre под ней
+// синхронизация скролла: при прокрутке textarea → pre и номера строк двигаются синхронно
+// тема: читаем useTheme() и переключаем prism-тему (oneDark / github) и цвета фона
+//
+// props:
+//   value — текущий код (управляемый компонент)
+//   onChange(value: string) — колбек при вводе, вызывается с новым полным текстом
+//   language — строка языка из LANGUAGES константы (Task.tsx), маппится через LANG_MAP
+//   placeholder — подсказка когда поле пустое
 import { useRef, useCallback, useState, useEffect } from "react"
 import { Highlight, themes, type Language } from "prism-react-renderer"
 import { useTheme } from "../../context/theme"
@@ -12,7 +22,10 @@ type Props = {
   placeholder?: string
 }
 
-// маппинг строк языка из нашего селекта в идентификаторы prism
+// маппинг строк языка из нашего селекта в идентификаторы prism-react-renderer
+// "auto" → "clike" (c-подобный синтаксис как общий fallback)
+// "html" → "markup" (prism использует "markup" для html/xml)
+// остальные совпадают с именами prism-грамматик один к одному
 const LANG_MAP: Record<string, Language> = {
   auto: "clike",
   python: "python",
@@ -42,16 +55,21 @@ export default function CodeEditor({ value, onChange, language, placeholder }: P
   const lines = value ? value.split("\n") : [""]
   const isDark = theme === "dark"
 
-  // синхронизируем скролл textarea и pre — иначе подсветка уедет при прокрутке
+  // синхронизирует скролл textarea → pre и колонки номеров строк
+  // вызывается на событие "scroll" textarea через addEventListener
+  // useCallback без зависимостей — функция стабильна, не пересоздаётся
+  // без синхронизации: пользователь скроллит код вниз, подсветка остаётся вверху
   const syncScroll = useCallback(() => {
     const ta = textareaRef.current
     const pre = preRef.current
     const ln = lineNumbersRef.current
     if (!ta) return
+    // копируем scrollTop и scrollLeft с textarea на подсвеченный pre
     if (pre) {
       pre.scrollTop = ta.scrollTop
       pre.scrollLeft = ta.scrollLeft
     }
+    // номера строк скроллятся только вертикально (нет горизонтального скролла)
     if (ln) {
       ln.scrollTop = ta.scrollTop
     }

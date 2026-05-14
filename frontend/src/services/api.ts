@@ -101,19 +101,28 @@ const API_BASE_URL = String(import.meta.env.VITE_API_URL || "").replace(
   "",
 );
 
+// возвращает access token из localStorage или null если не залогинен
+// используется в backendRequest перед каждым запросом
 function getAccessToken() {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
+// возвращает refresh token из localStorage или null
+// нужен только в tryRefreshToken() и logout чтобы передать на бэк
 function getRefreshToken() {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
+// сохраняет оба токена в localStorage
+// @param accessToken — короткоживущий JWT (обычно 15 минут), для авторизации запросов
+// @param refreshToken — долгоживущий токен (30 дней), для обновления access
 function setTokens(accessToken: string, refreshToken: string) {
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
+// удаляет оба токена — вызывается при logout или если refresh не удался
+// после этого пользователь считается незалогиненным
 function clearTokens() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -351,7 +360,11 @@ type RouteMapping = {
   ) => Promise<T>;
 };
 
-/** Helper: forward request to the same or different backend path with body. */
+// прокидывает запрос напрямую на бэкенд без трансформации данных
+// @param backendPath — путь на бэкенде (может отличаться от фронтового)
+// @param method — HTTP метод: "GET", "POST", "PATCH", "DELETE"
+// @param rawBody — тело запроса в виде объекта, будет сериализовано в JSON
+// @returns промис с данными типа T
 function passthrough<T>(
   backendPath: string,
   method: string,
@@ -364,7 +377,10 @@ function passthrough<T>(
   return backendRequest<T>(backendPath, init);
 }
 
-/** Helper: extract a numeric ID segment from a path. */
+// извлекает сегмент пути по индексу — используется для вытаскивания id из url
+// пример: pathId("/teacher/courses/42/steps", 3) → "42"
+// @param path — полный url путь, например "/admin/users/5/role"
+// @param index — индекс сегмента (после split по "/"), считая с 0
 function pathId(path: string, index: number): string {
   return path.split("/")[index];
 }

@@ -29,14 +29,19 @@ export default function Login() {
   const [twoFactorPending, setTwoFactorPending] = useState<string | null>(null) // pending токен для 2fa
   const [twoFactorCode, setTwoFactorCode] = useState("")
 
-  // базовая валидация перед отправкой
+  // валидирует email и пароль перед отправкой на сервер
+  // @returns строка ошибки или "" если поля заполнены корректно
   const validate = () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) return "Введите корректный email"
     if (password.trim().length < 8) return "Пароль — минимум 8 символов"
     return ""
   }
 
-  // основной логин — после успеха либо редиректим либо переключаемся на 2fa экран
+  // основной обработчик входа
+  // @flow: validate() → store.login(email, password) → POST /auth/login
+  //   результат.kind = "authenticated" → navigate("/dashboard")
+  //   результат.kind = "twoFactorRequired" → setTwoFactorPending(pendingToken), показываем шаг 2
+  // при ошибке — показываем сообщение прямо в форме и в тосте
   const handleLogin = async () => {
     const err = validate()
     if (err) { setError(err); return }
@@ -44,7 +49,8 @@ export default function Login() {
     try {
       const result = await login(email, password)
       if (result.kind === "twoFactorRequired") {
-        // сервер хочет второй фактор — показываем поле ввода кода
+        // pendingToken — временный JWT от бэка, срок жизни ~5 минут
+        // передаём его на втором шаге вместе с кодом из аутентификатора
         setTwoFactorPending(result.pendingToken)
         setTwoFactorCode("")
         toast.success("Введите код из приложения-аутентификатора")
@@ -58,7 +64,11 @@ export default function Login() {
     } finally { setLoading(false) }
   }
 
-  // подтверждение 2fa — отправляем pendingToken + 6-значный код
+  // второй шаг входа при включённой 2FA
+  // @param twoFactorPending — pendingToken полученный на первом шаге
+  // @param twoFactorCode — 6-значный TOTP код из Google Authenticator / Яндекс Ключа
+  // проверяем регуляркой что код строго 6 цифр перед отправкой
+  // POST /auth/2fa/verify → бэк верифицирует TOTP и выдаёт полноценные токены
   const handleTwoFactorVerify = async () => {
     const code = twoFactorCode.trim()
     if (!/^\d{6}$/.test(code)) {
@@ -77,14 +87,16 @@ export default function Login() {
     } finally { setLoading(false) }
   }
 
-  // отменить 2fa — вернуться к форме email/пароля
+  // сбрасывает состояние 2fa — возвращает к форме email/пароля
+  // очищаем pendingToken, код и сообщение об ошибке
   const cancelTwoFactor = () => {
     setTwoFactorPending(null)
     setTwoFactorCode("")
     setError("")
   }
 
-  // enter отправляет форму — или логин или 2fa в зависимости от текущего экрана
+  // перехватываем Enter: если на шаге 2fa → подтвердить код, иначе → войти
+  // @param e — KeyboardEvent от контейнера формы (onKeyDown на div)
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       if (twoFactorPending) void handleTwoFactorVerify()

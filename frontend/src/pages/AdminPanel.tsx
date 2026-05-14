@@ -48,18 +48,21 @@ export default function AdminPanel() {
   const [replyText, setReplyText] = useState<Record<number, string>>({}); // текст ответа по id обращения
   const [replyLoading, setReplyLoading] = useState<number | null>(null)
 
-  // загружаем все данные параллельно — быстрее
+  // загружает все данные панели параллельно через Promise.all
+  // 4 запроса одновременно: статистика, курсы, пользователи, обратная связь
+  // Promise.all ждёт все — если один упал, все данные не придут
+  // ошибки тихо игнорируем (catch пустой) — показываем то что загрузилось
   const load = async () => {
     setLoading(true)
     try {
       const [overview, adminCourses, adminUsers, feedback] = await Promise.all([
-        api.get<AdminOverview>("/admin/overview"),
-        api.get<AdminCourse[]>("/admin/courses"),
-        api.get<AdminUser[]>("/admin/users"),
-        api.get<FeedbackItem[]>("/feedback"),
+        api.get<AdminOverview>("/admin/overview"),   // GET /admin/overview → общая статистика
+        api.get<AdminCourse[]>("/admin/courses"),    // GET /admin/courses → список всех курсов
+        api.get<AdminUser[]>("/admin/users"),        // GET /admin/users → список пользователей
+        api.get<FeedbackItem[]>("/feedback"),        // GET /feedback → обращения пользователей
       ])
       setData(overview); setCourses(adminCourses); setUsers(adminUsers); setFeedbackItems(feedback)
-    } catch { /* тихо игнорируем — покажем что осталось */ } finally { setLoading(false) }
+    } catch { /* тихо игнорируем — покажем то что успело загрузиться */ } finally { setLoading(false) }
   }
 
   useEffect(() => { void load() }, [])
@@ -67,7 +70,9 @@ export default function AdminPanel() {
   // курсы ожидающие одобрения модератора
   const pendingCourses = useMemo(() => courses.filter(c => c.status === "pending_review"), [courses])
 
-  // фильтрация курсов по статусу и строке поиска
+  // вычисляет видимые курсы с учётом активного фильтра и поискового запроса
+  // useMemo пересчитывает только когда courses, filter или courseQuery изменились
+  // поиск идёт по полям title + author одновременно (конкатенируем через пробел)
   const visibleCourses = useMemo(() => {
     const base = filter === "all" ? courses
       : filter === "published" ? courses.filter(c => c.status === "published")
@@ -77,7 +82,8 @@ export default function AdminPanel() {
     return q ? base.filter(c => `${c.title} ${c.author}`.toLowerCase().includes(q)) : base
   }, [courses, filter, courseQuery])
 
-  // фильтрация пользователей по роли и строке поиска
+  // вычисляет видимых пользователей с учётом фильтра роли и поискового запроса
+  // поиск идёт по name + email одновременно
   const visibleUsers = useMemo(() => {
     const base = userFilter === "all" ? users : users.filter(u => u.role === userFilter)
     const q = userQuery.trim().toLowerCase()
@@ -87,7 +93,11 @@ export default function AdminPanel() {
   // количество новых обращений — для счётчика в заголовке вкладки
   const feedbackNew = feedbackItems.filter(f => f.status === "new").length
 
-  // одобрить или отклонить курс на модерации
+  // решение по курсу на модерации: одобрить или отклонить
+  // @param course — объект курса из таблицы
+  // @param action — "approve" (публикует) или "reject" (переводит в draft)
+  // setActionId блокирует кнопки конкретного курса во время запроса
+  // после ответа обновляем курс в локальном массиве через .map() без перезагрузки
   const moderateCourse = async (course: AdminCourse, action: "approve" | "reject") => {
     setActionId(course.id)
     try {
@@ -97,7 +107,10 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
-  // переключить публикацию курса (published/draft)
+  // переключает флаг published у курса (черновик ↔ опубликован)
+  // @param course — текущий объект курса, читаем course.published для инверсии
+  // PATCH /admin/courses/:id → { published: !course.published }
+  // после ответа обновляем и published и status в локальном стейте
   const togglePublish = async (course: AdminCourse) => {
     setActionId(course.id)
     try {
@@ -107,7 +120,9 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
-  // удалить курс — с подтверждением
+  // удаляет курс после подтверждения через браузерный confirm
+  // @param id — id курса для удаления
+  // после успеха фильтруем локальный массив — перезагрузка не нужна
   const removeCourse = async (id: number) => {
     if (!confirm("Удалить курс?")) return
     setActionId(id)
@@ -118,7 +133,10 @@ export default function AdminPanel() {
     } catch { toast.error("Ошибка") } finally { setActionId(null) }
   }
 
-  // изменить роль пользователя — выбирается из дропдауна
+  // меняет роль пользователя
+  // @param u — текущий объект пользователя
+  // @param role — новая роль: "student" | "teacher" | "admin"
+  // PATCH /admin/users/:id/role → { role } → бэк возвращает обновлённый объект пользователя
   const changeUserRole = async (u: AdminUser, role: AdminUser["role"]) => {
     setActionId(u.id)
     try {

@@ -18,23 +18,30 @@ import {
 } from "lucide-react";
 import { useState as useStateLocal, useRef, useMemo, useEffect as useEffectLocal } from "react";
 
-// хук для отслеживания тёмной темы — нужен для подсветки кода
+// хук для отслеживания тёмной/светлой темы приложения
+// не использует ThemeContext намеренно — читает класс "dark" напрямую с <html>
+// MutationObserver следит за изменением атрибута class на documentElement
+// @returns boolean — true если сейчас тёмная тема
+// используется для выбора цветовой схемы подсветки синтаксиса
 function useIsDark() {
   const [isDark, setIsDark] = useStateLocal(() =>
     document.documentElement.classList.contains("dark")
   );
   useEffectLocal(() => {
-    // следим за изменением класса dark на html-элементе
+    // следим только за атрибутом class чтобы не триггерить на другие изменения
     const obs = new MutationObserver(() =>
       setIsDark(document.documentElement.classList.contains("dark"))
     );
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => obs.disconnect();
+    return () => obs.disconnect(); // отписываемся при unmount
   }, []);
   return isDark;
 }
 
-// экранируем html-символы чтобы не было xss в коде подсветки
+// экранирует html-спецсимволы для безопасной вставки в innerHTML
+// @param s — исходная строка кода
+// @returns строка с &amp; &lt; &gt; вместо & < >
+// предотвращает XSS при рендере подсветки через dangerouslySetInnerHTML
 function escHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -57,9 +64,19 @@ const PY_BUILTINS = new Set([
   "BaseModel","Field","FastAPI","List","Optional","Dict","Union",
 ]);
 
-// подсвечивает одну строку кода — разбирает токены и оборачивает в span с цветом
+// подсвечивает одну строку python-кода вручную (без сторонних библиотек)
+// @param line — одна строка кода без символа переноса
+// @param dark — true для тёмной темы, false для светлой
+// @returns html-строка с <span style="color:..."> вокруг каждого токена
+// лексический анализ идёт слева направо через while(i < line.length):
+//   # → комментарий до конца строки
+//   f/r/b → префикс строкового литерала
+//   " / ' → строковый литерал (одинарные, двойные, тройные)
+//   0-9 → числовой литерал
+//   буква/_ → идентификатор → проверяем: keyword, builtin, или просто имя
+//   всё остальное → оператор/пунктуация
 function highlightLine(line: string, dark: boolean): string {
-  // цвета для тёмной и светлой темы
+  // цвета для тёмной и светлой темы — kw=ключевые слова, str=строки, cmt=комментарии
   const c = dark
     ? { kw:"#c084fc", str:"#4ade80", cmt:"#6b7280", num:"#fb923c", builtin:"#38bdf8", fn:"#60a5fa", op:"#818cf8", plain:"#e2e8f0" }
     : { kw:"#7c3aed", str:"#15803d", cmt:"#6b7280", num:"#ea580c", builtin:"#0369a1", fn:"#1d4ed8", op:"#6366f1", plain:"#1e293b" };
