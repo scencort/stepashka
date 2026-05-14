@@ -1,3 +1,6 @@
+// страница сброса пароля — получает email и devCode из query string
+// в dev режиме код подставляется автоматически в поле — удобно для тестирования
+// после успешного сброса редиректим на /login
 import { useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 

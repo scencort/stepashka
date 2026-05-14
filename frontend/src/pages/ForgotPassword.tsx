@@ -1,3 +1,6 @@
+// страница восстановления пароля — вводишь email, сервер отправляет код
+// после успеха автоматически редиректим на /reset-password с email в query
+// devCode в ответе нужен для разработки — подставляется в форму автоматически
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 

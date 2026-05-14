@@ -1,9 +1,13 @@
+// обёртка для экранов авторизации — фон с матричным дождём и печатающимися сниппетами кода
+// используется на страницах входа, регистрации, сброса пароля
+// кнопка смены темы вынесена сюда — не нужно дублировать на каждой странице
 import { useMemo, useEffect, useRef, type ReactNode } from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "../../context/theme"
 
 type Props = { children: ReactNode }
 
+// шрифт для матричного дождя — моноширинный
 const MONO = "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"
 
 /* ============================================================
@@ -62,6 +66,8 @@ const CODE_LINES = [
   "¡Hola mundo!", "Ciao mondo!", "Olá mundo!",
 ]
 
+// хук для матричного дождя на canvas — символы кода падают сверху вниз
+// isDark меняет цветовую гамму под тёмную/светлую тему
 function useMatrixRain(canvasRef: React.RefObject<HTMLCanvasElement | null>, isDark: boolean) {
   const stateRef = useRef<{ cols: number[]; texts: string[]; dpr: number }>({ cols: [], texts: [], dpr: 1 })
 
@@ -178,6 +184,9 @@ const SNIPPETS: Snippet[] = [
   { left: "82%", top: "82%", vis: "all", rotate: -2, text: `apiVersion: apps/v1\nkind: Deployment\nspec:\n  replicas: 3\n  template:\n    containers:\n    - name: web\n      image: app:1.2\n      ports:\n      - 8080` },
 ]
 
+// компонент одного печатающегося сниппета кода на фоне
+// текст появляется посимвольно с задержкой delay
+// vis контролирует при каком размере экрана видим сниппет
 function TypewriterCell({ text, left, top, vis, rotate, delay }: Snippet & { delay: number }) {
   const ref = useRef<HTMLPreElement>(null)
 
@@ -218,8 +227,11 @@ export default function AuthScreenShell({ children }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isDark = theme === "dark"
 
+  // запускаем анимацию матричного дождя на canvas
   useMatrixRain(canvasRef, isDark)
 
+  // случайный цветовой акцент выбирается один раз при монтировании
+  // useMemo без зависимостей = один вычисляется один раз
   const tint = useMemo(() => {
     const tints = [
       // Red + Burgundy

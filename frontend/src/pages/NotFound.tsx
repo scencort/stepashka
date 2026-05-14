@@ -1,3 +1,6 @@
+// страница 404 — показывается при переходе на несуществующий маршрут
+// анимация частиц на canvas и большая цифра 404 с градиентом
+// кнопки "на главную" и "назад" для навигации
 import { useNavigate } from "react-router-dom";
 import { useEffect, useRef } from "react";
 import { Home, ArrowLeft } from "lucide-react";

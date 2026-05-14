@@ -1,3 +1,6 @@
+// центр помощи — список FAQ с поиском и AI-ответами на вопросы
+// вопросы грузятся с сервера, фильтруются по категории и поисковому запросу
+// если вопрос не нашёлся в FAQ — можно спросить AI прямо здесь
 import { useEffect, useMemo, useState } from "react"
 import MainLayout from "../layout/MainLayout"
 import Card from "../components/ui/Card"
@@ -21,8 +24,10 @@ export default function HelpCenter() {
       .finally(() => setLoading(false))
   }, [])
 
+  // уникальные категории для кнопок-фильтров
   const categories = useMemo(() => [...new Set(faqData.map((item) => item.category))], [faqData])
 
+  // фильтрация по категории и поисковому запросу — оба фильтра работают одновременно
   const filtered = useMemo(() => {
     let items = faqData
     if (activeCategory) {
@@ -35,6 +40,7 @@ export default function HelpCenter() {
     return items
   }, [faqData, query, activeCategory])
 
+  // переключение аккордеона — Set чтобы открытых элементов могло быть несколько
   const toggle = (id: number) => {
     setOpenIds((prev) => {
       const next = new Set(prev)

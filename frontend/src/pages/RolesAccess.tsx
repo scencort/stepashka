@@ -1,3 +1,6 @@
+// страница управления ролями и доступом — только для администраторов
+// список всех участников с возможностью менять роль через select и удалять
+// карточки статистики по количеству студентов, преподавателей и администраторов
 import { useEffect, useMemo, useState } from "react"
 import MainLayout from "../layout/MainLayout"
 import { api } from "../lib/api"
@@ -28,12 +31,14 @@ export default function RolesAccess() {
       .finally(() => setLoading(false))
   }, [])
 
+  // фильтрация по роли и поиску по имени — применяются вместе
   const visible = useMemo(() => {
     const base = filter === "all" ? members : members.filter(m => m.role === filter)
     const q = query.trim().toLowerCase()
     return q ? base.filter(m => m.name.toLowerCase().includes(q)) : base
   }, [members, filter, query])
 
+  // смена роли через PATCH — optimistic update: обновляем список сразу после ответа
   const changeRole = async (member: Member, role: Member["role"]) => {
     setActionId(member.id)
     try {
