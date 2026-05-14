@@ -1,4 +1,7 @@
-﻿import MainLayout from "../layout/MainLayout";
+﻿// страница AI Code Review — редактор кода + AI-анализ качества, ошибок и улучшений
+// поддерживает 15 языков программирования, результат разбит на категории
+// история всех проверок хранится на бэкенде и загружается при старте
+import MainLayout from "../layout/MainLayout";
 import { useEffect, useState } from "react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -103,6 +106,7 @@ export default function Task() {
     }
   };
 
+  // средний балл — среднее из трёх метрик: качество, корректность, стиль
   const avgScore = result
     ? Math.round((result.quality + result.correctness + result.style) / 3)
     : 0;

@@ -1,3 +1,6 @@
+// редактор кода с подсветкой синтаксиса — прозрачная textarea поверх подсвеченного pre
+// prism-react-renderer рендерит подсветку, textarea принимает ввод
+// номера строк, синхронизация скролла, тема меняется вместе с темой приложения
 import { useRef, useCallback, useState, useEffect } from "react"
 import { Highlight, themes, type Language } from "prism-react-renderer"
 import { useTheme } from "../../context/theme"
@@ -9,6 +12,7 @@ type Props = {
   placeholder?: string
 }
 
+// маппинг строк языка из нашего селекта в идентификаторы prism
 const LANG_MAP: Record<string, Language> = {
   auto: "clike",
   python: "python",
@@ -38,6 +42,7 @@ export default function CodeEditor({ value, onChange, language, placeholder }: P
   const lines = value ? value.split("\n") : [""]
   const isDark = theme === "dark"
 
+  // синхронизируем скролл textarea и pre — иначе подсветка уедет при прокрутке
   const syncScroll = useCallback(() => {
     const ta = textareaRef.current
     const pre = preRef.current

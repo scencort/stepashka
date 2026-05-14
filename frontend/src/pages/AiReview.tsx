@@ -1,4 +1,7 @@
-﻿import { useEffect, useState, useRef } from "react";
+﻿// страница AI-ассистента — чат с GPT и быстрая проверка кода
+// чат использует streaming через ReadableStream если бэкенд поддерживает,
+// иначе fallback на обычный POST запрос с полным ответом
+import { useEffect, useState, useRef } from "react";
 import MainLayout from "../layout/MainLayout";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -40,6 +43,7 @@ export default function AiReview() {
   ]);
   const [error, setError] = useState("");
 
+  // загружаем историю предыдущих проверок — показываем в сайдбаре
   const loadHistory = async () => {
     try {
       const data = await api.get<Array<Verdict & { id: number; createdAt: string }>>("/ai/review/history");
@@ -71,6 +75,8 @@ export default function AiReview() {
     }
   };
 
+  // отправляем сообщение AI — пробуем streaming, при неудаче — обычный запрос
+  // последние 8 сообщений передаём как контекст чтобы AI помнил разговор
   const askAi = async () => {
     const message = chatInput.trim();
     if (!message) {
