@@ -1,3 +1,7 @@
+// лендинг — главная страница для незарегистрированных пользователей
+// секции: nav, hero с частицами, marquee статистики, глобус сообщества,
+// возможности платформы, треки обучения, популярные курсы, команда разработчиков, CTA, футер
+// данные курсов и статистики грузятся с сервера при монтировании
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,7 +37,7 @@ import ParticleNetwork from "../components/ParticleNetwork";
 import { useTheme } from "../context/theme";
 import { useAppStore } from "../store/AppStore";
 
-// ─── Team revolver component ───────────────────────────────────────────────
+// ─── Team revolver component — карусель команды расположена по кругу ─────────
 type Member = {
   name: string; roles: string[]; photo: string; link: string;
   objectPosition: string; scale: number;
@@ -134,8 +138,8 @@ export default function Landing() {
   const { theme, toggleTheme } = useTheme();
   const { user, loadingUser } = useAppStore();
 
-  // Stable references per theme so re-renders (e.g. from the live
-  // achievements ticker) don't tear down the BinaryGlobe animation loop.
+  // стабильные ссылки на палитру глобуса — useMemo чтобы живая лента достижений
+  // не пересоздавала пропсы BinaryGlobe и не рвала анимацию
   const globePalette = useMemo<string[]>(
     () =>
       theme === "dark"
@@ -203,7 +207,9 @@ export default function Landing() {
     [landingStats.averageRating]
   );
 
-  // ── Live activity feed (mock, decoupled from DB) ──
+  // ── живая лента активности — генерируется на клиенте, не из БД ──
+  // имитирует реальную активность: новые записи каждые 3.6 секунды
+  // тикер времени обновляется каждые 10 секунд чтобы метки были актуальны
   type ActivityItem = {
     id: number;
     name: string;
@@ -283,6 +289,7 @@ export default function Landing() {
     };
   }, []);
 
+  // форматирует метку времени для карточек ленты — "только что", "30 с назад", "5 мин назад"
   const feedTimeLabel = (createdAt: number) => {
     const sec = Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
     if (sec < 5) return "только что";
