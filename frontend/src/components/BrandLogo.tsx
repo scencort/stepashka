@@ -1,6 +1,16 @@
 // компонент логотипа бренда — SVG-иконка + опциональный текст
-// используется в навбаре, страницах авторизации и других местах
-// все классы настраиваются снаружи через пропсы для гибкости
+// используется в: MainLayout.tsx (сайдбар + мобильная шапка),
+//                 AuthScreenShell.tsx (экраны входа), NotFound.tsx, Landing.tsx
+//
+// SVG берётся из assets/gradus-logo.svg через Vite import (url становится строкой)
+// все стили (размер, цвет текста) задаются снаружи через пропсы — компонент не знает контекст
+//
+// props:
+//   showText       — показывать ли слово "Gradus" рядом с иконкой
+//   text           — текст логотипа, по умолчанию "Gradus"
+//   className      — класс для flex-обёртки (gap, отступы)
+//   iconClassName  — класс для <img> с иконкой (h-8 w-8, h-10 w-10, etc.)
+//   textClassName  — класс для <span> с текстом (размер шрифта, цвет, gradient-text)
 import logoSrc from "../assets/gradus-logo.svg";
 
 type BrandLogoProps = {

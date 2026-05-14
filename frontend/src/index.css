@@ -250,3 +250,15 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ── Toast animations — используются в hooks/useToast.tsx ── */
+/* toast-in: тост появляется справа, едет влево и становится видимым */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(20px) translateY(-4px); }
+  to   { opacity: 1; transform: translateX(0)    translateY(0); }
+}
+/* toast-out: тост уезжает вправо и исчезает — запускается за 400ms до удаления из DOM */
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0)    translateY(0); }
+  to   { opacity: 0; transform: translateX(14px) translateY(-4px); }
+}
