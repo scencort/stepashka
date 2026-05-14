@@ -1,3 +1,5 @@
+// компонент для отображения и сдачи одного шага курса
+// работает с теорией, квизами, кодом и эссе
 import {
   CheckCircle2,
   Circle,
@@ -16,12 +18,13 @@ import {
 } from "lucide-react";
 import { useState as useStateLocal, useRef, useMemo, useEffect as useEffectLocal } from "react";
 
-// ── Dark mode detector ───────────────────────────────────────────
+// хук для отслеживания тёмной темы — нужен для подсветки кода
 function useIsDark() {
   const [isDark, setIsDark] = useStateLocal(() =>
     document.documentElement.classList.contains("dark")
   );
   useEffectLocal(() => {
+    // следим за изменением класса dark на html-элементе
     const obs = new MutationObserver(() =>
       setIsDark(document.documentElement.classList.contains("dark"))
     );
@@ -31,17 +34,19 @@ function useIsDark() {
   return isDark;
 }
 
-// ── Python syntax highlighter ────────────────────────────────────
+// экранируем html-символы чтобы не было xss в коде подсветки
 function escHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// зарезервированные слова питона для подсветки синтаксиса
 const PY_KEYWORDS = new Set([
   "def","class","import","from","return","if","elif","else","for","while",
   "in","not","and","or","is","None","True","False","try","except","finally",
   "with","as","raise","pass","break","continue","lambda","async","await",
   "yield","global","nonlocal","del","assert","self","cls",
 ]);
+// встроенные функции питона
 const PY_BUILTINS = new Set([
   "print","len","range","str","int","float","list","dict","set","tuple",
   "bool","type","isinstance","hasattr","getattr","setattr","enumerate",
@@ -52,7 +57,9 @@ const PY_BUILTINS = new Set([
   "BaseModel","Field","FastAPI","List","Optional","Dict","Union",
 ]);
 
+// подсвечивает одну строку кода — разбирает токены и оборачивает в span с цветом
 function highlightLine(line: string, dark: boolean): string {
+  // цвета для тёмной и светлой темы
   const c = dark
     ? { kw:"#c084fc", str:"#4ade80", cmt:"#6b7280", num:"#fb923c", builtin:"#38bdf8", fn:"#60a5fa", op:"#818cf8", plain:"#e2e8f0" }
     : { kw:"#7c3aed", str:"#15803d", cmt:"#6b7280", num:"#ea580c", builtin:"#0369a1", fn:"#1d4ed8", op:"#6366f1", plain:"#1e293b" };
@@ -60,16 +67,17 @@ function highlightLine(line: string, dark: boolean): string {
   let out = "";
   let i = 0;
   while (i < line.length) {
+    // комментарий — всё от # до конца строки
     if (line[i] === "#") {
       out += `<span style="color:${c.cmt};font-style:italic">${escHtml(line.slice(i))}</span>`;
       break;
     }
-    // f/r/b prefix
+    // префикс строки: f, r, b
     let pfx = "";
     if ("frbrb".includes(line[i]) && (line[i+1] === '"' || line[i+1] === "'")) {
       pfx = line[i++];
     }
-    // String
+    // строковый литерал — одинарные или двойные кавычки, в том числе тройные
     if (line[i] === '"' || line[i] === "'") {
       const q = line[i];
       const triple = line.slice(i, i+3) === q+q+q;
@@ -84,21 +92,21 @@ function highlightLine(line: string, dark: boolean): string {
       i = j; continue;
     }
     if (pfx) { out += escHtml(pfx); continue; }
-    // Decorator
+    // декоратор (@something)
     if (line[i] === "@") {
       let j = i+1;
       while (j < line.length && /[\w.]/.test(line[j])) j++;
       out += `<span style="color:#f59e0b">${escHtml(line.slice(i, j))}</span>`;
       i = j; continue;
     }
-    // Number
+    // числовой литерал
     if (/[0-9]/.test(line[i]) && (i === 0 || !/\w/.test(line[i-1]))) {
       let j = i;
       while (j < line.length && /[0-9._xXbBoOeEjJ]/.test(line[j])) j++;
       out += `<span style="color:${c.num}">${escHtml(line.slice(i, j))}</span>`;
       i = j; continue;
     }
-    // Identifier
+    // идентификатор — проверяем не ключевое ли слово и вызов ли это функции
     if (/[a-zA-Z_]/.test(line[i])) {
       let j = i;
       while (j < line.length && /\w/.test(line[j])) j++;
@@ -115,7 +123,7 @@ function highlightLine(line: string, dark: boolean): string {
         out += `<span style="color:${c.plain}">${escHtml(word)}</span>`;
       i = j; continue;
     }
-    // Operator
+    // оператор
     if ("+-*/%=<>!&|^~".includes(line[i]))
       out += `<span style="color:${c.op}">${escHtml(line[i++])}</span>`;
     else
@@ -124,27 +132,32 @@ function highlightLine(line: string, dark: boolean): string {
   return out;
 }
 
+// подсвечивает весь блок кода построчно
 function highlightCode(code: string, dark: boolean): string {
   return code.split("\n").map(l => highlightLine(l, dark)).join("\n");
 }
 
-// ── Code editor with syntax highlighting ─────────────────────────
+// стили для редактора кода — моноширинный шрифт
 const FONT: React.CSSProperties = {
   fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code','Consolas',monospace",
   fontSize: "13px",
   lineHeight: "22px",
 };
-const PAD = 14;
-const GUTTER = 46;
+const PAD = 14;    // отступы внутри редактора
+const GUTTER = 46; // ширина колонки с номерами строк
 
+// редактор кода с подсветкой синтаксиса питона
+// работает как overlaid editor: textarea прозрачная поверх pre с подсветкой
 function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const dark = useIsDark();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
 
   const lines = Math.max((value || "").split("\n").length, 10);
+  // перепересчитываем подсветку только когда меняется код или тема
   const highlighted = useMemo(() => highlightCode(value || "", dark), [value, dark]);
 
+  // синхронизируем скролл textarea и pre чтобы подсветка не уезжала
   const syncScroll = () => {
     if (textareaRef.current && preRef.current) {
       preRef.current.scrollTop = textareaRef.current.scrollTop;
@@ -152,6 +165,7 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
     }
   };
 
+  // цвета для разных частей редактора в зависимости от темы
   const bg    = dark ? "#18181b" : "#f8fafc";
   const gutBg = dark ? "#1e1e24" : "#f1f5f9";
   const gutBorder = dark ? "#3f3f46" : "#e2e8f0";
@@ -161,22 +175,22 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
 
   return (
     <div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${border}`, boxShadow: "0 1px 4px 0 rgba(0,0,0,0.06)" }}>
-      {/* Title bar */}
+      {/* строка заголовка в стиле macOS */}
       <div style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 12px", background: gutBg, borderBottom:`1px solid ${gutBorder}` }}>
         <span style={{ width:10,height:10,borderRadius:"50%",background:"#f87171",display:"inline-block" }}/>
         <span style={{ width:10,height:10,borderRadius:"50%",background:"#fbbf24",display:"inline-block" }}/>
         <span style={{ width:10,height:10,borderRadius:"50%",background:"#34d399",display:"inline-block" }}/>
         <span style={{ ...FONT, fontSize:11, color: gutColor, marginLeft:8 }}>solution.py</span>
       </div>
-      {/* Editor body */}
+      {/* тело редактора */}
       <div style={{ display:"flex", background: bg, minHeight: lines*22 + PAD*2 }}>
-        {/* Gutter */}
+        {/* нумерация строк */}
         <div style={{ width:GUTTER, flexShrink:0, background:gutBg, borderRight:`1px solid ${gutBorder}`, paddingTop:PAD, paddingBottom:PAD, userSelect:"none" }}>
           {Array.from({ length: lines }, (_, i) => (
             <div key={i} style={{ ...FONT, textAlign:"right", paddingRight:10, color: gutColor }}>{i+1}</div>
           ))}
         </div>
-        {/* Overlay area */}
+        {/* область ввода — pre с подсветкой + прозрачная textarea поверх */}
         <div style={{ position:"relative", flex:1, overflow:"hidden" }}>
           <pre
             ref={preRef}
@@ -190,21 +204,22 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
             onChange={(e) => onChange(e.target.value)}
             onScroll={syncScroll}
             onKeyDown={(e) => {
+              // tab вставляет 4 пробела вместо переключения фокуса
               if (e.key === "Tab") {
                 e.preventDefault();
                 const el = e.currentTarget;
                 const start = el.selectionStart;
                 const end = el.selectionEnd;
-                const TAB = "    "; // 4 spaces
+                const TAB = "    "; // 4 пробела
                 if (start === end) {
-                  // Single cursor — insert 4 spaces
+                  // одиночный курсор — вставляем пробелы
                   const next = value.slice(0, start) + TAB + value.slice(end);
                   onChange(next);
                   requestAnimationFrame(() => {
                     el.selectionStart = el.selectionEnd = start + TAB.length;
                   });
                 } else {
-                  // Multi-line selection — indent/unindent each line
+                  // выделено несколько строк — отступаем или убираем отступ
                   const lines = value.split("\n");
                   let charCount = 0;
                   const startLine = lines.findIndex(l => { charCount += l.length + 1; return charCount > start; });
@@ -213,6 +228,7 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
                   const sl = Math.max(0, startLine);
                   const el2 = Math.min(lines.length - 1, endLine < 0 ? lines.length - 1 : endLine);
                   if (e.shiftKey) {
+                    // shift+tab убирает отступ
                     for (let i = sl; i <= el2; i++) {
                       if (lines[i].startsWith(TAB)) lines[i] = lines[i].slice(4);
                       else if (lines[i].startsWith(" ")) lines[i] = lines[i].replace(/^ +/, "");
@@ -223,7 +239,7 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
                   onChange(lines.join("\n"));
                 }
               }
-              // Auto-close brackets
+              // умный перенос строки — сохраняет отступ и добавляет если предыдущая заканчивается на :
               if (e.key === "Enter") {
                 e.preventDefault();
                 const el = e.currentTarget;
@@ -252,21 +268,27 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
     </div>
   );
 }
-// ────────────────────────────────────────────────────────────────
 
-// ── Theory renderer ──────────────────────────────────────────────
+// определяет является ли строка кодом питона или обычным текстом
+// нужно для разбивки теории на блоки текста и блоки кода
 function isCodeLine(line: string): boolean {
   if (!line.trim()) return false;
+  // отступы — признак кода
   if (line.startsWith("    ") || line.startsWith("\t")) return true;
   const s = line.trimStart();
+  // если много кириллицы — скорее всего это текст
   const cyrillic = (s.match(/[а-яА-ЯёЁ]/g) || []).length;
   if (cyrillic > 4) return false;
+  // проверяем питоновские конструкции
   return /^(def |class |import |from |for |while |if |elif |else:|return |print\(|try:|except|finally:|with |raise |pass\b|break\b|continue\b|async |await |#|lambda )/.test(s)
     || /^[a-zA-Z_]\w*(\s*[+\-*\/]?=(?!=)\s*|\s*\(|\s*\[)/.test(s);
 }
 
+// сегмент теоретического текста — или обычный текст или блок кода
 type Segment = { type: "text"; lines: string[] } | { type: "code"; lines: string[] };
 
+// разбирает теоретический текст на сегменты
+// чередует обычный текст с блоками кода чтобы красиво отобразить
 function parseTheory(text: string): Segment[] {
   const raw = text.split("\n");
   const segments: Segment[] = [];
@@ -276,7 +298,7 @@ function parseTheory(text: string): Segment[] {
     const line = raw[i];
 
     if (!line.trim()) {
-      // blank line — attach to previous text segment or skip
+      // пустая строка — добавляем к предыдущему текстовому сегменту
       if (segments.length && segments[segments.length - 1].type === "text") {
         segments[segments.length - 1].lines.push("");
       }
@@ -285,11 +307,11 @@ function parseTheory(text: string): Segment[] {
     }
 
     if (isCodeLine(line)) {
-      // collect consecutive code lines
+      // собираем подряд идущие строки кода в один блок
       const codeLines: string[] = [];
       while (i < raw.length && (isCodeLine(raw[i]) || (raw[i].trim() === "" && i + 1 < raw.length && isCodeLine(raw[i + 1])))) {
         if (raw[i].trim() === "") {
-          // blank inside code block — include if next is also code
+          // пустая строка внутри кода — включаем только если следующая тоже код
           if (i + 1 < raw.length && isCodeLine(raw[i + 1])) {
             codeLines.push("");
           } else {
@@ -313,11 +335,13 @@ function parseTheory(text: string): Segment[] {
   return segments.filter(s => s.lines.some(l => l.trim()));
 }
 
+// блок с кодом — с кнопкой копирования
 function CodeBlock({ code }: { code: string }) {
   const [copied, setCopied] = useStateLocal(false);
   const copy = () => {
     navigator.clipboard.writeText(code).catch(() => {});
     setCopied(true);
+    // через 1.8 секунды сбрасываем статус
     setTimeout(() => setCopied(false), 1800);
   };
   return (
@@ -337,6 +361,7 @@ function CodeBlock({ code }: { code: string }) {
   );
 }
 
+// рендерит теоретический текст чередуя текстовые блоки и блоки кода
 function TheoryRenderer({ text }: { text: string }) {
   const segments = parseTheory(text);
   return (
@@ -346,6 +371,7 @@ function TheoryRenderer({ text }: { text: string }) {
           <CodeBlock key={i} code={seg.lines.join("\n")} />
         ) : (
           <div key={i} className="text-[var(--text)] whitespace-pre-wrap space-y-3">
+            {/* разделитель --- превращается в визуальный разделитель */}
             {seg.lines.join("\n").trim().split(/^---$/m).map((part, j, arr) => (
               <span key={j}>
                 {part.trim() && <span className="block whitespace-pre-wrap">{part.trim()}</span>}
@@ -364,22 +390,23 @@ function TheoryRenderer({ text }: { text: string }) {
     </div>
   );
 }
-// ────────────────────────────────────────────────────────────────
 
+// тип шага с полями для всех видов: теория, квиз, код, эссе
 type CourseStepType = {
   id: number;
   title: string;
   kind: "theory" | "quiz" | "code" | "essay";
   taskTypeLabel?: string;
   theoryText: string;
-  quizQuestion?: string;
-  checks?: string[];
+  quizQuestion?: string;   // вопрос для квиза
+  checks?: string[];       // описание проверок для кода
   checkCount?: number;
-  options: string[];
+  options: string[];       // варианты ответа для квиза
   stepOrder: number;
   xp: number;
 };
 
+// прогресс по конкретному шагу
 type StepProgress = {
   stepId: number;
   status: "started" | "completed";
@@ -389,6 +416,7 @@ type StepProgress = {
   completedAt: string | null;
 };
 
+// одна попытка сдачи
 type AttemptEntry = {
   id: number;
   stepId: number;
@@ -399,11 +427,12 @@ type AttemptEntry = {
   checkResults?: Array<{ name: string; passed: boolean; expected?: string; actual?: string; error?: string }> | null;
 };
 
+// пропсы компонента — всё приходит из CourseDetail
 type Props = {
   activeStep: CourseStepType | null;
   activeProgress: StepProgress | null;
-  previousStep: CourseStepType | null;
-  nextStep: CourseStepType | null;
+  previousStep: CourseStepType | null;   // для навигации назад
+  nextStep: CourseStepType | null;       // для кнопки "следующий шаг"
   contentLoading: boolean;
   stepAnswer: string;
   setStepAnswer: (v: string) => void;
@@ -440,13 +469,16 @@ export default function CourseStep(props: Props) {
     onSelectStep,
   } = props;
 
+  // фильтруем историю попыток только для текущего шага
   const filteredAttempts = attemptHistory.filter(
     (a) => a.stepId === selectedStepId,
   );
+  // id раскрытой попытки в истории (accordion)
   const [expandedAttemptId, setExpandedAttemptId] = useStateLocal<number | null>(null);
 
   return (
     <>
+      {/* если шаг не выбран — подсказка */}
       {!activeStep && !contentLoading && (
         <div className="card p-10 flex flex-col items-center justify-center text-center">
           <BookOpen size={32} className="text-[var(--border)] mb-3" />
@@ -459,12 +491,14 @@ export default function CourseStep(props: Props) {
         </div>
       )}
 
+      {/* основная карточка шага */}
       {activeStep && (
         <div className="card p-6 space-y-5" id="active-step-container">
-          {/* Step header */}
+          {/* заголовок шага — тип, номер, xp, количество попыток */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-2">
+                {/* бейдж с типом шага — цвет зависит от вида */}
                 <span
                   className={`badge ${
                     activeStep.kind === "theory"
@@ -493,6 +527,7 @@ export default function CourseStep(props: Props) {
                     {activeStep.xp} XP
                   </span>
                 )}
+                {/* сколько попыток уже было */}
                 {activeProgress && activeProgress.attempts > 0 && (
                   <span className="text-xs text-[var(--muted)]">
                     {activeProgress.attempts}{" "}
@@ -508,6 +543,7 @@ export default function CourseStep(props: Props) {
                 {activeStep.title}
               </h2>
             </div>
+            {/* галочка если шаг уже выполнен */}
             {activeProgress?.status === "completed" && (
               <CheckCircle2
                 size={20}
@@ -516,14 +552,14 @@ export default function CourseStep(props: Props) {
             )}
           </div>
 
-          {/* Theory */}
+          {/* теория — рендерим через TheoryRenderer который умеет разделять текст и код */}
           {activeStep.kind === "theory" && (
             activeStep.theoryText
               ? <TheoryRenderer text={activeStep.theoryText} />
               : <span className="text-[var(--muted)] italic text-sm">Теоретический материал будет добавлен.</span>
           )}
 
-          {/* Quiz */}
+          {/* квиз — показываем вопрос и кнопки с вариантами ответа */}
           {activeStep.kind === "quiz" && (
             <div className="space-y-3">
               {activeStep.theoryText && (
@@ -544,6 +580,7 @@ export default function CourseStep(props: Props) {
                   }`}
                 >
                   <div className="flex items-center gap-3">
+                    {/* радио-кнопка */}
                     <div
                       className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                         stepAnswer === option
@@ -563,12 +600,13 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* Essay */}
+          {/* эссе — большое текстовое поле с счётчиком символов */}
           {activeStep.kind === "essay" && (
             <div className="space-y-3">
               {activeStep.theoryText && (
                 <TheoryRenderer text={activeStep.theoryText} />
               )}
+              {/* подсказка что эссе проверяет ИИ */}
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/40">
                 <span className="text-base">🤖</span>
                 <p className="text-xs text-purple-700 dark:text-purple-300 leading-snug">
@@ -590,12 +628,13 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* Code */}
+          {/* код — либо редактор с подсветкой либо обычный textarea для свободного ответа */}
           {activeStep.kind === "code" && (
             <div className="space-y-3">
               {activeStep.theoryText && (
                 <TheoryRenderer text={activeStep.theoryText} />
               )}
+              {/* список требований для кода */}
               {activeStep.checks && activeStep.checks.length > 0 && (
                 <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] space-y-1.5">
                   <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-2">
@@ -616,6 +655,7 @@ export default function CourseStep(props: Props) {
                   ))}
                 </div>
               )}
+              {/* выбор типа ввода — кодовый редактор или свободный текст */}
               {activeStep.taskTypeLabel === "Свободный ответ" ? (
                 <textarea
                   value={stepAnswer}
@@ -632,7 +672,7 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* Check results — show all tests */}
+          {/* результаты тест-кейсов — показываем каждый тест отдельно */}
           {stepCheckResults && stepCheckResults.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">Проверки</p>
@@ -648,6 +688,7 @@ export default function CourseStep(props: Props) {
                         : "border-red-200 dark:border-red-800/40"
                     }`}
                   >
+                    {/* заголовок теста */}
                     <div className={`flex items-center gap-2 px-3 py-2 text-xs font-medium ${
                       r.passed
                         ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
@@ -656,6 +697,7 @@ export default function CourseStep(props: Props) {
                       {r.passed ? <Check size={13} /> : <X size={13} />}
                       <span>{r.name}</span>
                     </div>
+                    {/* детали провала — что ожидалось и что получилось */}
                     {!r.passed && hasIO && (
                       <div className="bg-[var(--surface)]">
                         {r.error ? (
@@ -683,7 +725,7 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* AI Comment */}
+          {/* комментарий ии-наставника — появляется после проверки */}
           {stepAiComment && (
             <div className="rounded-2xl overflow-hidden border border-violet-200 dark:border-violet-700/40 shadow-sm">
               <div className="flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600">
@@ -697,13 +739,13 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* Feedback */}
+          {/* фидбек после проверки — зелёный или красный блок */}
           {(stepMessage || stepError) && (() => {
             const msg = stepError || stepMessage;
             const isError = !!stepError;
             const isMultiline = msg.includes("\n");
             if (isError && isMultiline) {
-              // Terminal-style error block
+              // многострочная ошибка — показываем как терминал
               return (
                 <div className="rounded-xl overflow-hidden border border-red-200 dark:border-red-800/40">
                   <div className="flex items-center gap-2 px-4 py-2 bg-red-600 dark:bg-red-800">
@@ -714,6 +756,7 @@ export default function CourseStep(props: Props) {
                 </div>
               );
             }
+            // однострочный фидбек — простой блок
             return (
               <div className={`px-4 py-3 rounded-xl text-sm font-medium ${
                 isError
@@ -725,10 +768,10 @@ export default function CourseStep(props: Props) {
             );
           })()}
 
-          {/* ── SUCCESS BANNER ── */}
+          {/* баннер успеха — появляется когда шаг уже выполнен */}
           {activeProgress?.status === "completed" && !stepLoading && (
             <div className="relative overflow-hidden rounded-2xl border-2 border-green-300 dark:border-green-700/60 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/40 dark:to-emerald-950/40 px-5 py-4 flex items-center gap-4">
-              {/* glow */}
+              {/* декоративное свечение */}
               <div className="absolute -right-8 -top-8 w-32 h-32 bg-green-400/20 rounded-full blur-2xl pointer-events-none" />
               <div className="w-11 h-11 rounded-full bg-green-100 dark:bg-green-900/50 border-2 border-green-300 dark:border-green-700 flex items-center justify-center shrink-0">
                 <PartyPopper size={20} className="text-green-600 dark:text-green-400" />
@@ -751,7 +794,7 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* AI loading banner */}
+          {/* анимация загрузки пока ии проверяет ответ */}
           {stepLoading && (
             <div className="relative overflow-hidden rounded-xl border border-violet-200 dark:border-violet-700/40 bg-violet-50 dark:bg-violet-950/30 px-4 py-3 flex items-center gap-3">
               {/* скользящий прогресс-бар */}
@@ -782,7 +825,7 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* Actions */}
+          {/* кнопки действий — назад, отправить, вперёд */}
           <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border)]">
             <div className="flex items-center gap-2">
               {previousStep && (
@@ -796,6 +839,7 @@ export default function CourseStep(props: Props) {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* главная кнопка — текст зависит от типа шага */}
               <button
                 onClick={onSubmitStep}
                 disabled={
@@ -813,6 +857,7 @@ export default function CourseStep(props: Props) {
                   </>
                 )}
               </button>
+              {/* кнопка следующего шага — только если текущий выполнен */}
               {activeProgress?.status === "completed" && nextStep && (
                 <button
                   onClick={() => onSelectStep(nextStep.id, "")}
@@ -827,7 +872,7 @@ export default function CourseStep(props: Props) {
         </div>
       )}
 
-      {/* Attempt history */}
+      {/* история попыток — аккордеон с деталями каждой попытки */}
       {filteredAttempts.length > 0 && (
         <div className="card p-5 space-y-3">
           <div className="flex items-center gap-2">
@@ -838,6 +883,7 @@ export default function CourseStep(props: Props) {
           </div>
 
           <div className="space-y-2">
+            {/* показываем в обратном порядке — последняя попытка сверху */}
             {[...filteredAttempts].reverse().map((attempt, idx) => {
               const isOpen = expandedAttemptId === attempt.id;
               const checks = attempt.checkResults ?? [];
@@ -852,7 +898,7 @@ export default function CourseStep(props: Props) {
                       : "border-red-200 dark:border-red-800/30"
                   }`}
                 >
-                  {/* Header */}
+                  {/* заголовок попытки — кликабельный для разворачивания */}
                   <button
                     onClick={() => setExpandedAttemptId(isOpen ? null : attempt.id)}
                     className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${
@@ -889,14 +935,14 @@ export default function CourseStep(props: Props) {
                     }
                   </button>
 
-                  {/* Expanded */}
+                  {/* развёрнутые детали попытки — фидбек, код, результаты тестов */}
                   {isOpen && (
                     <div className="px-4 pb-4 pt-3 space-y-3 bg-[var(--bg)] border-t border-[var(--border)]">
 
-                      {/* Feedback */}
+                      {/* текстовый фидбек */}
                       <p className="text-sm text-[var(--text)] leading-relaxed">{attempt.feedback}</p>
 
-                      {/* Code */}
+                      {/* код который отправил юзер */}
                       {attempt.answer && (
                         <div>
                           <p className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
@@ -908,7 +954,7 @@ export default function CourseStep(props: Props) {
                         </div>
                       )}
 
-                      {/* Check results */}
+                      {/* результаты тест-кейсов этой попытки */}
                       {checks.length > 0 && (
                         <div className="space-y-1.5">
                           <p className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wide">Тесты</p>

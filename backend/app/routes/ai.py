@@ -214,25 +214,45 @@ async def _gemini_stream(prompt: str, system: str = ""):
                         yield text
 
 
+async def _aitunnel_stream(prompt: str, system: str = ""):
+    """Fallback: stream via aitunnel (OpenAI-compatible)."""
+    async for chunk in _openai_compatible_stream(
+        base_url=settings.openai_base_url,
+        api_key=settings.openai_api_key,
+        model=settings.openai_model,
+        provider_name="aitunnel",
+        prompt=prompt,
+        system=system,
+    ):
+        yield chunk
+
+
 async def _ai_stream(prompt: str, system: str = ""):
-    """Route to the configured AI provider's streaming endpoint."""
+    """Route to the configured AI provider's streaming endpoint.
+    Falls back to aitunnel if Groq returns 429."""
     provider = (settings.ai_provider or "").strip().lower()
     if provider == "groq":
-        async for chunk in _openai_compatible_stream(
-            base_url="https://api.groq.com/openai/v1",
-            api_key=settings.groq_api_key,
-            model=settings.groq_model,
-            provider_name="Groq",
-            prompt=prompt,
-            system=system,
-        ):
-            yield chunk
+        try:
+            async for chunk in _openai_compatible_stream(
+                base_url="https://api.groq.com/openai/v1",
+                api_key=settings.groq_api_key,
+                model=settings.groq_model,
+                provider_name="Groq",
+                prompt=prompt,
+                system=system,
+            ):
+                yield chunk
+        except RateLimitError:
+            import logging
+            logging.getLogger(__name__).warning("Groq rate limit — switching to aitunnel")
+            async for chunk in _aitunnel_stream(prompt, system):
+                yield chunk
     elif provider == "openai":
         async for chunk in _openai_compatible_stream(
             base_url=settings.openai_base_url,
             api_key=settings.openai_api_key,
             model=settings.openai_model,
-            provider_name="OpenAI-compatible",
+            provider_name="aitunnel",
             prompt=prompt,
             system=system,
         ):
@@ -356,10 +376,16 @@ async def _gemini_generate(prompt: str, system: str = "") -> str:
 
 
 async def _ai_generate(prompt: str, system: str = "") -> str:
-    """Route to the configured AI provider."""
+    """Route to the configured AI provider.
+    Falls back to aitunnel if Groq returns 429."""
     provider = (settings.ai_provider or "").strip().lower()
     if provider == "groq":
-        return await _groq_generate(prompt, system)
+        try:
+            return await _groq_generate(prompt, system)
+        except RateLimitError:
+            import logging
+            logging.getLogger(__name__).warning("Groq rate limit — switching to aitunnel")
+            return await _openai_generate(prompt, system)
     if provider == "openai":
         return await _openai_generate(prompt, system)
     return await _gemini_generate(prompt, system)
@@ -368,7 +394,7 @@ async def _ai_generate(prompt: str, system: str = "") -> str:
 def _current_model() -> str:
     provider = (settings.ai_provider or "").strip().lower()
     if provider == "groq":
-        return settings.groq_model
+        return f"{settings.groq_model} (fallback: {settings.openai_model})"
     if provider == "openai":
         return settings.openai_model
     return settings.gemini_model

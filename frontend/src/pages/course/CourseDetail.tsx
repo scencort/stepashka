@@ -1,3 +1,5 @@
+// страница конкретного курса — шаги, прогресс, боковое меню, оценки
+// этот компонент рендерит саму страницу обучения, Course.tsx только управляет данными
 import { useMemo, useEffect, useState } from "react";
 import {
   ChevronDown,
@@ -12,6 +14,7 @@ import {
 import CourseStep from "./CourseStep";
 import CourseDiscussion from "./CourseDiscussion";
 
+// шаг курса — один элемент в боковом меню и в содержимом
 type CourseStepType = {
   id: number;
   title: string;
@@ -25,6 +28,7 @@ type CourseStepType = {
   xp: number;
 };
 
+// прогресс по шагу — сколько попыток, что ответил, выполнен ли
 type StepProgress = {
   stepId: number;
   status: "started" | "completed";
@@ -34,6 +38,7 @@ type StepProgress = {
   completedAt: string | null;
 };
 
+// всё что приходит с /courses/:id/steps
 type CourseContentResponse = {
   course: {
     id: number;
@@ -54,6 +59,7 @@ type CourseContentResponse = {
   };
 };
 
+// детальная инфа о курсе — рейтинг, категория и всё такое
 type CourseDetailType = {
   id: number;
   title: string;
@@ -76,6 +82,7 @@ type CourseDetailType = {
   stepsCount: number;
 };
 
+// статус записи текущего юзера на курс
 type EnrollmentStatus = {
   enrolled: boolean;
   status?: string;
@@ -84,6 +91,7 @@ type EnrollmentStatus = {
   teacherComment?: string | null;
 };
 
+// одна попытка сдачи шага
 type AttemptEntry = {
   id: number;
   stepId: number;
@@ -94,6 +102,7 @@ type AttemptEntry = {
   checkResults?: Array<{ name: string; passed: boolean; expected?: string; actual?: string; error?: string }> | null;
 };
 
+// все пропсы которые принимает компонент — Course.tsx передаёт всё это
 type Props = {
   selectedCourseId: number;
   courseContent: CourseContentResponse | null;
@@ -168,22 +177,26 @@ export default function CourseDetail(props: Props) {
     onSubmitRating,
   } = props;
 
+  // локальный стейт для звёздочек рейтинга
   const [hoverStar, setHoverStar] = useState(0);
   const [selectedStar, setSelectedStar] = useState(myRating?.myScore ?? 0);
   const [ratingComment, setRatingComment] = useState(myRating?.myComment ?? "");
   const [ratingSubmitting, setRatingSubmitting] = useState(false);
 
+  // когда с сервера пришёл рейтинг — обновляем поля формы
   useEffect(() => {
     setSelectedStar(myRating?.myScore ?? 0);
     setRatingComment(myRating?.myComment ?? "");
   }, [myRating?.myScore, myRating?.myComment]);
 
+  // находим текущий активный шаг и его прогресс
   const activeStep =
     courseContent?.steps.find((s) => s.id === selectedStepId) ?? null;
   const activeProgress =
     courseContent?.progress.find((p) => p.stepId === selectedStepId) ?? null;
   const activeStepIndex =
     courseContent?.steps.findIndex((s) => s.id === selectedStepId) ?? -1;
+  // соседние шаги для навигации вперёд/назад
   const previousStep =
     activeStepIndex > 0 && courseContent
       ? courseContent.steps[activeStepIndex - 1]
@@ -195,6 +208,7 @@ export default function CourseDetail(props: Props) {
       ? courseContent.steps[activeStepIndex + 1]
       : null;
 
+  // текст кнопки зависит от типа шага
   const submitLabel = activeStep
     ? activeStep.kind === "theory"
       ? "Отметить как изученный"
@@ -205,6 +219,8 @@ export default function CourseDetail(props: Props) {
           : "Отправить код"
     : "Проверить";
 
+  // собираем модули из шагов — бэк отдаёт плоский массив шагов,
+  // а нам нужна группировка по урокам и модулям для бокового меню
   const syllabusModules = useMemo(() => {
     if (!courseContent)
       return [] as Array<{
@@ -212,6 +228,7 @@ export default function CourseDetail(props: Props) {
         title: string;
         lessons: Array<{ id: number; title: string; steps: CourseStepType[] }>;
       }>;
+    // каждые 3 шага — один урок
     const lessons = new Map<
       number,
       { id: number; title: string; steps: CourseStepType[] }
@@ -226,6 +243,7 @@ export default function CourseDetail(props: Props) {
         });
       lessons.get(lessonIndex)?.steps.push(step);
     }
+    // каждые 2 урока — один модуль
     const modulesMap = new Map<
       number,
       {
@@ -247,6 +265,7 @@ export default function CourseDetail(props: Props) {
     return Array.from(modulesMap.values());
   }, [courseContent]);
 
+  // при первой загрузке открываем все модули, при смене курса сбрасываем
   useEffect(() => {
     if (syllabusModules.length === 0) {
       setOpenModules({});
@@ -254,12 +273,13 @@ export default function CourseDetail(props: Props) {
     }
     setOpenModules((prev) => {
       const next: Record<number, boolean> = {};
+      // по умолчанию открываем новые модули, сохраняем состояние старых
       for (const m of syllabusModules) next[m.id] = prev[m.id] ?? true;
       return next;
     });
   }, [syllabusModules]);
 
-  // Loading state
+  // пока грузится контент и ещё ничего нет — скелетон
   if (contentLoading && !courseContent) {
     return (
       <div className="space-y-4 max-w-5xl">
@@ -273,7 +293,7 @@ export default function CourseDetail(props: Props) {
     );
   }
 
-  // Error state
+  // если ошибка и нет данных — показываем сообщение
   if (contentError && !courseContent) {
     return (
       <div className="card p-6 max-w-lg">
@@ -290,13 +310,14 @@ export default function CourseDetail(props: Props) {
     );
   }
 
+  // общий прогресс по курсу для отображения в заголовке
   const percent = courseContent?.summary.percent ?? 0;
   const completed = courseContent?.summary.completed ?? 0;
   const total = courseContent?.summary.total ?? 0;
 
   return (
     <div className="max-w-6xl space-y-4">
-      {/* Header */}
+      {/* шапка курса — название, прогресс, кнопка назад */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
           <button
@@ -318,7 +339,7 @@ export default function CourseDetail(props: Props) {
           </div>
         </div>
 
-        {/* Progress bar */}
+        {/* прогресс-бар в заголовке */}
         <div className="flex-1 max-w-xs">
           <div className="h-2 rounded-full bg-[var(--border)] overflow-hidden">
             <div
@@ -329,10 +350,11 @@ export default function CourseDetail(props: Props) {
         </div>
       </div>
 
-      {/* Not enrolled */}
+      {/* баннер для незаписанных — предлагаем записаться или запросить доступ */}
       {enrollmentStatus && !enrollmentStatus.enrolled && (
         <div className="card p-5 border-primary/20 bg-primary-50 dark:bg-primary-900/10">
           {enrollmentStatus.requestStatus === "pending" ? (
+            // заявка уже отправлена — ждём одобрения
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary shrink-0">
                 <BookOpen size={16} />
@@ -347,6 +369,7 @@ export default function CourseDetail(props: Props) {
               </div>
             </div>
           ) : (
+            // ещё не записан — показываем кнопки записи
             <div className="space-y-3">
               <p className="font-semibold text-sm text-[var(--text)]">
                 Запишитесь на курс, чтобы начать обучение
@@ -379,11 +402,11 @@ export default function CourseDetail(props: Props) {
         </div>
       )}
 
-      {/* Main layout: content + sidebar */}
+      {/* основная сетка: контент слева, содержание справа */}
       <div className="grid xl:grid-cols-[1fr_380px] gap-4">
-        {/* Left: Step content */}
+        {/* левая часть — активный шаг */}
         <div className="space-y-4 min-w-0">
-          {/* Step selector tabs */}
+          {/* переключатель вкладок шаг/обсуждение */}
           <div className="flex gap-2 border-b border-[var(--border)] pb-1">
             <button
               onClick={() => setActiveTab("content")}
@@ -409,6 +432,7 @@ export default function CourseDetail(props: Props) {
             </button>
           </div>
 
+          {/* контент шага — теория, тест или код */}
           {activeTab === "content" && (
             <CourseStep
               activeStep={activeStep}
@@ -431,6 +455,7 @@ export default function CourseDetail(props: Props) {
             />
           )}
 
+          {/* вкладка обсуждения — показываем только если есть детали курса */}
           {activeTab === "discussion" && courseDetail && (
             <CourseDiscussion
               courseId={courseDetail.id}
@@ -439,7 +464,7 @@ export default function CourseDetail(props: Props) {
             />
           )}
 
-          {/* Rating widget — shown when canRate */}
+          {/* виджет оценки — появляется только когда юзер может оценить */}
           {myRating?.canRate && (
             <div className="card p-5 space-y-4 border-amber-200/50 dark:border-amber-800/30 bg-gradient-to-br from-amber-50/50 to-orange-50/30 dark:from-amber-900/10 dark:to-orange-900/5">
               <div className="flex items-center gap-2.5">
@@ -458,7 +483,7 @@ export default function CourseDetail(props: Props) {
                 </div>
               </div>
 
-              {/* Stars */}
+              {/* кликабельные звёздочки для выбора оценки */}
               <div className="flex items-center gap-1.5">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
@@ -479,6 +504,7 @@ export default function CourseDetail(props: Props) {
                     />
                   </button>
                 ))}
+                {/* текстовая подпись к выбранной оценке */}
                 {selectedStar > 0 && (
                   <span className="ml-2 text-sm font-semibold text-amber-600 dark:text-amber-400">
                     {["", "Плохо", "Так себе", "Нормально", "Хорошо", "Отлично!"][selectedStar]}
@@ -486,7 +512,7 @@ export default function CourseDetail(props: Props) {
                 )}
               </div>
 
-              {/* Comment */}
+              {/* поле для текстового отзыва */}
               <textarea
                 value={ratingComment}
                 onChange={(e) => setRatingComment(e.target.value)}
@@ -511,10 +537,10 @@ export default function CourseDetail(props: Props) {
           )}
         </div>
 
-        {/* Right: Syllabus sidebar */}
+        {/* правая колонка — содержание курса, прилипает при скролле */}
         <div className="xl:sticky xl:top-4 h-fit xl:pl-4">
           <div className="card p-5 space-y-4">
-            {/* Header */}
+            {/* заголовок содержания с счётчиком прогресса */}
             <div className="flex items-center gap-2.5 pb-3 border-b border-[var(--border)]">
               <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
                 <ListOrdered size={14} className="text-primary" />
@@ -527,15 +553,17 @@ export default function CourseDetail(props: Props) {
               )}
             </div>
 
+            {/* список модулей с уроками и шагами */}
             <div className="space-y-2 max-h-[calc(100vh-220px)] overflow-auto pr-1 -mr-1">
               {syllabusModules.map((module) => {
+                // считаем сколько шагов в модуле выполнено
                 const moduleSteps = module.lessons.flatMap(l => l.steps);
                 const moduleDone = moduleSteps.filter(s =>
                   courseContent?.progress.find(p => p.stepId === s.id)?.status === "completed"
                 ).length;
                 return (
                   <div key={module.id} className="rounded-xl overflow-hidden border border-[var(--border)]">
-                    {/* Module header */}
+                    {/* кнопка модуля — открывает/закрывает его шаги */}
                     <button
                       onClick={() => onToggleModule(module.id)}
                       className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-[var(--surface)] hover:bg-[var(--border)]/30 transition-colors text-left"
@@ -554,6 +582,7 @@ export default function CourseDetail(props: Props) {
                       }
                     </button>
 
+                    {/* раскрытый список шагов */}
                     {openModules[module.id] && (
                       <div className="divide-y divide-[var(--border)]">
                         {module.lessons.flatMap((lesson) =>
@@ -571,7 +600,7 @@ export default function CourseDetail(props: Props) {
                                     : "bg-[var(--bg)] hover:bg-[var(--surface)]"
                                 }`}
                               >
-                                {/* Status icon */}
+                                {/* иконка статуса шага — галочка, точка или круг */}
                                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                                   isDone
                                     ? "bg-green-500 border-green-500"
@@ -582,7 +611,7 @@ export default function CourseDetail(props: Props) {
                                   {isDone && <Check size={10} className="text-white" strokeWidth={3} />}
                                   {!isDone && isActive && <div className="w-2 h-2 rounded-full bg-primary" />}
                                 </div>
-                                {/* Title */}
+                                {/* название шага и XP */}
                                 <div className="flex-1 min-w-0">
                                   <p className={`text-sm leading-snug truncate font-medium ${
                                     isActive ? "text-primary" : isDone ? "text-[var(--muted)]" : "text-[var(--text)]"
@@ -604,6 +633,7 @@ export default function CourseDetail(props: Props) {
                   </div>
                 );
               })}
+              {/* пустое состояние — шагов нет */}
               {!courseContent?.steps.length && !contentLoading && (
                 <p className="text-xs text-[var(--muted)] px-2">Шаги ещё не добавлены.</p>
               )}
