@@ -1,5 +1,10 @@
 // главный лейаут — сайдбар + хедер + основной контент
-// оборачивает все защищённые страницы
+// оборачивает все защищённые страницы (Dashboard, Course, Task, AiReview, ...)
+// структура DOM: <div flex> → <aside> сайдбар | <div flex-col> → <header> + <main> + мобил.навигация
+// сайдбар: десктопный (sticky, свёртывается в 68px), мобильный (выезжает слева, оверлей)
+// хедер: прилипает сверху (sticky top-0 z-30), содержит стрик, уведомления, аватар
+// уведомления: хранятся на сервере (GET /notifications), прочитанные id в localStorage
+// стрик: данные берутся из /dashboard (stats.streakDays + активные дни для тепловой карты)
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/theme";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -173,13 +178,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   useEffect(() => {
     void loadNotifications();
-    // слушаем кастомное событие — например когда где-то в приложении появилось новое уведомление
+    // слушаем кастомное DOM-событие "gradus:notifications:refresh"
+    // любой компонент может его диспатчить через window.dispatchEvent(new Event("..."))
+    // чтобы принудительно обновить список уведомлений без перезагрузки страницы
     const handler = () => void loadNotifications();
     window.addEventListener("gradus:notifications:refresh", handler);
     return () => window.removeEventListener("gradus:notifications:refresh", handler);
   }, []);
 
-  // грузим стрик и активные дни из дашборда — нужно для календаря в хедере
+  // грузим стрик и активные дни из дашборда — нужно для календаря и тепловой карты в хедере
+  // activeDays = массив строк "YYYY-MM-DD" с днями когда студент что-то делал
+  // используем его чтобы подсветить ячейки в календаре (зелёный = был активен)
   useEffect(() => {
     if (!user) {
       setStreakDays(0);
@@ -228,7 +237,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
     setMobileMenuOpen(false);
   };
 
-  // выход из аккаунта — очищаем токены и редиректим на логин
+  // выход из аккаунта — вызывает store.logout() → POST /auth/logout
+  // store.logout() очищает user в стейте, api.ts удаляет токены из localStorage
   const handleLogout = async () => {
     try {
       await logout();

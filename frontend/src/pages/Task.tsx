@@ -1,6 +1,10 @@
 // страница AI Code Review — редактор кода + AI-анализ качества, ошибок и улучшений
-// поддерживает 15 языков программирования, результат разбит на категории
-// история всех проверок хранится на бэкенде и загружается при старте
+// поддерживает 15 языков программирования (auto = GPT сам определяет язык)
+// поток проверки: handleCheck() → POST /ai/review/check с { sourceCode, language }
+//   → бэк отправляет в GPT → возвращает { quality, correctness, style, summary, issues, ... }
+//   → avgScore = (quality + correctness + style) / 3, цвет зависит от значения
+// история: GET /ai/review/history при монтировании → показываем прошлые ревью в сайдбаре
+// CodeEditor — компонент с подсветкой синтаксиса (prism-react-renderer + textarea поверх)
 import MainLayout from "../layout/MainLayout";
 import { useEffect, useState } from "react";
 import Button from "../components/ui/Button";

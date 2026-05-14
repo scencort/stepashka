@@ -1,5 +1,7 @@
 // главный роутер приложения — здесь описаны все страницы и их пути
-// lazy-импорты чтобы не грузить весь код сразу, только нужную страницу
+// lazy-импорты (React.lazy + dynamic import) — каждая страница грузится отдельным чанком
+// это ускоряет первую загрузку: пользователь не качает весь JS, только то что нужно сейчас
+// Suspense показывает pageFallback пока нужный чанк скачивается и парсится браузером
 import { lazy, Suspense, type ReactNode } from "react"
 import { Routes, Route } from "react-router-dom"
 
@@ -23,17 +25,19 @@ const CourseEditor = lazy(() => import("../pages/CourseEditor"))
 const NotFound = lazy(() => import("../pages/NotFound"))
 const Privacy = lazy(() => import("../pages/Privacy"))
 const Terms = lazy(() => import("../pages/Terms"))
-// protectedRoute не ленивый — нужен сразу чтобы проверить авторизацию
+// ProtectedRoute НЕ lazy — он нужен синхронно на каждом защищённом маршруте
+// чтобы сразу проверить авторизацию, не дожидаясь загрузки чанка страницы
 import ProtectedRoute from "../features/auth/ProtectedRoute"
 
-// заглушка пока страница грузится — показываем простой текст вместо пустоты
+// заглушка пока страница грузится — показываем простой текст вместо пустоты (белого экрана)
 const pageFallback = (
   <div className="min-h-[40vh] flex items-center justify-center px-4">
     <div className="glass-panel rounded-xl px-4 py-3 text-sm text-slate-500">Загрузка страницы...</div>
   </div>
 )
 
-// обёртка которая добавляет Suspense с нашей заглушкой
+// хелпер: оборачивает элемент в <Suspense> с нашей заглушкой
+// используется в каждом <Route element={}> чтобы не дублировать Suspense
 const withSuspense = (element: ReactNode) => <Suspense fallback={pageFallback}>{element}</Suspense>
 
 export const Router = () => {

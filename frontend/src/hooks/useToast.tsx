@@ -1,6 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
 // система уведомлений (тостов) — провайдер и хук в одном файле
-// анимации через framer-motion, автоудаление через 3.2 секунды
+// анимации через framer-motion (AnimatePresence следит за массивом и анимирует вход/выход)
+// поток: компонент вызывает toast.success("...") → push() добавляет в массив toasts
+//   → AnimatePresence рендерит motion.div → через 3.2с setTimeout удаляет по id
+//   → AnimatePresence видит что элемент убрали → запускает exit анимацию → пропадает
+// тосты стекаются в правом верхнем углу, z-index 120 чтобы поверх модалок
 import { createContext, useCallback, useContext, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 

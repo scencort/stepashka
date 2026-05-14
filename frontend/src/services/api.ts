@@ -1,7 +1,11 @@
-// центральный API-слой — вся работа с бэкендом через этот файл
-// логика: routeMappings перехватывают маршруты и трансформируют данные,
-// backendRequest делает fetch с авторизацией и автоматическим refresh токенов при 401
-// нормализаторы toCourse и toPublicUser приводят данные бэкенда к формату фронтенда
+// центральный API-слой — вся работа с бэкендом только через этот файл
+// поток запроса: api.get/post/patch/delete → request() → routeMappings → backendRequest → fetch
+// routeMappings — таблица маршрутов: каждый перехватывает url по строке или regex,
+//   может изменить путь, тело или нормализовать ответ перед отдачей компоненту
+// backendRequest — низкоуровневый fetch: ставит Authorization заголовок из localStorage,
+//   при 401 пробует обновить токен через /auth/refresh, при неудаче → редирект на /login
+// нормализаторы toCourse и toPublicUser приводят формат бэкенда к формату фронтенда:
+//   fullName→name, priceCents→строка "500 ₽", level:"beginner"→"Начальный" и т.д.
 type Role = "student" | "teacher" | "admin";
 
 type PublicUser = {
@@ -88,9 +92,10 @@ type TwoFactorStatus = {
 
 /* ── Token management — токены хранятся в localStorage ── */
 
-// ключи хранения токенов — используем везде через эти константы
+// ключи хранения токенов — используем везде через эти константы, не хардкодим строки
 const ACCESS_TOKEN_KEY = "gradus_access_token";
 const REFRESH_TOKEN_KEY = "gradus_refresh_token";
+// базовый url бэкенда берём из .env (VITE_API_URL), убираем trailing slash
 const API_BASE_URL = String(import.meta.env.VITE_API_URL || "").replace(
   /\/+$/,
   "",
@@ -131,7 +136,8 @@ type BackendAuthResponse = {
   refreshToken: string;
 };
 
-// нормализует пользователя из бэкенда — fullName → name
+// нормализует пользователя из бэкенда — fullName → name (фронт ждёт "name", бэк отдаёт "fullName")
+// вызывается при логине, регистрации, /auth/me и 2fa-верификации
 function toPublicUser(user: BackendUser): PublicUser {
   return {
     id: user.id,
@@ -142,6 +148,11 @@ function toPublicUser(user: BackendUser): PublicUser {
   };
 }
 
+// нормализует курс из каталога бэкенда в формат Course для фронта
+// priceCents=0 → "Бесплатно", иначе делим на 100 и добавляем знак рубля
+// durationHours → количество уроков (грубо: 1 урок = 2 часа, минимум 1)
+// level на английском ("beginner") или русском ("начальный") — оба поддерживаются
+// вызывается при GET /courses (каталог) и GET /courses/:id
 function toCourse(catalogItem: {
   id: number;
   title: string;
@@ -204,27 +215,33 @@ function toCourse(catalogItem: {
 // базовый fetch с авторизацией и автообновлением токена
 // при 401 пробует refresh — если не вышло, редиректит на /login
 // исключения: auth-маршруты и /auth/refresh не триггерят повторный refresh
+// allowRefresh=false используется при повторном вызове после успешного refresh
+//   чтобы не уйти в бесконечную рекурсию
 async function backendRequest<T>(
   path: string,
   init: RequestInit = {},
   allowRefresh = true,
 ): Promise<T> {
   const headers = new Headers(init.headers || {});
+  // Content-Type ставим автоматически если есть тело запроса
   if (!headers.has("Content-Type") && init.body) {
     headers.set("Content-Type", "application/json");
   }
 
+  // берём access token из localStorage и добавляем в Authorization заголовок
   const accessToken = getAccessToken();
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
+  // credentials:"include" нужен для cookie-сессий (некоторые эндпоинты бэка их используют)
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
     credentials: "include",
   });
 
+  // 401 = токен протух → пробуем обновить через refresh token и повторить запрос
   if (
     response.status === 401 &&
     allowRefresh &&
@@ -234,8 +251,10 @@ async function backendRequest<T>(
   ) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
+      // повторяем исходный запрос с новым access token, allowRefresh=false
       return backendRequest<T>(path, init, false);
     }
+    // refresh не помог — выкидываем на логин (но не если уже на нём)
     if (
       typeof window !== "undefined" &&
       !window.location.pathname.startsWith("/login")
@@ -245,6 +264,8 @@ async function backendRequest<T>(
   }
 
   if (!response.ok) {
+    // пытаемся вытащить читабельное сообщение из тела ответа
+    // бэк может вернуть { error: "..." } или { detail: "..." } или массив FastAPI-ошибок
     let message = "Ошибка запроса";
     try {
       const data = (await response.json()) as {
@@ -266,6 +287,7 @@ async function backendRequest<T>(
     throw new Error(message);
   }
 
+  // 204 No Content — бэк ничего не вернул, возвращаем пустой объект
   if (response.status === 204) {
     return {} as T;
   }
@@ -273,14 +295,19 @@ async function backendRequest<T>(
   return (await response.json()) as T;
 }
 
+// пробует обновить пару токенов через /auth/refresh
+// если refresh token тоже протух или его нет — чистим localStorage и возвращаем false
+// вызывается автоматически из backendRequest при получении 401
 async function tryRefreshToken() {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
+    // нет refresh токена — нечего обновлять, чистим хранилище
     clearTokens();
     return false;
   }
 
   try {
+    // используем прямой fetch, а не backendRequest — чтобы не зациклиться
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -298,6 +325,7 @@ async function tryRefreshToken() {
       clearTokens();
       return false;
     }
+    // успешно обновили — сохраняем оба новых токена в localStorage
     setTokens(data.accessToken, data.refreshToken);
     return true;
   } catch {
@@ -933,33 +961,40 @@ const routeMappings: RouteMapping[] = [
 
 /* ── Request router ── */
 
+// главный роутер запросов — ищет подходящий маппинг и вызывает его трансформер
+// если маппинг не найден — пропускает запрос напрямую на бэкенд (fallback)
+// тело десериализуем из JSON обратно в объект чтобы передать в transform()
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const method = (options?.method || "GET").toUpperCase();
+  // body приходит уже сериализованным (JSON.stringify), распаковываем обратно
   const rawBody = options?.body ? JSON.parse(String(options.body)) : undefined;
 
+  // перебираем маппинги в порядке объявления — первый подходящий выигрывает
   for (const route of routeMappings) {
-    // Check method constraint
+    // если у маппинга задан метод — проверяем совпадение
     if (route.method && route.method !== method) continue;
 
-    // Check pattern match
+    // паттерн может быть строкой (точное совпадение) или RegExp (гибкий матч)
     if (typeof route.pattern === "string") {
       if (route.pattern !== path) continue;
     } else {
       if (!route.pattern.test(path)) continue;
     }
 
+    // нашли маппинг — отдаём ему управление
     return route.transform<T>(path, method, rawBody);
   }
 
-  // ── Fallback: pass through to backend directly ──
+  // ── Fallback: маппинг не нашёлся — идём напрямую на бэкенд ──
   return await backendRequest<T>(path, {
     method,
     ...(rawBody ? { body: JSON.stringify(rawBody) } : {}),
   });
 }
 
-/* ── Public API ── */
-
+/* ── Public API — публичный интерфейс который используется во всех компонентах ── */
+// все 4 метода сериализуют тело в JSON и вызывают request() → routeMappings → backendRequest
+// типовой вызов: api.post<LoginResult>("/auth/login", { email, password })
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>

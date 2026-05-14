@@ -1,6 +1,8 @@
-// защищённый роут — сюда не попасть без авторизации
-// если нет юзера — редиректим на /login
-// если юзер есть но роль не та — редиректим на дашборд
+// защищённый роут — обёртка для страниц требующих авторизации
+// поток: Router рендерит <ProtectedRoute> → он читает user из AppStore (уже загружен при старте)
+// если нет юзера — Navigate to="/login", state={{ from }} чтобы после логина вернуться обратно
+// если роль не в allowedRoles — Navigate to="/dashboard" (для teacher/admin страниц)
+// allowedRoles не передаётся — доступно всем залогиненным (student, teacher, admin)
 import { Navigate, useLocation } from "react-router-dom"
 import { useAppStore } from "../../store/AppStore"
 import Skeleton from "../../components/ui/Skeleton"

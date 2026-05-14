@@ -1,5 +1,8 @@
-// провайдер темы — читает тему из localStorage и синхронизирует с классом на html
-// при смене темы обновляет localStorage и добавляет/убирает класс dark на documentElement
+// провайдер темы — управляет переключением light/dark режима
+// как это работает: tailwind смотрит на класс "dark" у <html> элемента
+//   если класс есть — все dark:* классы становятся активными
+//   useEffect следит за темой и синхронизирует document.documentElement.classList
+// приоритет при загрузке: localStorage → prefers-color-scheme → light (дефолт)
 import { useEffect, useState } from "react"
 import { ThemeContext, type Theme } from "./theme"
 

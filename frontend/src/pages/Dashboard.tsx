@@ -1,4 +1,7 @@
 // главная страница после входа — показывает статистику, прогресс и активность
+// данные: GET /dashboard → бэк собирает всё в один запрос (stats, courses, activities, continue)
+// weeklyGoal хранится на сервере, PATCH /student/weekly-goal обновляет его при изменении
+// continueStep — последний незавершённый шаг, клик ведёт на /course/:id?step=:stepId
 import { useEffect, useState } from "react";
 import MainLayout from "../layout/MainLayout";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +46,8 @@ export default function Dashboard() {
   }, []);
 
   // сохраняем новую цель на сервере — clamp чтобы не поставили 0 или 9999
+  // patch вызывается сразу при изменении инпута, ошибки игнорируем (catch пустой)
+  // маршрут /student/weekly-goal → бэк обновляет поле goal у студента
   const updateWeeklyGoal = (next: number) => {
     const safe = Math.max(3, Math.min(50, Math.round(next)));
     setWeeklyGoal(safe);

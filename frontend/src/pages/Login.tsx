@@ -1,4 +1,9 @@
 // страница входа — email + пароль, с поддержкой двухфакторной аутентификации
+// поток аутентификации: handleLogin() → store.login() → POST /auth/login
+//   если result.kind="authenticated" → navigate("/dashboard")
+//   если result.kind="twoFactorRequired" → сохраняем pendingToken, показываем поле кода
+//   handleTwoFactorVerify() → store.verifyTwoFactor(pendingToken, code) → POST /auth/2fa/verify
+// вся бизнес-логика в AppStore, Login только обрабатывает UI и показывает ошибки
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 

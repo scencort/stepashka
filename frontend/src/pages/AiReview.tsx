@@ -1,6 +1,10 @@
 // страница AI-ассистента — чат с GPT и быстрая проверка кода
-// чат использует streaming через ReadableStream если бэкенд поддерживает,
-// иначе fallback на обычный POST запрос с полным ответом
+// чат: streaming через ReadableStream (Server-Sent Events), бэк шлёт чанки текста
+//   по мере генерации GPT добавляем символы в последнее сообщение через setChatMessages
+//   если streaming не поддерживается → fallback на обычный POST /ai/chat с полным ответом
+// проверка кода: POST /ai/review/check → бэк прогоняет через GPT → возвращает Verdict
+//   (quality, correctness, style, issues, improvements, goodParts)
+// история: GET /ai/review/history → загружается при монтировании и после каждой проверки
 import { useEffect, useState, useRef } from "react";
 import MainLayout from "../layout/MainLayout";
 import Card from "../components/ui/Card";
@@ -75,8 +79,11 @@ export default function AiReview() {
     }
   };
 
-  // отправляем сообщение AI — пробуем streaming, при неудаче — обычный запрос
-  // последние 8 сообщений передаём как контекст чтобы AI помнил разговор
+  // отправляем сообщение AI — пробуем streaming (SSE), при неудаче — обычный POST
+  // последние 8 сообщений передаём в context чтобы AI помнил разговор
+  // streaming поток: fetch → getReader() → цикл read() → decode() → парсим SSE строки "data: {...}"
+  // каждый чанк содержит { content: "кусок текста" } → дописываем к последнему сообщению
+  // [DONE] — маркер конца стрима от бэка, после него reader больше не читаем
   const askAi = async () => {
     const message = chatInput.trim();
     if (!message) {
