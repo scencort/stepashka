@@ -1,3 +1,18 @@
+// каталог курсов — список всех доступных курсов с фильтрацией и поиском
+//
+// КАК РАБОТАЕТ ФИЛЬТРАЦИЯ:
+//   catalogFiltered = useMemo — фильтрует массив courses по трём критериям сразу:
+//     1. поисковый запрос (query) — по title + description + author
+//     2. категория (selectedCategory) — programming, design, marketing...
+//     3. уровень (selectedLevel) — beginner, intermediate, advanced
+//   пересчитывается только когда меняется courses, query, selectedCategory или selectedLevel
+//
+// КАК РАБОТАЕТ HOVER-ЭФФЕКТ НА КАРТОЧКЕ КУРСА:
+//   родительский div карточки имеет класс "group"
+//   group-hover:scale-105 на обложке → при наведении на карточку картинка увеличивается на 5%
+//   overflow-hidden на контейнере обложки → обрезает картинку по границам блока
+//   group-hover:text-primary на заголовке → заголовок краснеет одновременно с zoom
+//   transition-transform duration-300 → анимация за 300мс, плавно
 import React, { useMemo } from "react";
 import {
   Users,
@@ -397,6 +412,12 @@ export default function CourseCatalog(props: Props) {
             const catMeta = getCatMeta(course.category || "");
             const levelMeta = getLevelMeta(course.level || "");
             return (
+              {/* карточка курса — hover-эффекты работают через CSS-класс "group":
+                  родительский div получает класс group, дочерние элементы реагируют на него
+                  group-hover:scale-105 → обложка плавно увеличивается при наведении на карточку
+                  overflow-hidden на контейнере обложки — обрезает выход картинки за границы
+                  group-hover:text-primary → заголовок меняет цвет на красный одновременно
+                  transition-transform duration-300 → анимация масштаба за 300мс */}
               <div
                 key={course.id}
                 className="card p-0 overflow-hidden cursor-pointer group flex flex-col"
