@@ -412,12 +412,10 @@ export default function CourseCatalog(props: Props) {
             const catMeta = getCatMeta(course.category || "");
             const levelMeta = getLevelMeta(course.level || "");
             return (
-              {/* карточка курса — hover-эффекты работают через CSS-класс "group":
-                  родительский div получает класс group, дочерние элементы реагируют на него
-                  group-hover:scale-105 → обложка плавно увеличивается при наведении на карточку
-                  overflow-hidden на контейнере обложки — обрезает выход картинки за границы
-                  group-hover:text-primary → заголовок меняет цвет на красный одновременно
-                  transition-transform duration-300 → анимация масштаба за 300мс */}
+              // карточка курса — hover-эффекты через класс "group" на родителе:
+              // group-hover:scale-105 на обложке → при наведении картинка увеличивается на 5%
+              // overflow-hidden на контейнере обрезает картинку по границам блока
+              // group-hover:text-primary на заголовке → цвет меняется одновременно с zoom
               <div
                 key={course.id}
                 className="card p-0 overflow-hidden cursor-pointer group flex flex-col"
