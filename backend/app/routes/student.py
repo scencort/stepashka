@@ -665,19 +665,31 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
                     feedback = "Ответ слишком короткий. Напишите развёрнутый ответ."
                     check_results = None
                 else:
-                    essay_eval = estimate_essay(answer, rubric_data)
+                    essay_eval = await estimate_essay(answer, rubric_data)
                     passed = essay_eval["passed"]
                     score = 20 if passed else 0
-                    feedback = essay_eval["feedback"]
-                    # Показываем список ключевых слов как чекбоксы в UI
-                    missing = essay_eval.get("missingKeywords", [])
+                    feedback = "Верно" if passed else essay_eval["feedback"]
+                    # Чекбоксы по ключевым словам в UI (зелёные/красные)
+                    missing_kws = essay_eval.get("missingKeywords", [])
                     rubric_kws = [kw.strip() for kw in re.split(r"[,;\n]", (rubric_data or {}).get("keywords", "")) if kw.strip()]
-                    if rubric_kws:
-                        check_results = [
-                            {"name": f"Ключевое слово: «{kw}»", "passed": kw not in missing}
-                            for kw in rubric_kws
-                        ]
-                    evaluation["aiComment"] = None
+                    check_results = [
+                        {"name": f"Ключевое слово: «{kw}»", "passed": kw not in missing_kws}
+                        for kw in rubric_kws
+                    ] if rubric_kws else None
+                    # AI-фидбек в блоке с роботом (только если прошло)
+                    if passed:
+                        ai_parts = []
+                        if essay_eval.get("feedback"):
+                            ai_parts.append(essay_eval["feedback"])
+                        if essay_eval.get("strengths"):
+                            ai_parts.append("ЧТО ХОРОШО:\n" + "\n".join(f"- {s}" for s in essay_eval["strengths"]))
+                        if essay_eval.get("improvements"):
+                            ai_parts.append("ЧТО ДОРАБОТАТЬ:\n" + "\n".join(f"- {s}" for s in essay_eval["improvements"]))
+                        elif essay_eval.get("hints"):
+                            ai_parts.append("СОВЕТЫ:\n" + "\n".join(f"- {s}" for s in essay_eval["hints"]))
+                        evaluation["aiComment"] = "\n\n".join(ai_parts) if ai_parts else None
+                    else:
+                        evaluation["aiComment"] = None
 
             else:
                 kind = "code"
