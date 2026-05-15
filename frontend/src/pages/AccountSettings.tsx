@@ -1,5 +1,31 @@
 // настройки аккаунта — четыре вкладки: профиль, безопасность, уведомления, сессии
 // вкладка хранится в url-параметре ?tab= чтобы можно было шарить ссылку
+//
+// КАК РАБОТАЕТ ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ЧЕРЕЗ URL:
+//   useSearchParams() — хук React Router для чтения и записи параметров URL
+//   activeTab = searchParams.get("tab") || "profile" — текущая вкладка из ?tab=...
+//   setTab(tab): new URLSearchParams(searchParams) → next.set("tab", tab) → setSearchParams(next)
+//   URL меняется без перезагрузки → кнопка "назад" в браузере работает корректно
+//
+// КАК РАБОТАЕТ ОТСЛЕЖИВАНИЕ ИЗМЕНЕНИЙ (isDirty):
+//   при загрузке: setInitialSnapshot(JSON.stringify(data)) — фиксируем начальное состояние
+//   isDirty = useMemo: JSON.stringify(profile) !== initialSnapshot
+//   каждое изменение поля → updateProfileField → profile обновляется → useMemo пересчитывается
+//   если profile отличается от снимка — появляется "Есть несохранённые изменения" и кнопка активна
+//   после saveProfile: setInitialSnapshot(JSON.stringify(updated)) — снимок обновляется
+//
+// КАК РАБОТАЕТ КРОП АВАТАРА:
+//   пользователь выбирает файл → FileReader читает как dataURL (base64 строка)
+//     → setPendingAvatarSrc(dataUrl) → открывается модалка с Cropper компонентом
+//       → пользователь двигает/зумирует → onCropComplete → setCroppedAreaPixels(pixels)
+//         → applyAvatarCrop(): создаём canvas 256×256 → ctx.drawImage() вырезает нужный кусок
+//           → canvas.toDataURL() → updateProfileField("avatarUrl", dataUrl) — в стейт профиля
+//             → при saveProfile этот base64 уходит на сервер как строка
+//
+// 2FA (двухфакторная аутентификация):
+//   POST /account/2fa/setup → QR-код (dataUrl) + секретный ключ → показываем пользователю
+//   пользователь сканирует QR в Google Authenticator → вводит 6-значный код
+//   POST /account/2fa/verify { code } → бэк проверяет TOTP → 2fa включена
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import Cropper, { type Area, type Point } from "react-easy-crop" // для обрезки аватара

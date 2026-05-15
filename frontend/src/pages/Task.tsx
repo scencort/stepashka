@@ -1,9 +1,25 @@
 // страница AI Code Review — редактор кода + AI-анализ качества, ошибок и улучшений
 // поддерживает 15 языков программирования (auto = GPT сам определяет язык)
-// поток проверки: handleCheck() → POST /ai/review/check с { sourceCode, language }
-//   → бэк отправляет в GPT → возвращает { quality, correctness, style, summary, issues, ... }
-//   → avgScore = (quality + correctness + style) / 3, цвет зависит от значения
-// история: GET /ai/review/history при монтировании → показываем прошлые ревью в сайдбаре
+//
+// КАК РАБОТАЕТ РЕВЬЮ:
+//   пользователь вставляет код → выбирает язык (или оставляет "Авто") → нажимает кнопку
+//     → handleCheck() → setLoading(true), setResult(null) — сбрасываем старый результат
+//       → POST /ai/review/check { sourceCode: code, language }
+//         → бэк отправляет в GPT и ждёт ответ
+//           → возвращает { quality, correctness, style, summary, issues[], improvements[], goodParts[] }
+//             → setResult(data) → React рендерит карточки с оценками и советами
+//             → await loadHistory() — обновляем историю справа сразу после ревью
+//
+// КАК СЧИТАЕТСЯ ОЦЕНКА:
+//   avgScore = Math.round((quality + correctness + style) / 3) — среднее трёх метрик
+//   scoreColor: >=80 → зелёный (emerald), >=50 → жёлтый (amber), <50 → красный
+//   тот же расчёт повторяется и для карточек в истории
+//
+// ИСТОРИЯ РЕВЬЮ:
+//   GET /ai/review/history при монтировании → массив прошлых ревью → список в сайдбаре
+//   expandedId — какой элемент истории раскрыт: click → setExpandedId(isOpen ? null : item.id)
+//   null закрывает текущий открытый, id открывает нужный
+//
 // CodeEditor — компонент с подсветкой синтаксиса (prism-react-renderer + textarea поверх)
 import MainLayout from "../layout/MainLayout";
 import { useEffect, useState } from "react";

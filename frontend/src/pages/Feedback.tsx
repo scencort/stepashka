@@ -1,5 +1,19 @@
 // страница обратной связи — обычный пользователь пишет обращение и видит ответы
 // никакого управления статусами — это только в AdminPanel
+//
+// КАК РАБОТАЕТ:
+//   при монтировании → GET /feedback → список своих обращений → setItems([...])
+//   пользователь заполняет поле и нажимает "Отправить"
+//     → submit() → POST /feedback { message, subject } → бэк создаёт тикет
+//       → оптимистичный update: setItems([created, ...prev]) — новое обращение сразу в начале списка
+//       → текст и тема сбрасываются, success=true → через 3 сек success=false
+//
+// STATUS_META — объект-справочник где ключ = статус, значение = { label, icon, cls }
+//   вместо switch/case или if/else: const meta = STATUS_META[item.status] — одна строка
+//   если пришёл неизвестный статус — ?. и ?? STATUS_META["new"] защищают от падения
+//
+// useMemo для visibleItems: фильтрация пересчитывается только когда меняются items или filter
+// useMemo для counts: .filter() по всему массиву выполняется один раз при изменении items
 import { useEffect, useMemo, useState } from "react"
 
 import MainLayout from "../layout/MainLayout"

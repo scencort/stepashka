@@ -1,4 +1,22 @@
 // кабинет преподавателя — управление своими курсами и заявками на запись
+//
+// КАК РАБОТАЕТ ЗАГРУЗКА:
+//   этап 1 — Promise.all([overview, list]) — 2 запроса параллельно
+//   этап 2 — Promise.all(list.map(async (c) => GET /teacher/courses/:id/enrollment-requests))
+//     для каждого курса свой параллельный запрос, все идут одновременно
+//     если один падает — catch возвращает пустой массив для этого курса, остальные не блокируются
+//   filter(cr => cr.requests.length > 0) — скрываем курсы у которых вообще нет заявок
+//
+// КАК РАБОТАЕТ РЕШЕНИЕ ПО ЗАЯВКЕ:
+//   decide(requestId, "approved"/"rejected")
+//     → PATCH /teacher/enrollment-requests/:id { status, teacherComment }
+//       → обновляем статус в локальном стейте через двойной map (по курсам, внутри по заявкам)
+//         → очищаем черновик комментария для этой заявки через delete n[requestId]
+//
+// АККОРДЕОН ЗАЯВОК:
+//   expandedCourse: number | null — id раскрытого курса или null если все закрыты
+//   клик по заголовку: setExpandedCourse(isOpen ? null : cr.courseId)
+//   null закрывает текущий, id открывает нужный — только один открыт одновременно
 import { useEffect, useMemo, useState } from "react"
 import MainLayout from "../layout/MainLayout"
 import Skeleton from "../components/ui/Skeleton"

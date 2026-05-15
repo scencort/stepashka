@@ -1,5 +1,18 @@
 // страница аналитики — графики прогресса и AI-рекомендации
 // доступна только преподавателям и администраторам (ProtectedRoute ограничивает)
+//
+// КАК РАБОТАЕТ:
+//   при монтировании и при смене period → useEffect запускает load()
+//     → GET /analytics?period=week (или month) → массив values + объект stats
+//       → setValues, setStats обновляют стейт → React перерисовывает компонент
+//   сразу после основных данных — отдельный запрос AI-инсайтов
+//     → POST /ai/insights с данными графика → GPT анализирует → массив { label, text }
+//     → insightsLoading отдельный флаг чтобы инсайты грузились независимо от основного спиннера
+//
+// ПОЧЕМУ [period] В ЗАВИСИМОСТЯХ useEffect:
+//   useEffect с [period] — запускается только когда period изменился
+//   без [period] запускался бы только один раз при монтировании
+//   при смене кнопки "Неделя"/"Месяц" React видит новый period → эффект срабатывает снова
 import { useEffect, useState } from "react"
 import MainLayout from "../layout/MainLayout"
 import Skeleton from "../components/ui/Skeleton"
@@ -46,12 +59,17 @@ export default function Analytics() {
     void load()
   }, [period])
 
-  // вычисляем дельту — разница между последним и первым значением
+  // вычисляем дельту — разница между последним и первым значением периода
+  // delta > 0 → рост (TrendingUp зелёный), delta < 0 → падение (TrendingDown красный)
   const last = values[values.length - 1] ?? 0
   const first = values[0] ?? 0
   const delta = last - first
-  const max = Math.max(...values, 1) // нужен для нормировки ширины полосок графика
+  // max нужен для нормировки ширины полосок: ширина = (v / max) * 100%
+  // Math.max(...values, 1) — добавляем 1 как минимум чтобы не делить на 0
+  const max = Math.max(...values, 1)
 
+  // data-driven подход: массив объектов вместо трёх отдельных JSX-блоков
+  // добавить новую карточку = добавить один объект в массив, не трогая шаблон
   const statCards = [
     {
       label: "Средний балл",
