@@ -145,15 +145,6 @@ export default function Landing() {
   );
   const globePulseColor = theme === "dark" ? "#FFCECE" : "#F83B3B";
 
-  const tracks = [
-    { name: "Программирование", icon: <Terminal size={20} /> },
-    { name: "Веб-разработка", icon: <Globe size={20} /> },
-    { name: "Аналитика данных", icon: <Cpu size={20} /> },
-    { name: "UI/UX Дизайн", icon: <Layers size={20} /> },
-    { name: "Тестирование", icon: <Code size={20} /> },
-    { name: "DevOps", icon: <Zap size={20} /> },
-  ];
-
   const features = [
     { icon: <Code size={22} />, title: "Практика на платформе", desc: "Выполняйте задания прямо на платформе без лишних настроек и установок" },
     { icon: <Brain size={22} />, title: "AI-наставник", desc: "Получайте мгновенную обратную связь и подсказки от искусственного интеллекта" },
