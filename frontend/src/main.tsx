@@ -1,9 +1,19 @@
-// точка входа приложения — здесь React монтируется в div#root из index.html
-// порядок провайдеров важен: каждый следующий может использовать предыдущий
-//   ThemeProvider — самый внешний, чтобы тема была доступна всем включая тосты
-//   AppStoreProvider — загружает юзера и курсы при старте (useEffect в провайдере)
-//   ToastProvider — рендерит тосты поверх App, но внутри стора (может показывать ошибки API)
-//   App → Router → конкретная страница
+// ─── ТОЧКА ВХОДА ПРИЛОЖЕНИЯ ───────────────────────────────────────────────────
+// здесь React монтируется в div#root из index.html
+//
+// ПОРЯДОК ЗАПУСКА ПРИЛОЖЕНИЯ:
+//   1. ReactDOM.createRoot → монтирует React в div#root
+//   2. ThemeProvider → читает тему из localStorage, вешает класс "dark" на <html>
+//   3. AppStoreProvider → запускает useEffect:
+//        - GET /auth/me  → определяет кто залогинен → setUser()
+//        - GET /courses  → загружает каталог курсов  → setCourses()
+//   4. ToastProvider → создаёт контейнер для всплывающих уведомлений
+//   5. App → BrowserRouter → Router → рендерит нужную страницу по URL
+//
+// ПОРЯДОК ПРОВАЙДЕРОВ ВАЖЕН:
+//   ThemeProvider — самый внешний, тема нужна всем включая тосты
+//   AppStoreProvider — внутри темы, снаружи тостов (тосты могут звать store)
+//   ToastProvider — снаружи App, тосты всплывают поверх любой страницы
 import React from "react"
 import ReactDOM from "react-dom/client"
 import App from "./App"

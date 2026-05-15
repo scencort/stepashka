@@ -61,6 +61,10 @@ export default function AiReview() {
     loadHistory();
   }, []);
 
+  // запускает проверку кода через ИИ
+  // @flow: POST /ai/review/check { sourceCode } → бэк → GPT → Verdict
+  // Verdict содержит оценки quality/correctness/style (0-100) и текстовый summary
+  // после получения результата сразу обновляем историю — loadHistory() подтягивает новую запись
   const runCheck = async () => {
     setIsChecking(true);
     setVerdict(null);
@@ -71,6 +75,7 @@ export default function AiReview() {
         sourceCode: code,
       });
       setVerdict(response);
+      // обновляем историю — новая проверка должна появиться в списке справа
       await loadHistory();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Проверка не удалась");

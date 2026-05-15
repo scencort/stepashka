@@ -1,11 +1,25 @@
-// центральный API-слой — вся работа с бэкендом только через этот файл
-// поток запроса: api.get/post/patch/delete → request() → routeMappings → backendRequest → fetch
-// routeMappings — таблица маршрутов: каждый перехватывает url по строке или regex,
-//   может изменить путь, тело или нормализовать ответ перед отдачей компоненту
-// backendRequest — низкоуровневый fetch: ставит Authorization заголовок из localStorage,
-//   при 401 пробует обновить токен через /auth/refresh, при неудаче → редирект на /login
-// нормализаторы toCourse и toPublicUser приводят формат бэкенда к формату фронтенда:
-//   fullName→name, priceCents→строка "500 ₽", level:"beginner"→"Начальный" и т.д.
+// ─── ЦЕНТРАЛЬНЫЙ API-СЛОЙ ─────────────────────────────────────────────────────
+// вся работа с бэкендом проходит ТОЛЬКО через этот файл — компоненты не делают fetch напрямую
+//
+// ПОЛНЫЙ ПУТЬ ЛЮБОГО ЗАПРОСА:
+//   компонент вызывает api.get("/courses")
+//     → request("/courses", { method: "GET" })
+//       → ищет совпадение в routeMappings (массив паттернов)
+//         → нашёл: вызывает transform() этого маппинга
+//           → transform() вызывает backendRequest("/catalog")
+//             → fetch(API_BASE_URL + "/catalog", { Authorization: Bearer <token> })
+//               → при 401 → tryRefreshToken() → повторный запрос
+//               → ответ.json() → toCourse() нормализует каждый элемент
+//                 → возвращает Course[] компоненту
+//
+// ЗАЧЕМ routeMappings:
+//   фронт и бэк используют разные URL (например "/courses" → "/catalog")
+//   и разные форматы данных (fullName → name, priceCents → "500 ₽")
+//   маппинги — это слой трансляции между ними, компоненты об этом не знают
+//
+// ТОКЕНЫ:
+//   access token  — живёт 15 минут, хранится в localStorage, добавляется в каждый запрос
+//   refresh token — живёт 30 дней, хранится в localStorage, используется для обновления access
 type Role = "student" | "teacher" | "admin";
 
 type PublicUser = {

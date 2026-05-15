@@ -1,9 +1,21 @@
 /* eslint-disable react-refresh/only-export-components */
-// глобальное хранилище состояния приложения — тут живут пользователь и курсы
-// используем React Context + useState вместо Redux — данных немного, так проще
-// поток данных: AppStoreProvider оборачивает <App> → компоненты берут данные через useAppStore()
-// при старте приложения: useEffect → refreshUser() → GET /auth/me → setUser()
-//                                  → refreshCourses() → GET /courses → setCourses()
+// ─── ГЛОБАЛЬНОЕ ХРАНИЛИЩЕ СОСТОЯНИЯ (AppStore) ───────────────────────────────
+// хранит данные которые нужны сразу нескольким компонентам: юзер, курсы, методы входа/выхода
+// реализовано через React Context + useState — без Redux, т.к. данных немного
+//
+// КАК ИСПОЛЬЗОВАТЬ В КОМПОНЕНТЕ:
+//   const { user, login, logout } = useAppStore()
+//
+// ПОТОК ДАННЫХ:
+//   main.tsx → <AppStoreProvider> оборачивает всё приложение
+//     → при старте useEffect запускает refreshUser() и refreshCourses() параллельно
+//       → refreshUser(): GET /auth/me → если токен валиден → setUser(данные)
+//       → refreshCourses(): GET /courses → setCourses(список)
+//   любой компонент → useAppStore() → получает актуальные данные из контекста
+//
+// ПОЧЕМУ НЕ REDUX:
+//   в проекте только два глобальных объекта (user и courses)
+//   Context + useState дают тот же результат без лишних зависимостей
 import { createContext, useContext, useEffect, useState } from "react"
 import { api, type Course, type LoginResult, type PublicUser } from "../services/api"
 
