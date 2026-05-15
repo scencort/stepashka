@@ -30,7 +30,7 @@ import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } f
 import { useSearchParams } from "react-router-dom"
 import Cropper, { type Area, type Point } from "react-easy-crop" // для обрезки аватара
 import MainLayout from "../layout/MainLayout"
-import { api } from "../lib/api"
+import { api, getRefreshToken } from "../lib/api"
 import { useToast } from "../hooks/useToast"
 import { useAppStore } from "../store/AppStore"
 import {
@@ -64,6 +64,7 @@ type AccountSession = {
   lastUsedAt: string
   expiresAt: string
   createdAt: string
+  isCurrent: boolean  // помечается бэком — сессия с тем же refresh token что сейчас в localStorage
 }
 
 type ProfileErrors = {
@@ -156,7 +157,11 @@ export default function AccountSettings() {
   const refreshSessions = useCallback(async () => {
     setSessionsLoading(true)
     try {
-      const data = await api.get<AccountSession[]>("/account/sessions")
+      // передаём текущий refresh token в заголовке — бэк пометит isCurrent=true для этой записи
+      const rt = getRefreshToken() ?? ""
+      const data = await api.get<AccountSession[]>("/account/sessions", {
+        headers: rt ? { "X-Refresh-Token": rt } : undefined,
+      })
       setSessions(data)
     } catch { setSessions([]) }
     finally { setSessionsLoading(false) }
@@ -891,22 +896,34 @@ export default function AccountSettings() {
                     {!sessionsLoading && (
                       <div className="space-y-2">
                         {sessions.map((s) => (
-                          <div key={s.id} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] group">
-                            <Monitor size={18} className="text-[var(--muted)] shrink-0" />
+                          <div key={s.id} className={`flex items-center gap-4 px-4 py-3 rounded-xl border group ${s.isCurrent ? "bg-primary/5 border-primary/20" : "bg-[var(--surface)] border-[var(--border)]"}`}>
+                            <Monitor size={18} className={`shrink-0 ${s.isCurrent ? "text-primary" : "text-[var(--muted)]"}`} />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-[var(--text)] truncate">{s.userAgent || "Неизвестное устройство"}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-medium text-[var(--text)] truncate">{s.userAgent || "Неизвестное устройство"}</p>
+                                {/* бейдж «Текущая» — помогает понять какая сессия сейчас активна */}
+                                {s.isCurrent && (
+                                  <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                    Текущая
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex gap-3 mt-0.5 text-xs text-[var(--muted)]">
                                 <span>IP: {s.ipAddress || "?"}</span>
                                 <span className="flex items-center gap-1"><Clock size={10} />{formatDateTime(s.lastUsedAt, profile.timezone)}</span>
                               </div>
                             </div>
-                            <button
-                              onClick={() => revokeSession(s.id)}
-                              disabled={saving}
-                              className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 text-red-500"
-                            >
-                              <X size={14} />
-                            </button>
+                            {/* кнопка «Завершить» скрыта для текущей сессии — нельзя отозвать себя */}
+                            {!s.isCurrent && (
+                              <button
+                                onClick={() => revokeSession(s.id)}
+                                disabled={saving}
+                                className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 text-red-500"
+                                title="Завершить сессию"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>

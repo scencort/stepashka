@@ -1,3 +1,31 @@
+// компонент прохождения одного шага курса — теория, тест, код или эссе
+// используется внутри CourseDetail.tsx (вкладка "Шаг")
+//
+// ТИПЫ ШАГОВ (kind):
+//   "theory"  — текстовая теория с markdown-форматированием
+//               кнопка "Отметить как изученный" → POST /courses/:id/steps/:stepId/submit { answer: "read" }
+//   "quiz"    — вопрос с вариантами ответа (radio-buttons из step.options[])
+//               пользователь выбирает вариант → кнопка "Проверить ответ"
+//   "code"    — редактор кода с подсветкой синтаксиса Python
+//               встроенный Python-хайлайтер (без внешних зависимостей) рисует токены через regex
+//               кнопка "Отправить код" → бэк проверяет через test-runner или AI
+//   "essay"   — textarea для развёрнутого ответа
+//               бэк вызывает estimate_essay() → AI анализирует текст без числовых баллов
+//
+// ПОДСВЕТКА КОДА (useIsDark + PY_KEYWORDS/PY_BUILTINS):
+//   MutationObserver следит за классом "dark" на <html>
+//   при изменении темы isDark обновляется без перезагрузки
+//   escHtml() экранирует < > & перед вставкой в innerHTML
+//   colorToken() → <span class="py-...">токен</span>
+//
+// ИСТОРИЯ ПОПЫТОК (attemptHistory[]):
+//   массив прошлых попыток с passed/feedback/checkResults/aiComment
+//   показывается аккордеоном под формой ответа
+//   хранится в Course.tsx, передаётся сюда как проп
+//
+// НАВИГАЦИЯ (previousStep / nextStep):
+//   кнопки "← Предыдущий" и "Следующий →" в нижней части
+//   onSelectStep(stepId, answerText) — выбирает шаг и подставляет сохранённый ответ
 import React from "react";
 import {
   CheckCircle2,

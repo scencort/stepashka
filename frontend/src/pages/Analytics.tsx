@@ -1,14 +1,35 @@
-// страница аналитики — статистика прогресса студента
+// страница аналитики — статистика прогресса студента по шагам курсов
+// маршрут: /analytics, доступна учителям и администраторам (MainLayout показывает ссылку только им)
 //
 // КАК РАБОТАЕТ:
 //   при монтировании и при смене period → useEffect запускает load()
 //     → GET /analytics?period=week|month → { values[], stats }
-//       values — количество выполненных шагов по дням (неделя) или неделям (месяц)
-//       stats  — averageScore, solvedTasks, completedCourses
+//       values[] — массив чисел: количество выполненных шагов за каждый день (week) или неделю (month)
+//                  для week: 7 элементов [пн, вт, ср, чт, пт, сб, вс]
+//                  для month: 4 элемента [нед.1, нед.2, нед.3, нед.4]
+//       stats.averageScore — "42%" строка — отношение выполненных шагов к общему количеству
+//       stats.solvedTasks  — количество шагов выполненных за выбранный период
+//       stats.completedCourses — количество курсов где progress_percent >= 100
 //
-// НОРМИРОВКА ГРАФИКА:
-//   max = Math.max(...values, 1) — максимум по периоду (минимум 1 чтобы не делить на 0)
-//   ширина полоски = (v / max) * 100% — самое большое значение всегда 100% ширины
+// НОРМИРОВКА ГРАФИКА (горизонтальные полоски):
+//   max = Math.max(...values, 1) — максимальное значение в периоде (минимум 1 чтобы не делить на 0)
+//   ширина полоски = (v / max) * 100% — бар с максимальным значением всегда 100% ширины
+//   остальные бары масштабируются пропорционально
+//
+// РУССКОЕ СКЛОНЕНИЕ:
+//   v === 1 → "шаг", v < 5 → "шага", иначе → "шагов"
+//   это правило работает для чисел 1-20 (для 11-14 всегда "шагов" — в данном контексте маловероятно)
+//
+// КАРТОЧКИ СТАТИСТИКИ:
+//   statCards — массив объектов с { label, value, icon, color, bg, border }
+//   рендерится через .map() вместо трёх отдельных JSX-блоков — меньше дублирования
+//   loading → Skeleton заглушки, loaded → карточки с реальными данными
+//
+// СОСТОЯНИЯ ГРАФИКА:
+//   loading → 7 Skeleton строк
+//   error → красный текст ошибки
+//   totalSteps === 0 → заглушка "Нет активности"
+//   totalSteps > 0 → список горизонтальных полосок с данными
 
 import { useEffect, useState } from "react"
 import MainLayout from "../layout/MainLayout"
@@ -140,11 +161,8 @@ export default function Analytics() {
                   </span>
                   <div className="flex-1 h-2 rounded-full bg-[var(--border)] overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${(v / max) * 100}%`,
-                        background: "linear-gradient(90deg, var(--btn-grad-from), var(--btn-grad-to))",
-                      }}
+                      className="h-full rounded-full bg-primary transition-all duration-500"
+                      style={{ width: `${(v / max) * 100}%` }}
                     />
                   </div>
                   <span className="text-xs font-semibold text-[var(--text)] w-12 shrink-0 text-right">

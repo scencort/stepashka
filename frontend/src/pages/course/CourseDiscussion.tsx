@@ -1,5 +1,28 @@
 // компонент обсуждения — чат для конкретного шага курса или всего курса целиком
-// используется внутри страницы курса, получает courseId и stepId как пропсы
+// используется внутри CourseDetail.tsx на вкладке "Обсуждение"
+//
+// КАК РАБОТАЕТ:
+//   props: courseId (обязательный), stepId (null = обсуждение всего курса, число = конкретный шаг)
+//   fetchMessages() → GET /courses/:id/discussions?step_id=N — грузим сообщения при монтировании
+//   после загрузки: bottomRef.current.scrollIntoView() — прокручиваем вниз к последним сообщениям
+//   sendMessage() → POST /courses/:id/discussions { message, step_id? }
+//     → бэк добавляет сообщение в discussions таблицу, возвращает созданный объект
+//     → добавляем его в массив через setMessages([...prev, created])
+//     → после отправки снова прокручиваем вниз через bottomRef
+//
+// АВТО-ПРОКРУТКА:
+//   bottomRef — невидимый div в самом конце списка сообщений
+//   scrollIntoView({ behavior: "smooth" }) — плавная прокрутка к нему
+//   useEffect([messages]) — срабатывает при каждом изменении массива сообщений
+//
+// useCallback для fetchMessages:
+//   без useCallback функция пересоздавалась бы при каждом рендере
+//   useCallback([courseId, stepId]) — пересоздаётся только при смене курса или шага
+//   это важно потому что fetchMessages передаётся в useEffect как зависимость
+//
+// ВРЕМЯ СООБЩЕНИЯ:
+//   new Date(createdAt).toLocaleTimeString("ru-RU") — "14:32:05"
+//   toLocaleDateString + toLocaleTimeString — форматирование под русскую локаль
 import { useEffect, useState, useCallback, useRef } from "react";
 import { MessageSquare, Send } from "lucide-react";
 import { api } from "../../lib/api";

@@ -1,6 +1,30 @@
 // страница управления ролями и доступом — только для администраторов
-// список всех участников с возможностью менять роль через select и удалять
-// карточки статистики по количеству студентов, преподавателей и администраторов
+// маршрут: /roles-access, защищён ProtectedRoute (role: admin)
+//
+// ЧТО ПОКАЗЫВАЕТ:
+//   три карточки-счётчика: студенты / преподаватели / администраторы
+//   таблица всех пользователей платформы с поиском и фильтром по роли
+//   для каждого: инициалы+цвет, имя, текущая роль, select смены роли, кнопка удалить
+//
+// КАК РАБОТАЕТ СМЕНА РОЛИ:
+//   changeRole(member, newRole) → PATCH /roles-members/:id { role }
+//     → бэк обновляет users.role в БД
+//     → на успех: optimistic update — setMembers(prev.map(...)) сразу обновляет список
+//     → setActionId(member.id) пока идёт запрос — блокирует select и кнопку удалить
+//
+// КАК РАБОТАЕТ УДАЛЕНИЕ:
+//   removeMember(id) → confirm() → DELETE /roles-members/:id
+//     → setMembers(prev.filter(...)) — удаляем из локального массива
+//
+// ФИЛЬТРАЦИЯ (useMemo):
+//   visible = members
+//     → filter(role) если выбрана не "all"
+//     → filter(name.includes(query)) если есть поисковый запрос
+//   пересчитывается только когда меняется members, filter или query
+//
+// counts = useMemo — три .filter() по всему массиву выполняются разом при изменении members
+// getInitials("Иван Иванов") → "ИИ" — первые буквы слов имени
+// roleColors — цвет кружка с инициалами зависит от роли: синий/зелёный/красный
 import { useEffect, useMemo, useState } from "react"
 import MainLayout from "../layout/MainLayout"
 import { api } from "../lib/api"

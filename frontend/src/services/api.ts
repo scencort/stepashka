@@ -1005,9 +1005,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   // ── Fallback: маппинг не нашёлся — идём напрямую на бэкенд ──
+  // прокидываем кастомные заголовки (например X-Refresh-Token для /account/sessions)
   return await backendRequest<T>(path, {
     method,
     ...(rawBody ? { body: JSON.stringify(rawBody) } : {}),
+    ...(options?.headers ? { headers: options.headers } : {}),
   });
 }
 
@@ -1015,7 +1017,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 // все 4 метода сериализуют тело в JSON и вызывают request() → routeMappings → backendRequest
 // типовой вызов: api.post<LoginResult>("/auth/login", { email, password })
 export const api = {
-  get: <T>(path: string) => request<T>(path),
+  // второй параметр options — опциональные RequestInit, например { headers: { "X-Refresh-Token": "..." } }
+  get: <T>(path: string, options?: Pick<RequestInit, "headers">) =>
+    request<T>(path, options ? { headers: options.headers } : undefined),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) =>
@@ -1023,7 +1027,7 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
-export { getAccessToken, API_BASE_URL, clearTokens };
+export { getAccessToken, getRefreshToken, API_BASE_URL, clearTokens };
 
 export type {
   PublicUser,

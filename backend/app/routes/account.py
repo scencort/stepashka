@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app import db
 from app.deps import CurrentUser
@@ -211,16 +211,27 @@ async def change_password(body: ChangePasswordBody, user: CurrentUser):
 
 
 @router.get("/sessions")
-async def get_sessions(user: CurrentUser):
+async def get_sessions(request: Request, user: CurrentUser):
+    # X-Refresh-Token — фронт передаёт свой текущий refresh token в заголовке
+    # хэшируем его и сравниваем с записями в БД чтобы пометить текущую сессию
+    current_token = request.headers.get("X-Refresh-Token", "")
+    current_hash = hash_token(current_token) if current_token else ""
+
     rows = await db.fetch(
         """SELECT id, user_agent AS "userAgent", ip_address AS "ipAddress", last_used_at AS "lastUsedAt",
-                  expires_at AS "expiresAt", created_at AS "createdAt"
+                  expires_at AS "expiresAt", created_at AS "createdAt", token_hash AS "tokenHash"
            FROM refresh_tokens
            WHERE user_id=$1 AND revoked_at IS NULL AND expires_at > NOW()
            ORDER BY created_at DESC""",
         user["id"],
     )
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        row = dict(r)
+        row["isCurrent"] = (current_hash != "" and row["tokenHash"] == current_hash)
+        del row["tokenHash"]  # не отдаём хэш клиенту — чувствительные данные
+        result.append(row)
+    return result
 
 
 @router.delete("/sessions/{session_id}")
@@ -241,11 +252,27 @@ async def delete_session(session_id: int, user: CurrentUser):
 
 
 @router.post("/logout-all")
-async def logout_all(user: CurrentUser):
-    await db.execute(
-        "UPDATE refresh_tokens SET revoked_at=NOW() WHERE user_id=$1 AND revoked_at IS NULL",
-        user["id"],
-    )
+async def logout_all(request: Request, user: CurrentUser):
+    # keepCurrentRefreshToken — фронт передаёт свой текущий токен
+    # исключаем его из отзыва чтобы пользователь не потерял текущую сессию
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    keep_token = body.get("keepCurrentRefreshToken", "")
+    if keep_token:
+        keep_hash = hash_token(keep_token)
+        await db.execute(
+            "UPDATE refresh_tokens SET revoked_at=NOW() WHERE user_id=$1 AND revoked_at IS NULL AND token_hash != $2",
+            user["id"], keep_hash,
+        )
+    else:
+        await db.execute(
+            "UPDATE refresh_tokens SET revoked_at=NOW() WHERE user_id=$1 AND revoked_at IS NULL",
+            user["id"],
+        )
     await write_audit(user["id"], "account.logout_all", "user", user["id"])
     return {"success": True}
 

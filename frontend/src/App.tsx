@@ -1,5 +1,22 @@
-// корневой компонент приложения — оборачивает всё в BrowserRouter
-// и устанавливает title страницы при переходах между маршрутами
+// ─── КОРНЕВОЙ КОМПОНЕНТ ПРИЛОЖЕНИЯ ─────────────────────────────────────────
+// App.tsx — единственный компонент между провайдерами (main.tsx) и роутером (router/index.tsx)
+// его задача: обернуть Router в BrowserRouter и менять document.title при переходах
+//
+// ЗАЧЕМ ОТДЕЛЬНЫЙ AppRoutes ВНУТРИ BrowserRouter:
+//   useLocation() работает только ВНУТРИ BrowserRouter
+//   нельзя вызвать useLocation() в том же компоненте, где рендерится <BrowserRouter>
+//   поэтому создаём вложенный компонент AppRoutes который имеет доступ к контексту роутера
+//
+// КАК ОБНОВЛЯЕТСЯ TITLE:
+//   useLocation() возвращает { pathname, search, hash, state, key }
+//   useEffect зависит от [pathname] — срабатывает при каждом переходе
+//   getPageTitle(pathname) — простой lookup по статическому словарю routes→titles
+//   document.title = "Панель | Gradus" — браузер показывает это во вкладке и в истории
+//   динамические маршруты (напр. /course/42) обрабатываются отдельно через startsWith
+//
+// ВЫНОС getPageTitle ЗА КОМПОНЕНТ:
+//   это чистая функция — не зависит от стейта и рефов, всегда возвращает одно и то же
+//   вынос за компонент означает что она не пересоздаётся при каждом рендере (не нужен useCallback)
 import { BrowserRouter, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { Router } from "./router";

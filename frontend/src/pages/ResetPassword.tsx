@@ -1,6 +1,29 @@
-// страница сброса пароля — получает email и devCode из query string
-// в dev режиме код подставляется автоматически в поле — удобно для тестирования
-// после успешного сброса редиректим на /login
+// страница сброса пароля — шаг 2 из 2 (после ForgotPassword.tsx)
+// получает email и devCode из query string: /reset-password?email=...&devCode=...
+// в dev режиме код подставляется автоматически — не нужно лезть в почту при разработке
+//
+// КАК РАБОТАЕТ:
+//   emailFromQuery = searchParams.get("email") — уже заполнен, не надо вводить
+//   devCodeFromQuery = searchParams.get("devCode") — в dev-режиме подставляется бэком
+//   handleSubmit() → validate() → POST /auth/reset-password { email, code, password }
+//     → бэк находит запись по email+code, проверяет что не истёк (10 минут),
+//       хэширует новый пароль через bcrypt, сохраняет, удаляет код из БД
+//     → возвращает { success, message }
+//   после успеха: toast.success(message) → navigate("/login")
+//
+// ВАЛИДАЦИЯ (в порядке приоритета):
+//   1. Корректный email (regex)
+//   2. Код строго 6 цифр (/^\d{6}$/)
+//   3. Пароль минимум 8 символов
+//   4. Подтверждение совпадает с паролем
+//
+// DEV-режим:
+//   если devCodeFromQuery задан — показываем зелёный баннер "DEV режим: код подставлен автоматически"
+//   это визуальная подсказка разработчику что ручное копирование кода не нужно
+//
+// useMemo для emailFromQuery и devCodeFromQuery:
+//   searchParams — стабильный объект если URL не меняется
+//   useMemo предотвращает лишние вычисления при ре-рендерах не связанных с URL
 import { useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 
