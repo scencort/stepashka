@@ -43,7 +43,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\backend\" -Recurse)",
       "Bash(Select-Object FullName)",
       "Bash(ConvertTo-Csv -NoTypeInformation)",
-      "Bash(Out-String)"
+      "Bash(Out-String)",
+      "Bash(del \"C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\backend\\\\export_course_seed.py\")",
+      "Bash(del \"C:\\\\Users\\\\yaros\\\\Desktop\\\\stepashka\\\\backend\\\\fix_fake_data.py\")"
     ]
   }
 }
