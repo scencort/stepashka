@@ -1,8 +1,20 @@
-﻿import { useEffect, useState, useRef } from "react";
+﻿// страница AI-чата — диалог с GPT-ассистентом
+//
+// КАК РАБОТАЕТ:
+//   пользователь вводит вопрос → нажимает Enter или кнопку отправки
+//     → askAi() добавляет сообщение юзера в chatMessages → POST /ai/chat
+//       { message, context: последние 8 сообщений для памяти диалога }
+//         → бэк отправляет в GPT → возвращает { reply: string }
+//           → добавляем ответ ассистента в chatMessages → React перерисовывает чат
+//   useEffect следит за chatMessages → при новом сообщении скроллит вниз (chatEndRef)
+//
+// AiMarkdown — свой рендерер markdown: парсит ```код```, **жирный**, *курсив*, списки
+// context: последние 8 сообщений — чтобы GPT помнил контекст разговора
+import { useEffect, useState, useRef } from "react";
 import React from "react";
 import MainLayout from "../layout/MainLayout";
 import Card from "../components/ui/Card";
-import { getAccessToken, API_BASE_URL } from "../lib/api";
+import { api } from "../lib/api";
 import { Send, Bot, User } from "lucide-react";
 
 type ChatMessage = {
@@ -144,10 +156,9 @@ export default function AiReview() {
   ]);
   const askAi = async () => {
     const message = chatInput.trim();
-    if (!message) {
-      return;
-    }
+    if (!message) return;
 
+    // добавляем сообщение юзера в чат и сбрасываем поле ввода
     const nextMessages = [
       ...chatMessages,
       { role: "user" as const, content: message },
@@ -157,84 +168,18 @@ export default function AiReview() {
     setChatLoading(true);
 
     try {
-      const accessToken = getAccessToken();
-      const streamResponse = API_BASE_URL
-        ? await fetch(`${API_BASE_URL}/ai/chat/stream`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(accessToken
-                ? { Authorization: `Bearer ${accessToken}` }
-                : {}),
-            },
-            body: JSON.stringify({
-              message,
-              context: nextMessages
-                .slice(-8)
-                .map((item) => ({ role: item.role, content: item.content })),
-            }),
-          })
-        : null;
-
-      if (streamResponse && streamResponse.ok && streamResponse.body) {
-        const reader = streamResponse.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let streamed = "";
-
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "" },
-        ]);
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const raw = line.slice(6);
-              if (raw === "[DONE]") continue;
-              try {
-                const parsed = JSON.parse(raw) as { content?: string };
-                streamed += parsed.content ?? "";
-              } catch {
-                streamed += raw;
-              }
-            }
-          }
-          setChatMessages((prev) => {
-            const next = [...prev];
-            next[next.length - 1] = { role: "assistant", content: streamed };
-            return next;
-          });
-        }
-      } else {
-        const fallbackRes = await fetch(`${API_BASE_URL}/ai/chat`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          },
-          body: JSON.stringify({
-            message,
-            context: nextMessages
-              .slice(-8)
-              .map((item) => ({ role: item.role, content: item.content })),
-          }),
-        });
-        const response = await fallbackRes.json() as { reply: string; model: string };
-
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: response.reply,
-          },
-        ]);
-      }
+      // POST /ai/chat — отправляем вопрос и последние 8 сообщений как контекст
+      // бэк передаёт всё в GPT и возвращает { reply: string }
+      const response = await api.post<{ reply: string }>("/ai/chat", {
+        message,
+        context: nextMessages
+          .slice(-8)
+          .map((item) => ({ role: item.role, content: item.content })),
+      });
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: response.reply },
+      ]);
     } catch (err) {
       const messageText =
         err instanceof Error ? err.message : "Не удалось получить ответ AI";
