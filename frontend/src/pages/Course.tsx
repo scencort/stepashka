@@ -308,7 +308,7 @@ export default function Course() {
   const loadEnrollmentStatus = async (cId: number) => {
     try {
       const data = await api.get<EnrollmentStatus>(
-        `/courses/${cId}/enrollment-status`,
+        `/student/courses/${cId}/enrollment-status`,
       );
       setEnrollmentStatus(data);
     } catch {
@@ -388,7 +388,7 @@ export default function Course() {
         success?: boolean;
         message?: string;
         error?: string;
-      }>(`/courses/${selectedCourseId}/request-enrollment`, {
+      }>(`/student/courses/${selectedCourseId}/request-enrollment`, {
         message: enrollRequestMessage,
       });
       if (result.error) toast.error(result.error);
@@ -412,7 +412,7 @@ export default function Course() {
     setEnrollingIds(prev => new Set(prev).add(cId));
     try {
       const result = await api.post<{ success?: boolean; error?: string }>(
-        `/courses/${cId}/enroll`,
+        `/student/enroll/${cId}`,
         {},
       );
       if (result.error) toast.error(result.error);
