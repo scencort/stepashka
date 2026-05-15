@@ -84,11 +84,21 @@ export default function AiReview() {
     }
   };
 
-  // отправляем сообщение AI — пробуем streaming (SSE), при неудаче — обычный POST
-  // последние 8 сообщений передаём в context чтобы AI помнил разговор
-  // streaming поток: fetch → getReader() → цикл read() → decode() → парсим SSE строки "data: {...}"
-  // каждый чанк содержит { content: "кусок текста" } → дописываем к последнему сообщению
-  // [DONE] — маркер конца стрима от бэка, после него reader больше не читаем
+  // askAi — отправляет сообщение и получает ответ от GPT
+  // СТРИМИНГ (Server-Sent Events) — ответ приходит по кускам, как в ChatGPT:
+  //   fetch() открывает HTTP-соединение и держит его
+  //   response.body.getReader() — читаем тело ответа как поток байт
+  //   в цикле: reader.read() возвращает { done, value } где value это Uint8Array
+  //   TextDecoder.decode(value) — конвертирует байты в строку
+  //   каждая строка потока выглядит как: "data: {"content": "кусок текста"}"
+  //   парсим: split("\n") → фильтруем строки начинающиеся с "data: " → JSON.parse
+  //   каждый кусок дописываем к последнему сообщению через setChatMessages
+  //   пользователь видит как текст появляется символ за символом
+  //
+  // FALLBACK: если бэк не поддерживает стриминг — делаем обычный POST и ждём полный ответ
+  //
+  // context: передаём последние 8 сообщений чтобы AI помнил контекст разговора
+  // .slice(-8) — берём последние 8 (не все — чтобы не переполнить контекст GPT)
   const askAi = async () => {
     const message = chatInput.trim();
     if (!message) {
@@ -126,33 +136,48 @@ export default function AiReview() {
 
       if (streamResponse && streamResponse.ok && streamResponse.body) {
         const reader = streamResponse.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let streamed = "";
+        const decoder = new TextDecoder(); // конвертирует Uint8Array → строку
+        let buffer = "";   // накапливаем неполные строки между чанками
+        let streamed = ""; // весь накопленный текст ответа
 
+        // добавляем пустое сообщение ассистента сразу — пользователь видит что ответ начался
+        // потом будем менять его content по мере поступления чанков
         setChatMessages((prev) => [
           ...prev,
           { role: "assistant", content: "" },
         ]);
 
+        // читаем поток пока бэк не закроет соединение (done=true)
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) break; // соединение закрыто — выходим из цикла
+
+          // value это Uint8Array — массив байт, декодируем в строку
+          // { stream: true } — говорит декодеру что данные придут ещё, не сбрасывать буфер
           buffer += decoder.decode(value, { stream: true });
+
+          // SSE формат: каждое событие — строка "data: {...}\n\n"
+          // разбиваем по \n, последнюю неполную строку оставляем в buffer для следующего чанка
           const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
+          buffer = lines.pop() ?? ""; // последняя строка может быть обрезана — ждём следующего чанка
+
           for (const line of lines) {
             if (line.startsWith("data: ")) {
-              const raw = line.slice(6);
-              if (raw === "[DONE]") continue;
+              const raw = line.slice(6); // убираем префикс "data: "
+              if (raw === "[DONE]") continue; // маркер конца — бэк говорит что всё отправил
               try {
+                // каждый чанк это JSON: { content: "кусок текста" }
                 const parsed = JSON.parse(raw) as { content?: string };
                 streamed += parsed.content ?? "";
               } catch {
-                streamed += raw;
+                streamed += raw; // если не JSON — добавляем как есть (защита от неожиданного формата)
               }
             }
           }
+
+          // обновляем последнее сообщение в массиве (то самое пустое которое добавили выше)
+          // prev[prev.length - 1] — последний элемент массива
+          // создаём новый массив (spread) чтобы React заметил изменение и перерисовал
           setChatMessages((prev) => {
             const next = [...prev];
             next[next.length - 1] = { role: "assistant", content: streamed };

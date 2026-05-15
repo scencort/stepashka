@@ -1,5 +1,14 @@
-// страница регистрации — три поля: имя, email, пароль
-// после регистрации сразу логинит и отправляет на дашборд
+// страница регистрации — форма с тремя полями: имя, email, пароль
+// после успешной регистрации пользователь сразу залогинен и попадает на /dashboard
+//
+// КАК РАБОТАЕТ:
+//   пользователь заполняет поля → нажимает кнопку (или Enter)
+//     → handleRegister() → validate() проверяет поля на клиенте
+//       → если ошибка → показываем её под полями, запрос не отправляем
+//       → если всё ок → store.register(name, email, password)
+//         → POST /auth/register → бэк создаёт юзера и возвращает токены + данные юзера
+//           → api.ts сохраняет токены в localStorage через setTokens()
+//             → AppStore ставит user в стейт → navigate("/dashboard")
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
@@ -22,10 +31,13 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [passwordVisible, setPasswordVisible] = useState(false) // показать/скрыть пароль
 
-  // валидирует три поля перед отправкой запроса
-  // @returns строка с ошибкой или пустая строка если всё ок
-  // проверяет: имя ≥2 символов, email соответствует формату, пароль ≥8 символов
-  // regex email: [^\s@]+@[^\s@]+\.[^\s@]+ — простая проверка без RFC-перегибов
+  // клиентская валидация — проверяем поля ДО отправки запроса на сервер
+  // зачем: не тратим время на запрос если очевидная ошибка (пустое поле, короткий пароль)
+  // возвращает строку ошибки или "" если всё ок
+  // regex /^[^\s@]+@[^\s@]+\.[^\s@]+$/ — минимальная проверка email:
+  //   [^\s@]+ — один или более символов кроме пробела и @
+  //   @ — обязательно есть собака
+  //   [^\s@]+\.[^\s@]+ — домен с точкой
   const validate = () => {
     if (name.trim().length < 2) return "Имя — минимум 2 символа"
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) return "Введите корректный email"
@@ -33,22 +45,23 @@ export default function Register() {
     return ""
   }
 
-  // обработчик кнопки "Зарегистрироваться"
-  // сначала клиентская валидация (validate), потом store.register()
-  // store.register() → POST /auth/register → бэк создаёт юзера и выдаёт токены
-  // при успехе: токены сохраняются в localStorage через api.ts, user ставится в стор
+  // основной обработчик регистрации
+  // сначала клиентская валидация — если не прошла, прерываемся без запроса
+  // потом store.register() — это async функция, ждём её через await
+  // при успехе: navigate уводит на дашборд (user уже в сторе, токены в localStorage)
+  // при ошибке: показываем текст из бэкенда (например "Email уже занят")
   const handleRegister = async () => {
     const err = validate()
-    if (err) { setError(err); return }
+    if (err) { setError(err); return } // early return — дальше не идём
     setLoading(true); setError("")
     try {
       await register(name, email, password)
       toast.success("Аккаунт создан!")
-      navigate("/dashboard")
+      navigate("/dashboard") // react-router меняет URL без перезагрузки страницы
     } catch (e) {
-      // e.message — строка из бэкенда, например "Email already in use"
       const msg = e instanceof Error ? e.message : "Ошибка регистрации"
-      setError(msg); toast.error(msg)
+      setError(msg)    // показываем под полями формы
+      toast.error(msg) // и в тосте — пользователь точно заметит
     } finally { setLoading(false) }
   }
 
@@ -118,7 +131,9 @@ export default function Register() {
                 />
               </div>
 
-              {/* поле пароля с кнопкой показать/скрыть */}
+              {/* поле пароля с кнопкой показать/скрыть
+                  type меняется между "password" (звёздочки) и "text" (обычный текст)
+                  passwordVisible — boolean в стейте, кнопка глаза переключает его */}
               <div className="relative">
                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
                 <input

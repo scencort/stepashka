@@ -1,5 +1,18 @@
-// компонент для отображения и сдачи одного шага курса
-// работает с теорией, квизами, кодом и эссе
+// CourseStep — компонент одного шага курса (теория / квиз / код / эссе)
+// получает данные о шаге снаружи через props, отправляет ответ на бэкенд
+//
+// ЧЕТЫРЕ ТИПА ШАГОВ:
+//   theory — только текст для чтения, кнопка "Дальше" сразу доступна
+//   quiz   — вопрос с вариантами ответа, нужно выбрать правильный
+//   code   — редактор кода, ответ отправляется на бэк и проверяется
+//   essay  — текстовое поле, ответ оценивается вручную преподавателем
+//
+// КАК РАБОТАЕТ ПРОВЕРКА ОТВЕТА:
+//   студент вводит ответ → нажимает "Проверить"
+//     → POST /steps/:id/check { answer } → бэк проверяет
+//       → возвращает { correct: true/false, feedback: "..." }
+//         → компонент показывает результат и разблокирует кнопку "Дальше"
+//           → "Дальше" вызывает onNext() который переключает шаг в родителе
 import {
   CheckCircle2,
   Circle,
@@ -18,11 +31,13 @@ import {
 } from "lucide-react";
 import { useState as useStateLocal, useRef, useMemo, useEffect as useEffectLocal } from "react";
 
-// хук для отслеживания тёмной/светлой темы приложения
-// не использует ThemeContext намеренно — читает класс "dark" напрямую с <html>
-// MutationObserver следит за изменением атрибута class на documentElement
-// @returns boolean — true если сейчас тёмная тема
-// используется для выбора цветовой схемы подсветки синтаксиса
+// useIsDark — локальный хук для определения текущей темы
+// НЕ использует ThemeContext намеренно: редактор кода рендерится отдельно
+// и ThemeContext может быть недоступен если компонент используется в изоляции
+// механика: MutationObserver следит за атрибутом class на теге <html>
+// когда ThemeContext меняет тему — он добавляет/убирает класс "dark" на documentElement
+// MutationObserver это замечает → вызывает callback → обновляем isDark
+// attributeFilter: ["class"] — следим ТОЛЬКО за классом, не за другими атрибутами
 function useIsDark() {
   const [isDark, setIsDark] = useStateLocal(() =>
     document.documentElement.classList.contains("dark")
@@ -163,15 +178,23 @@ const FONT: React.CSSProperties = {
 const PAD = 14;    // отступы внутри редактора
 const GUTTER = 46; // ширина колонки с номерами строк
 
-// редактор кода с подсветкой синтаксиса питона
-// работает как overlaid editor: textarea прозрачная поверх pre с подсветкой
+// CodeEditor — редактор кода с подсветкой синтаксиса Python
+// ТРЮК "overlaid editor" — два слоя один поверх другого:
+//   нижний слой: <pre> с HTML-подсветкой (dangerouslySetInnerHTML) — только для отображения
+//   верхний слой: <textarea> прозрачная (color: transparent, background: transparent)
+//   пользователь печатает в textarea, видит подсветку из pre
+//   syncScroll() синхронизирует прокрутку обоих слоёв чтобы подсветка не "уезжала"
+// Tab в textarea — перехватываем e.preventDefault() и вставляем 4 пробела вручную
+//   без перехвата Tab переключал бы фокус между элементами страницы
 function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const dark = useIsDark();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
 
   const lines = Math.max((value || "").split("\n").length, 10);
-  // перепересчитываем подсветку только когда меняется код или тема
+  // useMemo кешируует результат highlightCode — не пересчитывает при каждом рендере
+  // highlightCode — дорогая операция: парсит каждый символ, создаёт HTML-строку
+  // пересчитываем только когда изменился сам код (value) или тема (dark)
   const highlighted = useMemo(() => highlightCode(value || "", dark), [value, dark]);
 
   // синхронизируем скролл textarea и pre чтобы подсветка не уезжала

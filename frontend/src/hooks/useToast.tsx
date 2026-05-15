@@ -1,75 +1,82 @@
 /* eslint-disable react-refresh/only-export-components */
-// система уведомлений (тостов) — провайдер и хук в одном файле
-// используется в: main.tsx (оборачивает всё приложение), любой компонент через useToast()
+// useToast — система всплывающих уведомлений (тостов) в правом верхнем углу
+// реализована как Context + хук, в одном файле провайдер и хук
 //
-// поток данных:
-//   компонент вызывает toast.success("текст") или toast.error("текст")
-//   → push() добавляет элемент в массив toasts с уникальным id
-//   → React рендерит новый <div> в фиксированном контейнере (правый верхний угол)
-//   → через 3.2 секунды setTimeout вызывает setToasts(filter) — элемент удаляется
+// КАК РАБОТАЕТ (полная цепочка):
+//   любой компонент вызывает toast.success("Сохранено!")
+//     → push("success", "Сохранено!") добавляет объект в массив toasts через setToasts
+//       → React видит что toasts изменился → перерисовывает контейнер тостов
+//         → новый <div> появляется с анимацией toast-in (объявлена в index.css)
+//           → через 2800мс setTimeout: ставит dying=true → анимация toast-out запускается
+//             → через 3200мс второй setTimeout: удаляет тост из массива фильтром
+//               → React снова перерисовывается → тост исчезает из DOM
 //
-// анимация — чистый CSS без framer-motion:
-//   появление: .toast-enter → opacity:0 translateX(20px) → opacity:1 translateX(0) за 220ms
-//   исчезновение: управляем через состояние dying — ставим класс .toast-exit
-//   z-index 120 — выше модалок (110) и всего остального интерфейса
+// ПОЧЕМУ ДВА ТАЙМЕРА (2800 и 3200):
+//   нельзя удалить элемент из DOM пока идёт CSS-анимация исчезновения
+//   2800мс — начало анимации исчезновения (400мс анимации)
+//   3200мс — удаление из DOM (анимация уже закончилась)
+//
+// z-index 120 — выше модалок (z-110) и всего остального интерфейса
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react"
 
-// два типа — успех (зелёно-красный градиент) и ошибка (тёмно-красный)
+// два вида тостов — влияют только на цвет фона
 type ToastType = "success" | "error"
 
 type ToastItem = {
-  id: number       // уникальный id — Date.now() + random, нужен для удаления по фильтру
-  message: string
+  id: number       // уникальный id: Date.now() + случайное число — нужен для точечного удаления
+  message: string  // текст который видит пользователь
   type: ToastType
-  dying?: boolean  // флаг: true когда начинается анимация исчезновения
+  dying?: boolean  // когда true — CSS меняет анимацию с toast-in на toast-out
 }
 
 type ToastContextValue = {
-  success: (message: string) => void  // показать зелёный тост
-  error: (message: string) => void    // показать красный тост
+  success: (message: string) => void
+  error: (message: string) => void
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null)
 
-type Props = {
-  children: React.ReactNode
-}
-
-export function ToastProvider({ children }: Props) {
+export function ToastProvider({ children }: { children: React.ReactNode }) {
+  // массив всех активных тостов — может быть несколько одновременно
   const [toasts, setToasts] = useState<ToastItem[]>([])
-  // храним таймеры в ref чтобы очищать при unmount без лишних ре-рендеров
+  // храним id таймеров в ref (не в state) — изменение ref не вызывает ре-рендер
+  // это важно: нам не нужно перерисовывать компонент при добавлении таймера
   const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
 
-  // добавляет тост и запускает таймер его удаления
-  // @param type — тип тоста влияет только на цвет
-  // @param message — текст который покажется пользователю
-  // id = Date.now() + случайное число чтобы избежать коллизий при быстрых вызовах
+  // добавляет тост и запускает два таймера: на анимацию и на удаление
+  // useCallback мемоизирует функцию — она не пересоздаётся при каждом рендере
+  // это нужно чтобы useMemo ниже не пересоздавал value при каждом рендере
   const push = useCallback((type: ToastType, message: string) => {
+    // Date.now() + random — защита от коллизий если два тоста появятся в одну миллисекунду
     const id = Date.now() + Math.floor(Math.random() * 1000)
+
+    // добавляем новый тост к существующим (spread чтобы не мутировать массив)
     setToasts(prev => [...prev, { id, type, message }])
 
-    // через 2.8с ставим dying=true → CSS-анимация исчезновения запускается
+    // через 2.8с — помечаем тост как dying
+    // map возвращает новый массив где только нужный тост изменён (immutable update)
     const dyingTimer = setTimeout(() => {
       setToasts(prev => prev.map(t => t.id === id ? { ...t, dying: true } : t))
     }, 2800)
 
-    // через 3.2с удаляем из DOM — даём анимации 400ms завершиться
+    // через 3.2с — удаляем тост из DOM
+    // filter возвращает новый массив без элемента с нашим id
     const removeTimer = setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
       timers.current.delete(id)
     }, 3200)
 
     timers.current.set(id, removeTimer)
-    // dyingTimer тоже нужно хранить для очистки — упрощённо возвращаем оба
-    // при unmount всё равно React чистит компонент
     void dyingTimer
   }, [])
 
-  // мемоизируем value чтобы не вызывать ре-рендер всех потребителей при каждом тосте
+  // useMemo — пересоздаёт объект только когда меняется push
+  // без него каждый рендер ToastProvider создавал бы новый объект value
+  // все компоненты которые читают контекст перерисовывались бы без причины
   const value = useMemo<ToastContextValue>(
     () => ({
       success: (message: string) => push("success", message),
-      error: (message: string) => push("error", message),
+      error:   (message: string) => push("error",   message),
     }),
     [push]
   )
@@ -78,28 +85,28 @@ export function ToastProvider({ children }: Props) {
     <ToastContext.Provider value={value}>
       {children}
 
-      {/* фиксированный контейнер тостов — правый верхний угол экрана */}
-      {/* w-[min(92vw,340px)] — не выходит за экран на мобиле */}
+      {/* fixed — контейнер всегда в правом верхнем углу независимо от скролла */}
+      {/* z-[120] — выше модалок (z-110) и сайдбара (z-30) */}
+      {/* w-[min(92vw,340px)] — на узких экранах не выходит за края */}
       <div className="fixed z-[120] top-4 right-4 space-y-2 w-[min(92vw,340px)]">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            // CSS-анимация через data-атрибут: появление / исчезновение
-            // стили объявлены в index.css как @keyframes toast-in / toast-out
             style={{
+              // dying=false → появление: opacity 0→1, сдвиг вправо→центр за 220мс
+              // dying=true  → исчезновение: opacity 1→0, сдвиг центр→вправо за 300мс
+              // keyframes объявлены в index.css как @keyframes toast-in / toast-out
               animation: toast.dying
                 ? "toast-out 0.3s ease forwards"
                 : "toast-in 0.22s ease both",
             }}
             className={`relative overflow-hidden rounded-2xl border px-4 py-3.5 shadow-[0_10px_24px_rgba(26,10,10,0.18)] text-sm font-semibold ${
               toast.type === "success"
-                // успех — основной градиент приложения (from-primary to-burgundy)
                 ? "bg-gradient-to-r from-[#CD3036] to-[#7A171C] border-red-700/40 text-white"
-                // ошибка — более тёмный оттенок того же градиента
                 : "bg-gradient-to-r from-[#8A1D24] to-[#4A1014] border-red-900/40 text-rose-50"
             }`}
           >
-            {/* декоративный блик — белая линия вверху карточки */}
+            {/* декоративный блик — тонкая белая линия по верхнему краю карточки */}
             <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/45" />
             {toast.message}
           </div>
@@ -109,12 +116,11 @@ export function ToastProvider({ children }: Props) {
   )
 }
 
-// хук для показа тостов — бросает ошибку если вызван вне ToastProvider
-// пример: const toast = useToast(); toast.success("Сохранено!")
+// хук — даёт любому компоненту доступ к toast.success() и toast.error()
+// бросает ошибку если вызван вне ToastProvider — защита от забытого провайдера
+// пример использования: const toast = useToast(); toast.error("Ошибка сети")
 export function useToast() {
   const ctx = useContext(ToastContext)
-  if (!ctx) {
-    throw new Error("useToast must be used inside ToastProvider")
-  }
+  if (!ctx) throw new Error("useToast must be used inside ToastProvider")
   return ctx
 }
