@@ -1380,49 +1380,54 @@ async def student_analytics(request: Request, user: CurrentUser):
     period = request.query_params.get("period", "week")
     uid = user["id"]
 
-    if period == "week":
-        points = 7
-        interval = "7 days"
-    else:
-        points = 4
-        interval = "28 days"
+    interval = "7 days" if period == "week" else "28 days"
 
-    # Build daily/weekly progress snapshots
-    submissions_rows = await db.fetch(
-        """SELECT DATE(created_at) AS day, AVG(score)::numeric(5,1) AS avg_score
-           FROM submissions WHERE user_id=$1 AND created_at >= NOW()-INTERVAL '30 days'
+    # Шаги выполненные по дням — из step_progress (реальная таблица прогресса)
+    daily_rows = await db.fetch(
+        """SELECT DATE(completed_at) AS day, COUNT(*)::int AS cnt
+           FROM step_progress
+           WHERE user_id=$1 AND status='completed' AND completed_at IS NOT NULL
+             AND completed_at >= NOW() - INTERVAL '30 days'
            GROUP BY day ORDER BY day ASC""",
         uid,
     )
-    score_map = {
-        str(r["day"])[:10]: float(r["avg_score"] or 0) for r in submissions_rows
-    }
+    day_map = {str(r["day"])[:10]: r["cnt"] for r in daily_rows}
 
     today = date.today()
-    values = []
+    values: list[int] = []
     if period == "week":
+        # 7 точек — шагов выполнено за каждый из последних 7 дней
         for i in range(7):
             d = (today - timedelta(days=6 - i)).isoformat()
-            values.append(min(100, int(score_map.get(d, 0))))
+            values.append(day_map.get(d, 0))
     else:
+        # 4 точки — шагов выполнено за каждую из последних 4 недель
         for w in range(4):
-            week_scores = []
-            for d_off in range(7):
-                d = (today - timedelta(days=(3 - w) * 7 + d_off)).isoformat()
-                if d in score_map:
-                    week_scores.append(score_map[d])
-            values.append(
-                min(100, int(sum(week_scores) / len(week_scores))) if week_scores else 0
+            total = sum(
+                day_map.get((today - timedelta(days=(3 - w) * 7 + d_off)).isoformat(), 0)
+                for d_off in range(7)
             )
+            values.append(total)
 
-    avg_score_val = await db.fetchval(
-        f"SELECT COALESCE(AVG(score),0)::numeric(5,1) FROM submissions WHERE user_id=$1 AND created_at >= NOW()-INTERVAL '{interval}'",
-        uid,
-    )
+    # Всего шагов выполнено за период
     solved_tasks = await db.fetchval(
-        f"SELECT COUNT(*)::int FROM submissions WHERE user_id=$1 AND status='passed' AND created_at >= NOW()-INTERVAL '{interval}'",
+        f"""SELECT COUNT(*)::int FROM step_progress
+            WHERE user_id=$1 AND status='completed'
+              AND completed_at >= NOW() - INTERVAL '{interval}'""",
         uid,
     )
+
+    # Всего шагов пройдено за всё время (для среднего прогресса)
+    total_completed = await db.fetchval(
+        "SELECT COUNT(*)::int FROM step_progress WHERE user_id=$1 AND status='completed'",
+        uid,
+    )
+    total_steps = await db.fetchval(
+        "SELECT COUNT(*)::int FROM course_steps",
+    )
+    avg_progress = round(total_completed / total_steps * 100) if total_steps else 0
+
+    # Пройденные курсы
     completed_courses = await db.fetchval(
         "SELECT COUNT(*)::int FROM enrollments WHERE user_id=$1 AND progress_percent >= 100",
         uid,
@@ -1431,7 +1436,7 @@ async def student_analytics(request: Request, user: CurrentUser):
     return {
         "values": values,
         "stats": {
-            "averageScore": f"{int(avg_score_val or 0)}%",
+            "averageScore": f"{avg_progress}%",
             "solvedTasks": solved_tasks or 0,
             "completedCourses": completed_courses or 0,
         },
