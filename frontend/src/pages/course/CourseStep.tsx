@@ -880,11 +880,9 @@ export default function CourseStep(props: Props) {
 
           {/* ── SUCCESS BANNER ── */}
           {activeProgress?.status === "completed" && !stepLoading && (
-            <div className="relative overflow-hidden rounded-2xl border-2 border-green-300 dark:border-green-700/60 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/40 dark:to-emerald-950/40 px-5 py-4 flex items-center gap-4">
-              {/* glow */}
-              <div className="absolute -right-8 -top-8 w-32 h-32 bg-green-400/20 rounded-full blur-2xl pointer-events-none" />
-              <div className="w-11 h-11 rounded-full bg-green-100 dark:bg-green-900/50 border-2 border-green-300 dark:border-green-700 flex items-center justify-center shrink-0">
-                <PartyPopper size={20} className="text-green-600 dark:text-green-400" />
+            <div className="rounded-xl border border-green-600/30 bg-green-500/10 px-5 py-4 flex items-center gap-4">
+              <div className="w-9 h-9 rounded-full bg-green-500/15 flex items-center justify-center shrink-0">
+                <PartyPopper size={18} className="text-green-500" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-green-800 dark:text-green-300 text-base leading-snug">
@@ -896,7 +894,7 @@ export default function CourseStep(props: Props) {
                 </p>
               </div>
               {activeStep.xp > 0 && (
-                <div className="shrink-0 flex items-center gap-1 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-full font-bold text-sm border border-amber-200 dark:border-amber-700/40">
+                <div className="shrink-0 flex items-center gap-1 text-amber-500 font-bold text-sm">
                   <Zap size={13} className="fill-current" />
                   +{activeStep.xp} XP
                 </div>
