@@ -28,30 +28,46 @@ export default function Dashboard() {
   const [weeklyGoal, setWeeklyGoal] = useState(10);
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
 
+  // useEffect с [] — запускается ОДИН РАЗ когда компонент появляется на экране
+  // [] означает "нет зависимостей" → эффект не повторяется при перерисовках
+  // без [] — запускался бы после каждого рендера → бесконечный цикл запросов
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
-      setError("");
+      setLoading(true);  // покажет скелетон пока данные летят
+      setError("");      // сбрасываем старую ошибку если была
       try {
+        // один запрос возвращает всё сразу: статистику, курсы, активность, план
+        // бэк специально собирает это в один endpoint чтобы не делать 4 отдельных запроса
         const data = await api.get<DashboardPayload>("/dashboard");
-        setPayload(data);
-        setWeeklyGoal(data.weeklyPlan.goalSteps);
+        setPayload(data);                         // кладём весь объект в стейт
+        setWeeklyGoal(data.weeklyPlan.goalSteps); // дублируем цель отдельно — она редактируемая
       } catch (err) {
+        // instanceof Error — проверяем тип чтобы безопасно взять .message
+        // если err не Error (например строка) — показываем дефолтный текст
         setError(err instanceof Error ? err.message : "Не удалось загрузить данные");
       } finally {
+        // finally выполнится и при успехе и при ошибке
+        // гарантирует что скелетон исчезнет в любом случае
         setLoading(false);
       }
     };
-    void load();
+    void load(); // void говорит TypeScript что мы намеренно не ждём Promise
   }, []);
 
-  // сохраняем новую цель на сервере — clamp чтобы не поставили 0 или 9999
-  // patch вызывается сразу при изменении инпута, ошибки игнорируем (catch пустой)
-  // маршрут /student/weekly-goal → бэк обновляет поле goal у студента
+  // обновляет недельную цель — это паттерн "optimistic update"
+  // optimistic update = UI обновляется СРАЗУ не дожидаясь ответа сервера
+  // пользователь видит изменение мгновенно, а запрос летит в фоне
+  // если сервер вернёт ошибку — мы её тихо игнорируем (.catch(() => {}))
+  // это нормально для некритичных данных — хуже было бы если бы интерфейс "подвисал"
+  //
+  // Math.max(3, Math.min(50, next)) — ограничиваем значение диапазоном 3..50
+  // Math.min(50, next) → не больше 50
+  // Math.max(3, ...) → не меньше 3
+  // это защита от того что пользователь введёт 0 или 9999
   const updateWeeklyGoal = (next: number) => {
     const safe = Math.max(3, Math.min(50, Math.round(next)));
-    setWeeklyGoal(safe);
-    api.patch<{ goal: number }>("/student/weekly-goal", { goal: safe }).catch(() => {});
+    setWeeklyGoal(safe);                                                      // сразу в UI
+    api.patch<{ goal: number }>("/student/weekly-goal", { goal: safe }).catch(() => {}); // потом на сервер
   };
 
   const completedSteps = payload?.weeklyPlan.completedSteps ?? 0;
@@ -59,7 +75,10 @@ export default function Dashboard() {
   // шаг с которого можно продолжить обучение
   const continueStep = payload?.continue;
 
-  // карточки статистики — каждая с иконкой и цветом
+  // statCards — массив объектов вместо четырёх отдельных JSX-блоков
+  // это паттерн "data-driven rendering": данные отдельно, шаблон отдельно
+  // одна карточка рендерится через .map() — если добавить 5-ю карточку,
+  // достаточно добавить объект в массив — JSX менять не нужно
   const statCards = [
     { label: "Активные курсы", value: String(payload?.stats.activeCourses ?? 0), icon: BookOpen, color: "text-primary", bg: "bg-primary-50 dark:bg-primary-900/20" },
     { label: "Серия дней", value: `${payload?.stats.streakDays ?? 0}`, icon: Flame, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/20" },
@@ -67,7 +86,11 @@ export default function Dashboard() {
     { label: "Задач за неделю", value: String(payload?.stats.tasksWeek ?? 0), icon: TrendingUp, color: "text-green-500", bg: "bg-green-50 dark:bg-green-900/20" },
   ];
 
-  // берём только имя чтобы обращаться "Привет, Иван" вместо "Привет, Иван Петров"
+  // берём только имя для обращения "Привет, Иван" вместо "Привет, Иван Петров"
+  // user?.name — optional chaining: если user=null → не падаем, возвращаем undefined
+  // ?.split(" ") — то же самое: если name=undefined → не падаем
+  // [0] — берём первое слово (имя), игнорируем фамилию и отчество
+  // || "студент" — если имя не задано вообще — дефолтное обращение
   const firstName = user?.name?.split(" ")[0] || "студент";
 
   return (
@@ -81,7 +104,11 @@ export default function Dashboard() {
           <p className="text-[var(--muted)]">Вот ваш прогресс на сегодня</p>
         </div>
 
-        {/* скелетон во время загрузки */}
+        {/* три состояния интерфейса — только одно видно в каждый момент времени:
+            loading=true  → скелетон (данные ещё летят с сервера)
+            error!=""     → карточка с ошибкой (запрос упал)
+            иначе         → реальные данные (всё ок)
+            && — короткое замыкание: если левая часть false — правая не рендерится */}
         {loading && (
           <div className="space-y-4">
             {[1,2,3].map(i => (
@@ -130,6 +157,10 @@ export default function Dashboard() {
                   <div className="h-2 rounded-full bg-white/20 overflow-hidden mb-5">
                     <div
                       className="h-full rounded-full bg-white transition-all duration-700"
+                      // width через inline style а не через Tailwind класс
+                      // потому что процент динамический (любое число 0-100)
+                      // Tailwind генерирует классы статически при сборке — w-[37%] не будет в бандле
+                      // inline style работает с любым значением в рантайме
                       style={{ width: `${weeklyPercent}%` }}
                     />
                   </div>
@@ -204,6 +235,10 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    {/* .map() превращает массив данных в массив JSX-элементов
+                        key={c.id} — обязательный уникальный ключ для каждого элемента
+                        React использует key чтобы понять какой элемент изменился/удалился
+                        без key — React перерисует весь список при любом изменении */}
                     {(payload?.courses ?? []).map((c) => (
                       <div key={c.id}
                         className="flex items-center gap-4 p-4 rounded-xl bg-[var(--surface)] hover:border-primary/20 border border-transparent cursor-pointer group transition-all"

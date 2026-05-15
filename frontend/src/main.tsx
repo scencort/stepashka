@@ -1,19 +1,21 @@
 // ─── ТОЧКА ВХОДА ПРИЛОЖЕНИЯ ───────────────────────────────────────────────────
-// здесь React монтируется в div#root из index.html
+// ReactDOM.createRoot берёт div#root из index.html и отдаёт его React
+// "!" (non-null assertion) говорит TypeScript: "доверяй мне, этот элемент точно есть"
+// если div#root вдруг не найдётся — упадёт в рантайме, но это баг в HTML а не в коде
 //
-// ПОРЯДОК ЗАПУСКА ПРИЛОЖЕНИЯ:
-//   1. ReactDOM.createRoot → монтирует React в div#root
-//   2. ThemeProvider → читает тему из localStorage, вешает класс "dark" на <html>
-//   3. AppStoreProvider → запускает useEffect:
-//        - GET /auth/me  → определяет кто залогинен → setUser()
-//        - GET /courses  → загружает каталог курсов  → setCourses()
-//   4. ToastProvider → создаёт контейнер для всплывающих уведомлений
-//   5. App → BrowserRouter → Router → рендерит нужную страницу по URL
+// ПОРЯДОК ЗАПУСКА после createRoot().render():
+//   1. ThemeProvider → читает localStorage → вешает класс "dark" на <html> если нужно
+//   2. AppStoreProvider → запускает useEffect → параллельно:
+//        GET /auth/me  → кто залогинен → setUser()      (loadingUser: true→false)
+//        GET /courses  → каталог курсов → setCourses()  (loadingCourses: true→false)
+//   3. ToastProvider → создаёт портал для тостов поверх всего DOM-дерева
+//   4. App → BrowserRouter → смотрит на текущий URL → рендерит нужный Route
 //
-// ПОРЯДОК ПРОВАЙДЕРОВ ВАЖЕН:
-//   ThemeProvider — самый внешний, тема нужна всем включая тосты
-//   AppStoreProvider — внутри темы, снаружи тостов (тосты могут звать store)
-//   ToastProvider — снаружи App, тосты всплывают поверх любой страницы
+// ПОЧЕМУ ПРОВАЙДЕРЫ В ТАКОМ ПОРЯДКЕ:
+//   ThemeProvider снаружи всех — тема нужна буквально каждому компоненту включая тосты
+//   AppStoreProvider внутри темы — стор может рендерить тематизированные скелетоны
+//   ToastProvider внутри стора — тосты могут вызывать store.logout() при ошибке 401
+//   App внутри всех — страницы используют и тему и стор и тосты
 import React from "react"
 import ReactDOM from "react-dom/client"
 import App from "./App"
@@ -23,13 +25,15 @@ import { AppStoreProvider } from "./store/AppStore"
 import { ToastProvider } from "./hooks/useToast"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  // StrictMode помогает ловить проблемы в разработке — двойной рендер и т.д.
+  // StrictMode — только в режиме разработки, на проде ведёт себя как обычный Fragment
+  // в dev-режиме специально рендерит каждый компонент ДВАЖДЫ чтобы поймать побочные эффекты
+  // помогает заметить баги в useEffect до того как они попадут к пользователям
   <React.StrictMode>
-    {/* тема самая внешняя — чтобы всё приложение знало текущую тему */}
+    {/* тема самая внешняя — вешает класс "dark" на <html>, все Tailwind dark: классы зависят от этого */}
     <ThemeProvider>
-      {/* стор с пользователем и логикой запросов */}
+      {/* стор загружает юзера и курсы при старте — все страницы ждут этих данных */}
       <AppStoreProvider>
-        {/* тосты рендерятся поверх всего — поэтому внутри стора, но снаружи App */}
+        {/* тосты рендерятся через React Portal — появляются поверх любого контента на странице */}
         <ToastProvider>
           <App />
         </ToastProvider>
