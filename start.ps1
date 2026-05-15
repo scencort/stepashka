@@ -96,7 +96,7 @@ Write-Host "  Сайт:   http://localhost:5173" -ForegroundColor Cyan
 Write-Host "  API:    http://localhost:4000"
 Write-Host "  Docs:   http://localhost:4000/api/docs"
 Write-Host ""
-Write-Host "Демо-аккаунты:" -ForegroundColor DarkGray
-Write-Host "  student@gradus.dev  / Student@12345" -ForegroundColor DarkGray
-Write-Host "  teacher@gradus.dev  / Teacher@12345" -ForegroundColor DarkGray
-Write-Host "  admin@gradus.dev    / Admin@12345" -ForegroundColor DarkGray
+Write-Host 'Демо-аккаунты:' -ForegroundColor DarkGray
+Write-Host '  student@gradus.dev  / Student@12345' -ForegroundColor DarkGray
+Write-Host '  teacher@gradus.dev  / Teacher@12345' -ForegroundColor DarkGray
+Write-Host '  admin@gradus.dev    / Admin@12345' -ForegroundColor DarkGray
