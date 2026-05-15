@@ -1,3 +1,27 @@
+// страница AI Code Review — редактор кода + AI-анализ качества, ошибок и улучшений
+// поддерживает 15 языков программирования (auto = GPT сам определяет язык)
+//
+// КАК РАБОТАЕТ РЕВЬЮ:
+//   пользователь вставляет код → выбирает язык → нажимает "Запустить ревью"
+//     → handleCheck() → setLoading(true), setResult(null) — сбрасываем старый результат
+//       → POST /ai/review/check { sourceCode: code, language }
+//         → бэк отправляет в GPT → возвращает { quality, correctness, style, summary, issues[], improvements[], goodParts[] }
+//           → setResult(data) → карточки с оценками появляются под редактором (левая колонка)
+//           → await loadHistory() — обновляем историю в правой колонке сразу после ревью
+//
+// КАК СЧИТАЕТСЯ ОЦЕНКА:
+//   avgScore = Math.round((quality + correctness + style) / 3) — среднее трёх метрик
+//   scoreColor: >=80 → зелёный (emerald), >=50 → жёлтый (amber), <50 → красный
+//   тот же расчёт повторяется внутри карточек истории (переменная avg)
+//
+// ИСТОРИЯ РЕВЬЮ (правая колонка):
+//   GET /ai/review/history при монтировании → массив прошлых ревью → список с аккордеоном
+//   expandedId: number | null — какая запись раскрыта; клик → isOpen ? null : item.id
+//   handleClearHistory() → DELETE /ai/review/history → setHistory([]) — очищает весь список
+//
+// МАКЕТ: grid xl:grid-cols-3
+//   левая колонка (xl:col-span-2): редактор + результаты + ошибка
+//   правая колонка: кнопка запуска + история прошлых ревью
 import MainLayout from "../layout/MainLayout";
 import { useEffect, useState } from "react";
 import Button from "../components/ui/Button";
