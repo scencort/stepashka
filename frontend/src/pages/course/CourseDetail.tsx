@@ -100,6 +100,7 @@ type AttemptEntry = {
   feedback: string;
   createdAt: string;
   checkResults?: Array<{ name: string; passed: boolean; expected?: string; actual?: string; error?: string }> | null;
+  aiComment?: string | null;
 };
 
 // все пропсы которые принимает компонент — Course.tsx передаёт всё это
@@ -450,6 +451,7 @@ export default function CourseDetail(props: Props) {
               attemptHistory={attemptHistory}
               selectedStepId={selectedStepId}
               submitLabel={submitLabel}
+              isEnrolled={!!enrollmentStatus?.enrolled}
               onSubmitStep={onSubmitStep}
               onSelectStep={onSelectStep}
             />

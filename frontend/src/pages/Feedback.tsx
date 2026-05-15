@@ -182,7 +182,7 @@ export default function Feedback() {
                 { v: "closed", l: `Закрытые (${counts.closed})` },
               ] as const).filter(f => {
                 if (f.v === "all") return true
-                const n = f.v === "in progress" ? counts.active : counts[f.v as keyof typeof counts]
+                const n = f.v === "in_progress" ? counts.active : counts[f.v as keyof typeof counts]
                 return (n as number) > 0
               }).map((f) => (
                 <button

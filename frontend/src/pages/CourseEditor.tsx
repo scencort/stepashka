@@ -345,7 +345,7 @@ const REGEX_EXAMPLES = [
   { label: "f-строка",          pat: 'f["\']',               hint: "Используется f-string" },
 ]
 
-function RegexField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function _RegexField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -479,7 +479,7 @@ function StepEditor({
           value={step.title}
           onChange={(e) => onChange({ ...step, title: e.target.value })}
           onClick={(e) => e.stopPropagation()}
-          className="flex-1 bg-transparent text-sm font-medium outline-none"
+          className="flex-1 bg-white dark:bg-zinc-700/60 border border-slate-200 dark:border-zinc-600 rounded-lg px-2 py-0.5 text-sm font-medium outline-none focus:border-rose-400 dark:focus:border-rose-500 transition-colors min-w-0"
           placeholder="Название шага"
         />
         <span className="text-xs text-slate-400 shrink-0">{step.xp} XP</span>
@@ -654,9 +654,12 @@ function StepEditor({
                       <label className="text-xs font-semibold text-[var(--text)]">
                         Проверки
                         <span className="ml-1.5 font-normal text-[var(--muted)]">
-                          {(step.content.tests || []).length === 0 ? "— нет (AI оценит свободно)" : `(${(step.content.tests || []).length})`}
+                          {(step.content.tests || []).length === 0 ? "— нет" : `(${(step.content.tests || []).length})`}
                         </span>
                       </label>
+                      <span className="flex items-center gap-1 text-[10px] font-medium text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-800/40">
+                        🤖 AI всегда проверяет код
+                      </span>
                     </div>
 
                     {(step.content.tests || []).map((test, idx) => {
@@ -683,8 +686,6 @@ function StepEditor({
                         if (test.type === "outputContainsLine") return "outContains"
                         if (test.type === "regex") return "regex"
                         if (test.type === "includesAll") {
-                          const tokens = (test.tokens || "").split(",").map((s: string) => s.trim()).filter(Boolean)
-                          // guess: single token, looks like a function call?
                           return "var" // default
                         }
                         return "var"
@@ -709,7 +710,6 @@ function StepEditor({
                                   outContains: { ...base, type: "outputContainsLine", pattern: "", input: "" } as unknown as TestCase,
                                   outLines:    { ...base, type: "outputLineCount", min: 1, input: "" } as unknown as TestCase,
                                   io:          { ...base, type: "io", input: "", expectedOutput: "" } as unknown as TestCase,
-                                  regex:       { ...base, type: "regex", pattern: "" } as unknown as TestCase,
                                 }
                                 updateContent({ tests: (step.content.tests || []).map((t, i) => i === idx ? next[k] : t) })
                               }}
@@ -720,7 +720,6 @@ function StepEditor({
                               <option value="outContains">💬 Вывод содержит</option>
                               <option value="outLines">📊 Строк в выводе</option>
                               <option value="io">▶️ Ввод → Вывод</option>
-                              <option value="regex">🔬 Regex (сложный)</option>
                             </select>
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${meta.color}`}>{meta.label}</span>
                             <button onClick={removeTest} className="ml-auto text-slate-400 hover:text-rose-500 shrink-0">
@@ -806,14 +805,6 @@ function StepEditor({
                               </div>
                             )}
 
-                            {/* Regex */}
-                            {uiKind === "regex" && test.type === "regex" && (
-                              <RegexField
-                                value={test.pattern}
-                                onChange={(v) => setTest({ pattern: v } as Partial<TestCase>)}
-                              />
-                            )}
-
                             <p className="text-[10px] text-[var(--muted)] italic">{meta.hint}</p>
                           </div>
                         </div>
@@ -828,7 +819,6 @@ function StepEditor({
                         ["outContains", "💬 Вывод содержит",    { _ui:"outContains", type:"outputContainsLine",description:"", pattern:"", input:"" }],
                         ["outLines",    "📊 Строк в выводе",    { _ui:"outLines",    type:"outputLineCount",  description:"", min:1, input:"" }],
                         ["io",          "▶️ Ввод → Вывод",      { _ui:"io",          type:"io",               description:"", input:"", expectedOutput:"" }],
-                        ["regex",       "🔬 Regex (сложный)",   { _ui:"regex",       type:"regex",            description:"", pattern:"" }],
                       ] as const).map(([, label, def]) => (
                         <button
                           key={label}
@@ -867,9 +857,9 @@ function StepEditor({
                       className="input-field text-sm w-full"
                     />
                   </div>
-                  <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-xs text-amber-700 dark:text-amber-300 space-y-1">
-                    <p className="font-semibold">Как оценивается эссе:</p>
-                    <p>🤖 AI выставляет оценки по 4 критериям: содержание, творчество, ясность изложения, глубина анализа</p>
+                  <div className="rounded-xl border border-violet-200 dark:border-violet-800/40 bg-violet-50 dark:bg-violet-900/20 px-4 py-3 text-xs text-violet-700 dark:text-violet-300 space-y-1">
+                    <p className="font-semibold flex items-center gap-1.5">🤖 AI всегда проверяет эссе</p>
+                    <p>Оценка ставится автоматически по 4 критериям: содержание, творчество, ясность изложения, глубина анализа</p>
                     <p>🔑 Ключевые слова проверяются отдельно — каждое пропущенное снижает итоговый балл</p>
                     <p>💡 Оставьте поле ключевых слов пустым, если хотите полностью свободное эссе</p>
                   </div>
@@ -1465,20 +1455,20 @@ export default function CourseEditor() {
                 return (
                 <div key={modIdx} className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
                   <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 dark:bg-zinc-800/80">
-                    <GripVertical size={16} className="text-slate-400" />
-                    <span className="text-xs bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded font-semibold">
+                    <GripVertical size={16} className="text-slate-400 shrink-0" />
+                    <span className="text-xs bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded font-semibold shrink-0">
                       Модуль {modIdx + 1}
                     </span>
                     <input
                       value={mod.title}
                       onChange={(e) => updateModule(modIdx, { ...mod, title: e.target.value })}
-                      className="flex-1 bg-transparent font-semibold text-sm outline-none"
+                      className="flex-1 bg-white dark:bg-zinc-700/60 border border-slate-200 dark:border-zinc-600 rounded-lg px-2.5 py-1 font-semibold text-sm outline-none focus:border-rose-400 dark:focus:border-rose-500 transition-colors min-w-0"
                       placeholder="Название модуля"
                     />
-                    <span className="text-xs text-slate-400">{allSteps.length} шагов</span>
+                    <span className="text-xs text-slate-400 shrink-0">{allSteps.length} шагов</span>
                     <button
                       onClick={() => deleteModule(modIdx)}
-                      className="text-slate-400 hover:text-rose-500 transition-colors"
+                      className="text-slate-400 hover:text-rose-500 transition-colors shrink-0"
                     >
                       <Trash2 size={14} />
                     </button>

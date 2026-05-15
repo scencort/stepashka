@@ -11,6 +11,8 @@ services:
       REDIS_URL: redis://redis:6379/0
     ports:
       - "4000:4000"
+    volumes:
+      - gradus_covers:/app/covers
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,3 +52,4 @@ services:
 volumes:
   gradus_pg_data:
   gradus_redis_data:
+  gradus_covers:

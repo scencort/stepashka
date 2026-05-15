@@ -1,41 +1,138 @@
-// страница AI-ассистента — чат с GPT и быстрая проверка кода
-// чат: streaming через ReadableStream (Server-Sent Events), бэк шлёт чанки текста
-//   по мере генерации GPT добавляем символы в последнее сообщение через setChatMessages
-//   если streaming не поддерживается → fallback на обычный POST /ai/chat с полным ответом
-// проверка кода: POST /ai/review/check → бэк прогоняет через GPT → возвращает Verdict
-//   (quality, correctness, style, issues, improvements, goodParts)
-// история: GET /ai/review/history → загружается при монтировании и после каждой проверки
-import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
+import React from "react";
 import MainLayout from "../layout/MainLayout";
 import Card from "../components/ui/Card";
-import Button from "../components/ui/Button";
-import { api, getAccessToken, API_BASE_URL } from "../lib/api";
-import { Send, History, Code2, Bot, User, ChevronDown, ChevronUp, AlertTriangle, Lightbulb, ThumbsUp, CheckCircle } from "lucide-react";
-
-type Verdict = {
-  id?: number;
-  quality: number;
-  correctness: number;
-  style: number;
-  summary: string;
-  issues?: string[];
-  improvements?: string[];
-  goodParts?: string[];
-  sourceCode?: string;
-  language?: string;
-};
+import { getAccessToken, API_BASE_URL } from "../lib/api";
+import { Send, Bot, User } from "lucide-react";
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
 
+// ── Markdown renderer ────────────────────────────────────────────────────────
+
+function AiCodeBlock({ code, lang }: { code: string; lang: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <div className="rounded-xl overflow-hidden border my-3" style={{ borderColor: "var(--border)" }}>
+      <div className="flex items-center justify-between px-3 py-1.5 text-[11px] font-semibold" style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", color: "var(--muted)" }}>
+        <span>{lang || "code"}</span>
+        <button onClick={copy} className="hover:opacity-70 transition-opacity">{copied ? "✓ скопировано" : "копировать"}</button>
+      </div>
+      <pre className="text-xs font-mono overflow-x-auto p-4 leading-relaxed whitespace-pre" style={{ background: "#1e1e2e", color: "#cdd6f4" }}>{code}</pre>
+    </div>
+  );
+}
+
+function renderInline(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  // split on **bold**, *italic*, `code`
+  const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let idx = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(<span key={idx++}>{text.slice(last, m.index)}</span>);
+    if (m[2] !== undefined) parts.push(<strong key={idx++} className="font-bold">{m[2]}</strong>);
+    else if (m[3] !== undefined) parts.push(<em key={idx++}>{m[3]}</em>);
+    else if (m[4] !== undefined) parts.push(<code key={idx++} className="px-1.5 py-0.5 rounded text-[11px] font-mono" style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>{m[4]}</code>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(<span key={idx++}>{text.slice(last)}</span>);
+  return parts;
+}
+
+function AiMarkdown({ text }: { text: string }) {
+  if (!text) return null;
+
+  // Split by fenced code blocks first
+  const segments: React.ReactNode[] = [];
+  const fenceRe = /```(\w*)\n?([\s\S]*?)```/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let si = 0;
+
+  while ((m = fenceRe.exec(text)) !== null) {
+    if (m.index > last) {
+      segments.push(<AiTextBlock key={si++} text={text.slice(last, m.index)} />);
+    }
+    segments.push(<AiCodeBlock key={si++} lang={m[1] || "code"} code={m[2].trimEnd()} />);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) {
+    segments.push(<AiTextBlock key={si++} text={text.slice(last)} />);
+  }
+
+  return <div className="space-y-0.5">{segments}</div>;
+}
+
+function AiTextBlock({ text }: { text: string }) {
+  const lines = text.split("\n");
+  const nodes: React.ReactNode[] = [];
+  let i = 0;
+  let li = 0;
+
+  while (i < lines.length) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+
+    // Skip blank lines (used as separators)
+    if (!trimmed) { i++; continue; }
+
+    // Heading: # ## ###
+    const hMatch = trimmed.match(/^(#{1,3})\s+(.+)/);
+    if (hMatch) {
+      const level = hMatch[1].length;
+      const cls = level === 1 ? "text-base font-bold mt-3 mb-1" : level === 2 ? "text-sm font-bold mt-2 mb-0.5" : "text-sm font-semibold mt-1.5";
+      nodes.push(<p key={li++} className={cls} style={{ color: "var(--text)" }}>{renderInline(hMatch[2])}</p>);
+      i++; continue;
+    }
+
+    // Horizontal rule
+    if (/^[-*]{3,}$/.test(trimmed)) {
+      nodes.push(<hr key={li++} className="my-2 border-[var(--border)]" />);
+      i++; continue;
+    }
+
+    // List block: collect consecutive list items
+    if (/^[-*+]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) {
+      const items: React.ReactNode[] = [];
+      while (i < lines.length) {
+        const l = lines[i].trim();
+        const listMatch = l.match(/^(?:[-*+]|\d+\.)\s+(.*)/);
+        if (!listMatch && l !== "") break;
+        if (listMatch) {
+          items.push(
+            <li key={items.length} className="flex gap-2 text-sm leading-relaxed" style={{ color: "var(--text)" }}>
+              <span className="shrink-0 mt-0.5 text-rose-400">•</span>
+              <span>{renderInline(listMatch[1])}</span>
+            </li>
+          );
+        }
+        i++;
+      }
+      if (items.length) nodes.push(<ul key={li++} className="space-y-1 my-1.5 pl-1">{items}</ul>);
+      continue;
+    }
+
+    // Regular paragraph
+    nodes.push(<p key={li++} className="text-sm leading-relaxed" style={{ color: "var(--text)" }}>{renderInline(trimmed)}</p>);
+    i++;
+  }
+
+  return <>{nodes}</>;
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
+
 export default function AiReview() {
-  const [code, setCode] = useState("");
-  const [isChecking, setIsChecking] = useState(false);
-  const [verdict, setVerdict] = useState<Verdict | null>(null);
-  const [history, setHistory] = useState<Array<Verdict & { id: number; createdAt: string }>>([]);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -45,60 +142,6 @@ export default function AiReview() {
         "Привет. Я AI-ассистент Gradus. Могу помочь с кодом, архитектурой, SQL, алгоритмами и roadmap по задачам.",
     },
   ]);
-  const [error, setError] = useState("");
-
-  // загружаем историю предыдущих проверок — показываем в сайдбаре
-  const loadHistory = async () => {
-    try {
-      const data = await api.get<Array<Verdict & { id: number; createdAt: string }>>("/ai/review/history");
-      setHistory(data);
-    } catch {
-      setHistory([]);
-    }
-  };
-
-  useEffect(() => {
-    loadHistory();
-  }, []);
-
-  // запускает проверку кода через ИИ
-  // @flow: POST /ai/review/check { sourceCode } → бэк → GPT → Verdict
-  // Verdict содержит оценки quality/correctness/style (0-100) и текстовый summary
-  // после получения результата сразу обновляем историю — loadHistory() подтягивает новую запись
-  const runCheck = async () => {
-    setIsChecking(true);
-    setVerdict(null);
-    setError("");
-
-    try {
-      const response = await api.post<Verdict>("/ai/review/check", {
-        sourceCode: code,
-      });
-      setVerdict(response);
-      // обновляем историю — новая проверка должна появиться в списке справа
-      await loadHistory();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Проверка не удалась");
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
-  // askAi — отправляет сообщение и получает ответ от GPT
-  // СТРИМИНГ (Server-Sent Events) — ответ приходит по кускам, как в ChatGPT:
-  //   fetch() открывает HTTP-соединение и держит его
-  //   response.body.getReader() — читаем тело ответа как поток байт
-  //   в цикле: reader.read() возвращает { done, value } где value это Uint8Array
-  //   TextDecoder.decode(value) — конвертирует байты в строку
-  //   каждая строка потока выглядит как: "data: {"content": "кусок текста"}"
-  //   парсим: split("\n") → фильтруем строки начинающиеся с "data: " → JSON.parse
-  //   каждый кусок дописываем к последнему сообщению через setChatMessages
-  //   пользователь видит как текст появляется символ за символом
-  //
-  // FALLBACK: если бэк не поддерживает стриминг — делаем обычный POST и ждём полный ответ
-  //
-  // context: передаём последние 8 сообщений чтобы AI помнил контекст разговора
-  // .slice(-8) — берём последние 8 (не все — чтобы не переполнить контекст GPT)
   const askAi = async () => {
     const message = chatInput.trim();
     if (!message) {
@@ -112,7 +155,6 @@ export default function AiReview() {
     setChatMessages(nextMessages);
     setChatInput("");
     setChatLoading(true);
-    setError("");
 
     try {
       const accessToken = getAccessToken();
@@ -136,48 +178,33 @@ export default function AiReview() {
 
       if (streamResponse && streamResponse.ok && streamResponse.body) {
         const reader = streamResponse.body.getReader();
-        const decoder = new TextDecoder(); // конвертирует Uint8Array → строку
-        let buffer = "";   // накапливаем неполные строки между чанками
-        let streamed = ""; // весь накопленный текст ответа
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let streamed = "";
 
-        // добавляем пустое сообщение ассистента сразу — пользователь видит что ответ начался
-        // потом будем менять его content по мере поступления чанков
         setChatMessages((prev) => [
           ...prev,
           { role: "assistant", content: "" },
         ]);
 
-        // читаем поток пока бэк не закроет соединение (done=true)
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break; // соединение закрыто — выходим из цикла
-
-          // value это Uint8Array — массив байт, декодируем в строку
-          // { stream: true } — говорит декодеру что данные придут ещё, не сбрасывать буфер
+          if (done) break;
           buffer += decoder.decode(value, { stream: true });
-
-          // SSE формат: каждое событие — строка "data: {...}\n\n"
-          // разбиваем по \n, последнюю неполную строку оставляем в buffer для следующего чанка
           const lines = buffer.split("\n");
-          buffer = lines.pop() ?? ""; // последняя строка может быть обрезана — ждём следующего чанка
-
+          buffer = lines.pop() ?? "";
           for (const line of lines) {
             if (line.startsWith("data: ")) {
-              const raw = line.slice(6); // убираем префикс "data: "
-              if (raw === "[DONE]") continue; // маркер конца — бэк говорит что всё отправил
+              const raw = line.slice(6);
+              if (raw === "[DONE]") continue;
               try {
-                // каждый чанк это JSON: { content: "кусок текста" }
                 const parsed = JSON.parse(raw) as { content?: string };
                 streamed += parsed.content ?? "";
               } catch {
-                streamed += raw; // если не JSON — добавляем как есть (защита от неожиданного формата)
+                streamed += raw;
               }
             }
           }
-
-          // обновляем последнее сообщение в массиве (то самое пустое которое добавили выше)
-          // prev[prev.length - 1] — последний элемент массива
-          // создаём новый массив (spread) чтобы React заметил изменение и перерисовал
           setChatMessages((prev) => {
             const next = [...prev];
             next[next.length - 1] = { role: "assistant", content: streamed };
@@ -185,15 +212,20 @@ export default function AiReview() {
           });
         }
       } else {
-        const response = await api.post<{ reply: string; model: string }>(
-          "/ai/chat",
-          {
+        const fallbackRes = await fetch(`${API_BASE_URL}/ai/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          body: JSON.stringify({
             message,
             context: nextMessages
               .slice(-8)
               .map((item) => ({ role: item.role, content: item.content })),
-          },
-        );
+          }),
+        });
+        const response = await fallbackRes.json() as { reply: string; model: string };
 
         setChatMessages((prev) => [
           ...prev,
@@ -206,7 +238,6 @@ export default function AiReview() {
     } catch (err) {
       const messageText =
         err instanceof Error ? err.message : "Не удалось получить ответ AI";
-      setError(messageText);
       setChatMessages((prev) => [
         ...prev,
         { role: "assistant", content: `Ошибка: ${messageText}` },
@@ -236,9 +267,9 @@ export default function AiReview() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 gap-6 lg:gap-8">
           {/* Main Chat Area */}
-          <Card className="xl:col-span-2 flex flex-col h-[60vh] md:h-[700px] !p-0 overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+          <Card className="flex flex-col h-[60vh] md:h-[700px] !p-0 overflow-hidden" style={{ border: "1px solid var(--border)" }}>
             {/* Chat Header */}
             <div className="px-6 py-4 flex items-center justify-between z-10" style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}>
               <div className="flex items-center gap-3">
@@ -290,39 +321,15 @@ export default function AiReview() {
                       className={`p-4 rounded-2xl ${isAi ? "rounded-tl-none border" : "bg-gradient-to-br from-rose-600 to-red-700 text-white rounded-tr-none"}`}
                       style={isAi ? { background: "var(--surface)", borderColor: "var(--border)" } : undefined}
                     >
-                      <p
-                        className={`text-sm whitespace-pre-wrap leading-relaxed ${isAi ? "" : "text-white/95"}`}
-                        style={isAi ? { color: "var(--text)" } : undefined}
-                      >
-                        {item.content}
-                      </p>
+                      {isAi ? (
+                        <AiMarkdown text={item.content} />
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed text-white/95">{item.content}</p>
+                      )}
                     </div>
                   </div>
                 );
               })}
-              {chatLoading && (
-                <div className="flex gap-4 max-w-[85%]">
-                  <div className="shrink-0 mt-1">
-                    <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center border border-rose-200 dark:border-rose-500/30">
-                      <Bot
-                        size={16}
-                        className="text-rose-600 dark:text-rose-400"
-                      />
-                    </div>
-                  </div>
-                  <div className="p-4 rounded-2xl rounded-tl-none border flex items-center gap-1.5 h-12" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
-                    <span className="w-2 h-2 bg-rose-400 rounded-full animate-bounce"></span>
-                    <span
-                      className="w-2 h-2 bg-rose-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    ></span>
-                    <span
-                      className="w-2 h-2 bg-rose-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.4s" }}
-                    ></span>
-                  </div>
-                </div>
-              )}
               <div ref={chatEndRef} />
             </div>
 
@@ -355,140 +362,6 @@ export default function AiReview() {
               </p>
             </div>
           </Card>
-
-          {/* Sidebar */}
-          <div className="space-y-6 lg:space-y-8">
-            <Card className="space-y-4 !rounded-[2rem]" style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-rose-500" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-                  <Code2 size={20} />
-                </div>
-                <h3 className="font-bold text-lg">Быстрая проверка кода</h3>
-              </div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 font-medium leading-relaxed mb-4">
-                Нужно оценить решение или найти баг? Откройте вкладку "AI Code
-                Review" для детального анализа файла.
-              </p>
-              <div className="space-y-3">
-                <textarea
-                  value={code}
-                  onChange={(event) => setCode(event.target.value)}
-                  placeholder="Вставьте код (опционально)..."
-                  className="input-field min-h-[120px] text-sm py-3 font-mono"
-                />
-                <Button
-                  onClick={runCheck}
-                  disabled={isChecking || !code.trim()}
-                  className="w-full !rounded-2xl"
-                >
-                  {isChecking ? "Проверяю..." : "Проверить код"}
-                </Button>
-              </div>
-
-              {verdict && !isChecking && (
-                <div className="pt-2 border-t mt-4" style={{ borderColor: "var(--border)" }}>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-semibold">Оценка:</span>
-                    <span
-                      className={`text-lg font-black ${verdict.quality >= 80 ? "text-emerald-500" : verdict.quality >= 50 ? "text-amber-500" : "text-rose-500"}`}
-                    >
-                      {verdict.quality}%
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-                    {verdict.summary}
-                  </p>
-                </div>
-              )}
-              {error && !isChecking && (
-                <div className="pt-2">
-                  <p className="text-xs text-rose-500 font-medium">{error}</p>
-                </div>
-              )}
-            </Card>
-
-            <Card className="space-y-4 !rounded-[2rem]" style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-rose-500" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-                  <History size={20} />
-                </div>
-                <h3 className="font-bold text-lg">История проверок</h3>
-              </div>
-
-              {history.length === 0 ? (
-                <p className="text-sm font-medium text-center py-4" style={{ color: "var(--muted)" }}>
-                  Нет недавних проверок
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-[500px] overflow-auto pr-1">
-                  {history.map((item) => {
-                    const avg = Math.round((item.quality + item.correctness + item.style) / 3);
-                    const scoreColor = avg >= 80 ? "text-emerald-500" : avg >= 50 ? "text-amber-500" : "text-rose-500";
-                    const isOpen = expandedId === item.id;
-                    return (
-                    <div key={item.id} className="rounded-2xl border overflow-hidden" style={{ borderColor: "var(--border)" }}>
-                      <button
-                        onClick={() => setExpandedId(isOpen ? null : item.id)}
-                        className="w-full text-left p-3 flex items-center justify-between gap-2 transition-colors"
-                        style={{ background: "var(--bg)" }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <p className={`text-lg font-black ${scoreColor}`}>{avg}%</p>
-                          <div className="flex gap-1.5 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>
-                            <span>Q:{item.quality}</span>
-                            <span>C:{item.correctness}</span>
-                            <span>S:{item.style}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ color: "var(--muted)", background: "var(--surface)" }}>
-                            {new Date(item.createdAt).toLocaleDateString("ru-RU")}
-                          </span>
-                          {isOpen ? <ChevronUp size={13} style={{ color: "var(--muted)" }} /> : <ChevronDown size={13} style={{ color: "var(--muted)" }} />}
-                        </div>
-                      </button>
-
-                      {isOpen && (
-                        <div className="px-3 pb-3 pt-2 space-y-3 border-t" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
-                          {item.sourceCode && (
-                            <div>
-                              <p className="text-[10px] font-bold uppercase tracking-wide mb-1 flex items-center gap-1" style={{ color: "var(--muted)" }}><Code2 size={10} /> Код</p>
-                              <pre className="text-xs font-mono rounded-xl p-2.5 overflow-auto max-h-36 whitespace-pre-wrap break-words border" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }}>
-                                {item.sourceCode}
-                              </pre>
-                            </div>
-                          )}
-                          <div className="text-xs rounded-xl p-2.5 border border-blue-200/30 bg-blue-500/5">
-                            <p className="font-bold text-blue-400 mb-1 flex items-center gap-1"><CheckCircle size={10} /> Резюме</p>
-                            <p style={{ color: "var(--text)" }}>{item.summary}</p>
-                          </div>
-                          {item.issues && item.issues.length > 0 && (
-                            <div className="text-xs rounded-xl p-2.5 border border-rose-200/30 bg-rose-500/5 space-y-1">
-                              <p className="font-bold text-rose-400 flex items-center gap-1"><AlertTriangle size={10} /> Проблемы</p>
-                              {item.issues.map((s, i) => <p key={i} className="flex gap-1.5" style={{ color: "var(--text)" }}><span className="text-rose-400 shrink-0">•</span>{s}</p>)}
-                            </div>
-                          )}
-                          {item.improvements && item.improvements.length > 0 && (
-                            <div className="text-xs rounded-xl p-2.5 border border-amber-200/30 bg-amber-500/5 space-y-1">
-                              <p className="font-bold text-amber-400 flex items-center gap-1"><Lightbulb size={10} /> Улучшения</p>
-                              {item.improvements.map((s, i) => <p key={i} className="flex gap-1.5" style={{ color: "var(--text)" }}><span className="text-amber-400 shrink-0">•</span>{s}</p>)}
-                            </div>
-                          )}
-                          {item.goodParts && item.goodParts.length > 0 && (
-                            <div className="text-xs rounded-xl p-2.5 border border-emerald-200/30 bg-emerald-500/5 space-y-1">
-                              <p className="font-bold text-emerald-400 flex items-center gap-1"><ThumbsUp size={10} /> Что хорошо</p>
-                              {item.goodParts.map((s, i) => <p key={i} className="flex gap-1.5" style={{ color: "var(--text)" }}><span className="text-emerald-400 shrink-0">•</span>{s}</p>)}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Card>
-          </div>
         </div>
       </div>
     </MainLayout>

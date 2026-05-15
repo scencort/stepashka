@@ -175,7 +175,7 @@ async def courses_alias():
            LEFT JOIN course_modules cm ON cm.course_id = c.id
            LEFT JOIN lessons l ON l.module_id = cm.id
            LEFT JOIN submissions sub ON sub.lesson_id = l.id AND sub.score IS NOT NULL
-           WHERE c.status IN ('published', 'pending_review')
+           WHERE c.status = 'published'
            GROUP BY c.id, u.full_name
            ORDER BY c.created_at DESC"""
     )

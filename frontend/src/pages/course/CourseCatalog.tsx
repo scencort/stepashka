@@ -1,5 +1,3 @@
-// каталог курсов — основная страница со списком всех курсов
-// принимает данные сверху (из Course.tsx) и просто отображает карточки
 import React, { useMemo } from "react";
 import {
   Users,
@@ -27,13 +25,12 @@ import {
   Trophy,
 } from "lucide-react";
 
-// тип одного курса — всё что нужно для карточки
 type CourseItem = {
   id: number;
   title: string;
   lessons: number;
   progress: number;
-  enrolled?: boolean; // записан ли студент на курс
+  enrolled?: boolean;
   type: string;
   students: string;
   rating: string;
@@ -48,12 +45,11 @@ type CourseItem = {
   category?: string;
 };
 
-// маппинг категорий к иконкам и цветам — поддерживает и старые и новые ключи из бд
 const CATEGORY_META: Record<
   string,
   { label: string; icon: React.ReactNode; color: string }
 > = {
-  // новые ключи маленькими буквами — так пишет CourseEditor
+  // lowercase keys — matches CourseEditor values
   programming: {
     label: "Программирование",
     icon: <Code2 size={14} />,
@@ -89,7 +85,7 @@ const CATEGORY_META: Record<
     icon: <Sparkles size={14} />,
     color: "text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50",
   },
-  // старые ключи с большой буквы — для данных которые уже есть в бд
+  // legacy uppercase keys — for old data in DB
   Programming: {
     label: "Программирование",
     icon: <Code2 size={14} />,
@@ -147,7 +143,6 @@ const CATEGORY_META: Record<
   },
 };
 
-// фолбек если категория вообще не найдена в словаре
 const DEFAULT_CAT = {
   label: "Другое",
   icon: <GraduationCap size={14} />,
@@ -155,21 +150,18 @@ const DEFAULT_CAT = {
 };
 const getCatMeta = (cat: string) => CATEGORY_META[cat] ?? DEFAULT_CAT;
 
-// метаданные уровней — иконка и цвет для бейджа на карточке
 const _BEGINNER  = { label: "Начинающий",  icon: <Sprout size={11} />, color: "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50" }
 const _INTERMEDIATE = { label: "Средний",   icon: <Flame  size={11} />, color: "text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50" }
 const _ADVANCED  = { label: "Продвинутый", icon: <Trophy size={11} />, color: "text-rose-700 bg-rose-50 dark:text-rose-300 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" }
 
-// нормализуем разные написания уровня — в бд могут быть и английские и русские
 const getLevelMeta = (level: string) => {
   const l = (level || "").toLowerCase().trim()
   if (["beginner", "начинающий", "начальный", "junior"].includes(l)) return _BEGINNER
   if (["intermediate", "средний", "средний уровень", "middle"].includes(l)) return _INTERMEDIATE
   if (["advanced", "продвинутый", "senior", "expert"].includes(l)) return _ADVANCED
-  return null // уровень неизвестен — просто не показываем бейдж
+  return null
 }
 
-// пропсы — всё состояние и колбэки приходят сверху из Course.tsx
 type Props = {
   courses: CourseItem[];
   loading: boolean;
@@ -181,17 +173,16 @@ type Props = {
   setSelectedCategory: (v: string | null) => void;
   selectedLevel: string | null;
   setSelectedLevel: (v: string | null) => void;
-  viewTab: "all" | "my"; // все курсы или только мои
+  viewTab: "all" | "my";
   setViewTab: (v: "all" | "my") => void;
-  canCreateCourse: boolean; // true если препод или админ
+  canCreateCourse: boolean;
   onNavigateToCourse: (id: number) => void;
-  onNavigateToCreate: () => void; // переход на страницу создания
+  onNavigateToCreate: () => void;
   onEnroll: (id: number) => void;
-  enrollingIds: Set<number>; // какие курсы сейчас в процессе записи
+  enrollingIds: Set<number>;
   courseCoverUrl: (course: { id: number; title: string; coverUrl?: string }) => string;
 };
 
-// названия уровней для фильтров — должны совпадать с тем что хранится в бд
 const LEVELS = ["Начальный", "Средний", "Продвинутый"];
 
 export default function CourseCatalog(props: Props) {
@@ -216,26 +207,26 @@ export default function CourseCatalog(props: Props) {
     courseCoverUrl,
   } = props;
 
-  // уникальные категории из текущего списка курсов — динамически строим фильтры
   const allCategories = useMemo(() => {
-    const set = new Set(courses.map((c) => c.category || "").filter(Boolean));
-    return Array.from(set).sort();
+    const seen = new Set<string>();
+    for (const c of courses) {
+      const raw = (c.category || "").trim();
+      if (raw) seen.add(raw.toLowerCase());
+    }
+    return Array.from(seen).sort();
   }, [courses]);
 
-  // курсы на которые записан текущий пользователь
   const myCourses = useMemo(
     () => courses.filter((c) => c.enrolled),
     [courses],
   );
 
-  // в зависимости от вкладки показываем либо все курсы либо только свои
   const displayCourses = viewTab === "my" ? myCourses : courses;
 
-  // применяем все фильтры последовательно — категория, уровень, тип, поисковая строка
   const catalogFiltered = useMemo(() => {
     let result = displayCourses;
     if (selectedCategory)
-      result = result.filter((c) => c.category === selectedCategory);
+      result = result.filter((c) => (c.category || "").toLowerCase() === selectedCategory);
     if (selectedLevel) result = result.filter((c) => c.level === selectedLevel);
     if (active !== "Все") result = result.filter((c) => c.type === active);
     if (search.trim()) {
@@ -250,13 +241,11 @@ export default function CourseCatalog(props: Props) {
     return result;
   }, [displayCourses, selectedCategory, selectedLevel, active, search]);
 
-  // сбросить все фильтры разом
   const clearFilters = () => {
     setSelectedCategory(null);
     setSelectedLevel(null);
     setSearch("");
   };
-  // считаем сколько фильтров активно — чтобы показать кнопку сброса
   const activeFiltersCount = [
     selectedCategory,
     selectedLevel,
@@ -265,7 +254,7 @@ export default function CourseCatalog(props: Props) {
 
   return (
     <div className="space-y-6 max-w-7xl">
-      {/* заголовок страницы с общим количеством курсов */}
+      {/* Header */}
       <div>
         <h1 className="font-display font-bold text-3xl text-[var(--text)] mb-1">
           Каталог курсов
@@ -276,7 +265,7 @@ export default function CourseCatalog(props: Props) {
         </p>
       </div>
 
-      {/* строка поиска + кнопки фильтров по уровню + сброс + кнопка создания */}
+      {/* Search + filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-lg">
           <Search
@@ -306,7 +295,6 @@ export default function CourseCatalog(props: Props) {
               {lvl}
             </button>
           ))}
-          {/* кнопка сброса фильтров — появляется только если что-то выбрано */}
           {activeFiltersCount > 0 && (
             <button
               onClick={clearFilters}
@@ -316,7 +304,6 @@ export default function CourseCatalog(props: Props) {
             </button>
           )}
         </div>
-        {/* кнопка создания — только преподы и админы видят */}
         {canCreateCourse && (
           <button
             onClick={onNavigateToCreate}
@@ -327,7 +314,7 @@ export default function CourseCatalog(props: Props) {
         )}
       </div>
 
-      {/* вкладки "Все курсы" / "Мои курсы" */}
+      {/* Tab: Все курсы / Мои курсы */}
       <div className="flex gap-2 mb-4">
         {(["all", "my"] as const).map((tab) => (
           <button
@@ -346,7 +333,7 @@ export default function CourseCatalog(props: Props) {
         ))}
       </div>
 
-      {/* фильтры по категории — динамически из существующих курсов */}
+      {/* Category chips */}
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => setSelectedCategory(null)}
@@ -373,21 +360,20 @@ export default function CourseCatalog(props: Props) {
             >
               {meta.icon}
               {meta.label}
-              {/* показываем количество курсов в категории */}
               <span className="text-[10px] opacity-60">
-                {courses.filter((c) => c.category === cat).length}
+                {courses.filter((c) => (c.category || "").toLowerCase() === cat).length}
               </span>
             </button>
           );
         })}
       </div>
 
-      {/* счётчик результатов */}
+      {/* Results count */}
       <p className="text-xs text-[var(--muted)]">
         {catalogFiltered.length} из {courses.length} курсов
       </p>
 
-      {/* скелетон пока грузятся данные */}
+      {/* Grid */}
       {loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -416,31 +402,26 @@ export default function CourseCatalog(props: Props) {
                 className="card p-0 overflow-hidden cursor-pointer group flex flex-col"
                 onClick={() => onNavigateToCourse(course.id)}
               >
-                {/* обложка курса — с ленивой загрузкой и фолбеком на picsum */}
-                <div className="h-48 overflow-hidden relative shrink-0 bg-gradient-to-br from-primary to-burgundy">
-                  <img
-                    src={courseCoverUrl(course)}
-                    alt={course.title}
-                    loading="lazy"
-                    onError={(event) => {
-                      // если обложка не загрузилась — подставляем случайную картинку с picsum
-                      // dataset.fallback чтобы не попасть в бесконечный цикл onError
-                      const target =
-                        event.currentTarget as HTMLImageElement & {
-                          dataset: DOMStringMap;
-                        };
-                      if (target.dataset.fallback === "1") return;
-                      target.dataset.fallback = "1";
-                      const seed = `c${course.id}`;
-                      target.src = `https://picsum.photos/seed/${encodeURIComponent(seed)}/960/540`;
-                    }}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+                {/* Cover */}
+                <div className="h-48 overflow-hidden relative shrink-0 bg-gradient-to-br from-primary/80 to-primary-700">
+                  {courseCoverUrl(course) ? (
+                    <img
+                      src={courseCoverUrl(course)}
+                      alt={course.title}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-white/30 text-5xl font-black select-none">
+                        {(course.title || "?").charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {/* основной контент карточки */}
+                {/* Content */}
                 <div className="p-4 flex-1 flex flex-col">
-                  {/* бейджи категории и уровня */}
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <div
                       className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md ${catMeta.color}`}
@@ -464,7 +445,7 @@ export default function CourseCatalog(props: Props) {
                   </p>
 
                   <div className="mt-auto pt-3 space-y-2">
-                    {/* мета-информация: рейтинг, количество студентов, длительность */}
+                    {/* Meta */}
                     <div className="flex items-center gap-3 text-xs text-[var(--muted)]">
                       {course.rating && course.rating !== "—" && course.rating !== "0" ? (
                         <span className="flex items-center gap-1 text-amber-500 font-semibold">
@@ -488,7 +469,7 @@ export default function CourseCatalog(props: Props) {
                       )}
                     </div>
 
-                    {/* прогресс прохождения — показываем только если есть */}
+                    {/* Progress */}
                     {course.progress > 0 && (
                       <div>
                         <div className="h-1.5 rounded-full bg-[var(--border)] overflow-hidden">
@@ -509,11 +490,9 @@ export default function CourseCatalog(props: Props) {
                       >
                         {course.price}
                       </span>
-                      {/* кнопка "Записаться" — скрываем если пользователь уже записан */}
                       {!course.enrolled && (
                         <button
                           onClick={(e) => {
-                            // stopPropagation чтобы не открывался курс при клике на кнопку
                             e.stopPropagation();
                             onEnroll(course.id);
                           }}
@@ -530,7 +509,6 @@ export default function CourseCatalog(props: Props) {
             );
           })}
 
-          {/* заглушка если на "Мои курсы" нет ни одного курса */}
           {viewTab === "my" && myCourses.length === 0 && (
             <div className="col-span-full card p-10 flex flex-col items-center justify-center text-center">
               <BookOpen size={32} className="text-[var(--border)] mb-3" />
@@ -549,7 +527,6 @@ export default function CourseCatalog(props: Props) {
             </div>
           )}
 
-          {/* заглушка если фильтры ничего не нашли */}
           {viewTab !== "my" && catalogFiltered.length === 0 && (
             <div className="col-span-full card p-10 flex flex-col items-center justify-center text-center">
               <Search size={32} className="text-[var(--border)] mb-3" />

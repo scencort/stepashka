@@ -214,24 +214,12 @@ async def _gemini_stream(prompt: str, system: str = ""):
                         yield text
 
 
-async def _aitunnel_stream(prompt: str, system: str = ""):
-    """Fallback: stream via aitunnel (OpenAI-compatible)."""
-    async for chunk in _openai_compatible_stream(
-        base_url=settings.openai_base_url,
-        api_key=settings.openai_api_key,
-        model=settings.openai_model,
-        provider_name="aitunnel",
-        prompt=prompt,
-        system=system,
-    ):
-        yield chunk
-
-
 async def _ai_stream(prompt: str, system: str = ""):
-    """Route to the configured AI provider's streaming endpoint.
-    Falls back to aitunnel if Groq returns 429."""
+    """Route to the configured AI provider's streaming endpoint with fallback to AI tunnel."""
     provider = (settings.ai_provider or "").strip().lower()
+
     if provider == "groq":
+        # Try Groq first, fallback to AI tunnel on rate limit
         try:
             async for chunk in _openai_compatible_stream(
                 base_url="https://api.groq.com/openai/v1",
@@ -242,24 +230,69 @@ async def _ai_stream(prompt: str, system: str = ""):
                 system=system,
             ):
                 yield chunk
+            return
         except RateLimitError:
-            import logging
-            logging.getLogger(__name__).warning("Groq rate limit — switching to aitunnel")
-            async for chunk in _aitunnel_stream(prompt, system):
+            pass
+        # Fallback: AI tunnel
+        if settings.openai_api_key and settings.openai_base_url:
+            async for chunk in _openai_compatible_stream(
+                base_url=settings.openai_base_url,
+                api_key=settings.openai_api_key,
+                model=settings.openai_model,
+                provider_name="AI-tunnel",
+                prompt=prompt,
+                system=system,
+            ):
                 yield chunk
-    elif provider == "openai":
-        async for chunk in _openai_compatible_stream(
-            base_url=settings.openai_base_url,
-            api_key=settings.openai_api_key,
-            model=settings.openai_model,
-            provider_name="aitunnel",
-            prompt=prompt,
-            system=system,
-        ):
-            yield chunk
-    else:
+            return
+        # Fallback: Gemini
+        if settings.gemini_api_key:
+            async for chunk in _gemini_stream(prompt, system):
+                yield chunk
+        return
+
+    if provider == "openai":
+        # Try AI tunnel first, fallback to Groq
+        try:
+            async for chunk in _openai_compatible_stream(
+                base_url=settings.openai_base_url,
+                api_key=settings.openai_api_key,
+                model=settings.openai_model,
+                provider_name="AI-tunnel",
+                prompt=prompt,
+                system=system,
+            ):
+                yield chunk
+            return
+        except RateLimitError:
+            pass
+        if settings.groq_api_key:
+            async for chunk in _openai_compatible_stream(
+                base_url="https://api.groq.com/openai/v1",
+                api_key=settings.groq_api_key,
+                model=settings.groq_model,
+                provider_name="Groq",
+                prompt=prompt,
+                system=system,
+            ):
+                yield chunk
+        return
+
+    # Default: Gemini with tunnel fallback
+    try:
         async for chunk in _gemini_stream(prompt, system):
             yield chunk
+    except Exception:
+        if settings.openai_api_key:
+            async for chunk in _openai_compatible_stream(
+                base_url=settings.openai_base_url,
+                api_key=settings.openai_api_key,
+                model=settings.openai_model,
+                provider_name="AI-tunnel",
+                prompt=prompt,
+                system=system,
+            ):
+                yield chunk
 
 
 async def _openai_compatible_generate(
@@ -376,25 +409,52 @@ async def _gemini_generate(prompt: str, system: str = "") -> str:
 
 
 async def _ai_generate(prompt: str, system: str = "") -> str:
-    """Route to the configured AI provider.
-    Falls back to aitunnel if Groq returns 429."""
+    """Route to the configured AI provider with automatic fallback to AI tunnel."""
     provider = (settings.ai_provider or "").strip().lower()
+
     if provider == "groq":
+        # 1. Try primary Groq model
         try:
             return await _groq_generate(prompt, system)
         except RateLimitError:
-            import logging
-            logging.getLogger(__name__).warning("Groq rate limit — switching to aitunnel")
-            return await _openai_generate(prompt, system)
+            pass
+        # 2. Fallback: AI tunnel (OpenAI-compatible)
+        if settings.openai_api_key and settings.openai_base_url:
+            try:
+                return await _openai_generate(prompt, system)
+            except (RateLimitError, Exception):
+                pass
+        # 3. Fallback: Gemini
+        if settings.gemini_api_key:
+            return await _gemini_generate(prompt, system)
+        raise RuntimeError("AI-сервис временно недоступен (лимит исчерпан). Попробуйте позже.")
+
     if provider == "openai":
-        return await _openai_generate(prompt, system)
-    return await _gemini_generate(prompt, system)
+        # 1. AI tunnel
+        try:
+            return await _openai_generate(prompt, system)
+        except RateLimitError:
+            pass
+        # 2. Fallback: Groq
+        if settings.groq_api_key:
+            return await _groq_generate(prompt, system)
+        raise RuntimeError("AI-сервис временно недоступен. Попробуйте позже.")
+
+    # Default: Gemini with tunnel fallback
+    try:
+        return await _gemini_generate(prompt, system)
+    except Exception:
+        if settings.openai_api_key:
+            return await _openai_generate(prompt, system)
+        if settings.groq_api_key:
+            return await _groq_generate(prompt, system)
+        raise
 
 
 def _current_model() -> str:
     provider = (settings.ai_provider or "").strip().lower()
     if provider == "groq":
-        return f"{settings.groq_model} (fallback: {settings.openai_model})"
+        return settings.groq_model
     if provider == "openai":
         return settings.openai_model
     return settings.gemini_model
@@ -479,23 +539,25 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
     lang = body.language if body.language != "auto" else "не указан"
     try:
         system = (
-            "Ты опытный старший разработчик и строгий code-reviewer на платформе Gradus. "
-            f"Язык программирования: {lang}. "
-            "Проанализируй предоставленный код МАКСИМАЛЬНО подробно. "
-            "Ответь СТРОГО в JSON формате без markdown, без ```json, только чистый JSON:\n"
+            "Ты безжалостный senior code-reviewer. Оцениваешь код СТРОГО и честно. "
+            f"Язык: {lang}. "
+            "Шкала оценки: 90-100 — эталонный код; 70-89 — хороший, есть мелкие замечания; "
+            "50-69 — приемлемый, но значительные проблемы; 30-49 — плохой, много ошибок; "
+            "0-29 — ужасный код, переписать с нуля. "
+            "Не завышай баллы. Плохой код = низкие баллы. Нет обработки ошибок = минус 20. "
+            "Хардкод, магические числа, отсутствие типов = минус 15 каждое. "
+            "Ответь СТРОГО в JSON без markdown:\n"
             "{\n"
-            '  "quality": <число 0-100>,\n'
-            '  "correctness": <число 0-100>,\n'
-            '  "style": <число 0-100>,\n'
-            '  "summary": "<общая оценка, 2-3 предложения>",\n'
-            '  "issues": ["<проблема 1>", "<проблема 2>", ...],\n'
-            '  "improvements": ["<рекомендация 1>", "<рекомендация 2>", ...],\n'
-            '  "goodParts": ["<что хорошо 1>", "<что хорошо 2>", ...]\n'
+            '  "quality": <0-100>,\n'
+            '  "correctness": <0-100>,\n'
+            '  "style": <0-100>,\n'
+            '  "summary": "<честная оценка, 2-3 предложения>",\n'
+            '  "issues": ["<конкретная проблема с примером>", ...],\n'
+            '  "improvements": ["<конкретное улучшение с примером кода>", ...],\n'
+            '  "goodParts": ["<что сделано хорошо>", ...]\n'
             "}\n"
-            "В issues укажи конкретные баги, уязвимости, проблемы. "
-            "В improvements — конкретные предложения с примерами кода, как улучшить. "
-            "В goodParts — что сделано хорошо. Всё на русском языке. "
-            "Учитывай идиоматику и best-practices конкретного языка."
+            "В issues — конкретные баги, уязвимости, антипаттерны с объяснением почему плохо. "
+            "В goodParts — только реально хорошие вещи, не хвали за минимум. Всё на русском."
         )
         raw = await _ai_generate(
             f"Проверь этот код ({lang}):\n\n```{body.language}\n{body.sourceCode}\n```",
@@ -580,6 +642,12 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
         "goodParts": good_parts,
         "language": body.language,
     }
+
+
+@router.delete("/review/history", dependencies=[AllRoles])
+async def clear_review_history(user: CurrentUser):
+    await db.execute("DELETE FROM ai_reviews WHERE user_id=$1", user["id"])
+    return {"success": True}
 
 
 @router.get("/review/history", dependencies=[AllRoles])

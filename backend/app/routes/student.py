@@ -416,7 +416,8 @@ async def get_steps(course_id: int, user: CurrentUser):
         return {"error": "Некорректный курс"}
 
     course_row = await db.fetchrow(
-        """SELECT c.id, c.title, c.level, c.category, c.students_count AS "studentsCount", u.full_name AS author
+        """SELECT c.id, c.title, c.level, c.category, c.students_count AS "studentsCount",
+                  c.access_type, u.full_name AS author
            FROM courses c LEFT JOIN users u ON u.id=c.teacher_id WHERE c.id=$1 LIMIT 1""",
         course_id,
     )
@@ -559,6 +560,7 @@ async def get_steps(course_id: int, user: CurrentUser):
 
 @router.post("/steps/{step_id}/check", dependencies=[AllRoles])
 async def check_step(step_id: int, request: Request, user: CurrentUser):
+    global _ai_rate_limited_until
     if step_id <= 0:
         return {"error": "Некорректный шаг"}
 
@@ -577,6 +579,22 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
         return {"error": "Шаг не найден"}
 
     course_id = lesson["courseId"]
+
+    # For restricted courses, verify enrollment before allowing submission
+    course_access = await db.fetchrow(
+        "SELECT access_type FROM courses WHERE id=$1 LIMIT 1",
+        course_id,
+    )
+    if course_access:
+        access_type = course_access["access_type"] or "open"
+        if access_type in ("invite_only", "moderated"):
+            enrolled = await db.fetchrow(
+                "SELECT id FROM enrollments WHERE user_id=$1 AND course_id=$2 AND status='active' LIMIT 1",
+                user["id"],
+                course_id,
+            )
+            if not enrolled:
+                return {"error": "Доступ запрещён. Вы не записаны на этот курс."}
     kind = "theory"
     passed = False
     feedback = ""
@@ -587,12 +605,13 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
 
     if slot == 1:
         assignment = await db.fetchrow(
-            "SELECT id, assignment_type, tests, rubric FROM assignments WHERE lesson_id=$1 ORDER BY id ASC LIMIT 1",
+            "SELECT id, assignment_type, tests, rubric, description FROM assignments WHERE lesson_id=$1 ORDER BY id ASC LIMIT 1",
             lesson_id,
         )
         if assignment:
             atype = assignment["assignment_type"] or "code"
             assignment_id = assignment["id"]
+            task_description = str(assignment["description"] or "").strip()
             tests_data = assignment["tests"] or []
             if isinstance(tests_data, str):
                 try:
@@ -627,7 +646,7 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
                 if correct_answer and answer.strip() == correct_answer.strip():
                     passed = True
                     score = 15
-                    feedback = "Верно! Отличная работа."
+                    feedback = "Верно"
                 elif answer:
                     passed = False
                     score = 0
@@ -648,7 +667,32 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
                     essay_eval = await estimate_essay(answer, rubric_data)
                     passed = essay_eval["status"] == "passed"
                     score = max(0, min(20, round(essay_eval["score"] / 5)))
-                    feedback = essay_eval["feedback"]
+                    # Short pass/fail message in the feedback box
+                    total_score = essay_eval.get("score", 0)
+                    feedback = (
+                        "Верно"
+                        if passed
+                        else f"Эссе требует доработки. Набрано {total_score}/100 баллов."
+                    )
+                    # AI detailed analysis → shown in the robot box
+                    ai_feedback = essay_eval.get("feedback", "")
+                    ai_strengths = essay_eval.get("strengths", [])
+                    ai_improvements = essay_eval.get("improvements", [])
+                    ai_hints = essay_eval.get("hints", [])
+                    ai_comment_parts = []
+                    if ai_feedback:
+                        ai_comment_parts.append(ai_feedback)
+                    if ai_strengths:
+                        ai_comment_parts.append(
+                            "ЧТО ХОРОШО:\n" + "\n".join(f"- {s}" for s in ai_strengths)
+                        )
+                    if ai_improvements:
+                        ai_comment_parts.append(
+                            "ЧТО ДОРАБОТАТЬ:\n" + "\n".join(f"- {s}" for s in ai_improvements)
+                        )
+                    elif ai_hints:
+                        ai_comment_parts.append("СОВЕТЫ:\n" + "\n".join(f"- {s}" for s in ai_hints))
+                    evaluation["aiComment"] = "\n\n".join(ai_comment_parts) if ai_comment_parts else None
                     kw_matches = essay_eval.get("keywordMatches", [])
                     check_results = [
                         {"name": f"Ключевое слово: {m['keyword']}", "passed": m["found"]}
@@ -657,79 +701,159 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
 
             else:
                 kind = "code"
+                no_tests = not tests_data
 
                 # --- Redis cache: cache only test evaluation (not AI comment) ---
                 step_cache_key = f"gradus:step:{step_id}:{cache.sha256_text(answer)}"
                 cached_eval = await cache.get_json(step_cache_key)
-                if cached_eval:
-                    evaluation = cached_eval
-                else:
-                    evaluation = evaluate_code_by_tests(answer, tests_data)
-                    # Cache test results for 1 hour (AI comment is NOT cached — fetched fresh)
-                    await cache.set_json(step_cache_key, evaluation, ttl_seconds=3600)
 
-                # AI review — cached separately so successful comments are reused
-                # but failed ones (e.g. 429) are retried on next submission
-                runs_code_types = {"expectedOutput", "outputContainsLine", "outputLineCount"}
-                has_io_tests = any(
-                    "expectedOutput" in t or t.get("type") in runs_code_types
-                    for t in tests_data
-                )
-                # "Complex" = IO tests OR code is substantial (>= 80 chars)
-                is_complex = has_io_tests or len(answer) >= 80
-                # Skip AI for syntax/runtime errors — the error message is already clear
-                has_execution_error = "\n" in evaluation.get("feedback", "")
-                evaluation["aiComment"] = None
-                if is_complex and len(answer) >= 30 and not has_execution_error:
-                    global _ai_rate_limited_until
+                if no_tests:
+                    # No tests defined — AI fully evaluates correctness
+                    evaluation = {"passed": False, "scorePercent": 0, "feedback": "", "checkResults": None, "aiComment": None}
                     ai_cache_key = f"gradus:ai:{step_id}:{cache.sha256_text(answer)}"
                     cached_ai = await cache.get_json(ai_cache_key)
-                    if cached_ai and cached_ai.get("comment"):
-                        evaluation["aiComment"] = cached_ai["comment"]
+
+                    if cached_ai and cached_ai.get("comment") is not None:
+                        ai_passed_cached = bool(cached_ai.get("passed", True))
+                        evaluation["passed"] = ai_passed_cached
+                        evaluation["scorePercent"] = 100 if ai_passed_cached else 0
+                        evaluation["feedback"] = "Верно" if ai_passed_cached else "Решение неверное"
+                        evaluation["aiComment"] = cached_ai["comment"]  # always show AI comment
                     elif time.monotonic() < _ai_rate_limited_until:
-                        # AI provider is in cooldown due to recent 429 — skip to avoid hammering
-                        evaluation["aiComment"] = None
+                        # AI in cooldown — run code at least to check syntax
+                        base = evaluate_code_by_tests(answer, [])
+                        evaluation["passed"] = base["passed"]
+                        evaluation["scorePercent"] = base["scorePercent"]
+                        evaluation["feedback"] = base["feedback"]
+                        evaluation["checkResults"] = base.get("checkResults")
                     else:
                         try:
-                            failed_checks = [r["name"] for r in (evaluation.get("checkResults") or []) if not r["passed"]]
-                            all_passed = evaluation.get("passed", False)
-                            if all_passed:
-                                ai_prompt = (
-                                    f"Задание: «{lesson['title']}»\n\n"
-                                    f"Код студента:\n```python\n{answer[:1500]}\n```\n\n"
-                                    "Все тесты пройдены. Дай короткий разбор этого конкретного кода:\n"
-                                    "— какие именно конструкции использованы правильно (назови их)\n"
-                                    "— можно ли что-то улучшить или написать иначе (конкретно)\n"
-                                    "2-3 предложения. Начни с похвалы за правильное решение."
-                                )
-                            else:
-                                ai_prompt = (
-                                    f"Задание: «{lesson['title']}»\n\n"
-                                    f"Код студента:\n```python\n{answer[:1500]}\n```\n\n"
-                                    f"Не пройдены тесты: {', '.join(failed_checks)}.\n\n"
-                                    "Разбери этот конкретный код:\n"
-                                    "— что написано верно (назови конкретные строки/конструкции)\n"
-                                    "— что именно не так и как исправить (конкретно, с примером)\n"
-                                    "2-3 предложения, по существу."
-                                )
-                            ai_comment = await _ai_generate(
-                                ai_prompt,
-                                "Ты ментор по программированию на Python. "
-                                "Смотришь ТОЛЬКО на предоставленный код, не придумываешь контекст. "
-                                "Отвечаешь кратко и по делу, на русском языке."
+                            task_ctx = f"Описание задания: {task_description}\n\n" if task_description else ""
+                            ai_eval_prompt = (
+                                f"Задание: «{lesson['title']}»\n"
+                                f"{task_ctx}"
+                                f"Код:\n```\n{answer[:1500]}\n```\n\n"
+                                "Оцени строго: задание выполнено ПОЛНОСТЬЮ верно?\n\n"
+                                "КРИТЕРИИ ДЛЯ passed=true — ВСЕ должны быть выполнены:\n"
+                                "- Код решает именно поставленную задачу, а не что-то похожее\n"
+                                "- Использован правильный алгоритм/подход\n"
+                                "- Функции/переменные названы правильно (если указано в задании)\n"
+                                "- Нет грубых ошибок (деление на 0, неправильная логика, etc.)\n"
+                                "- Код выполняется без ошибок\n\n"
+                                "Если хоть один критерий нарушен — passed=false.\n\n"
+                                "Ответь СТРОГО в JSON без лишнего текста:\n"
+                                '{"passed": true/false, "comment": "если passed=true — подробный разбор ЧТО ХОРОШО и ЧТО МОЖНО ДОРАБОТАТЬ; если passed=false — объясни конкретно что именно неверно и в каком направлении думать (НЕ показывай готовый код решения)"}'
                             )
-                            evaluation["aiComment"] = ai_comment.strip()
-                            # Cache successful AI responses for 24h
-                            await cache.set_json(ai_cache_key, {"comment": ai_comment.strip()}, ttl_seconds=86400)
+                            raw_eval = await _ai_generate(
+                                ai_eval_prompt,
+                                "Ты строгий ментор-программист. Ты не принимаешь частично верные решения. "
+                                "Если задание не выполнено точно — ставишь passed=false. "
+                                "Обращайся к пользователю напрямую на 'ты'. "
+                                "Никогда не упоминай слово 'студент'. "
+                                "Пиши ТОЛЬКО на русском языке. Никаких иероглифов, китайских, японских или других символов. "
+                                "Отвечаешь только JSON. Без markdown вокруг JSON."
+                            )
+                            import re as _re
+                            json_match = _re.search(r'\{.*\}', raw_eval, _re.DOTALL)
+                            if json_match:
+                                parsed = json.loads(json_match.group())
+                                ai_passed = bool(parsed.get("passed", False))
+                                ai_cmt = str(parsed.get("comment", ""))
+                            else:
+                                ai_passed = True
+                                ai_cmt = raw_eval.strip()
+
+                            evaluation["passed"] = ai_passed
+                            evaluation["scorePercent"] = 100 if ai_passed else 0
+                            evaluation["feedback"] = "Верно" if ai_passed else "Решение неверное"
+                            evaluation["aiComment"] = ai_cmt if ai_cmt else ("Верно." if ai_passed else "Решение неверное.")
+                            await cache.set_json(
+                                ai_cache_key,
+                                {"passed": ai_passed, "feedback": evaluation["feedback"], "comment": evaluation["aiComment"]},
+                                ttl_seconds=86400,
+                            )
                         except Exception as exc:
-                            # Check if it's a rate limit error — enter cooldown
                             if "429" in str(exc):
                                 _ai_rate_limited_until = time.monotonic() + _AI_COOLDOWN_SECONDS
-                            evaluation["aiComment"] = None  # Not cached → retried after cooldown
+                            # Fallback: just check if code runs
+                            base = evaluate_code_by_tests(answer, [])
+                            evaluation["passed"] = base["passed"]
+                            evaluation["scorePercent"] = base["scorePercent"]
+                            evaluation["feedback"] = "Верно" if base["passed"] else "Решение неверное"
+                            evaluation["aiComment"] = "Верно." if base["passed"] else "Решение неверное."
+                            evaluation["checkResults"] = base.get("checkResults")
+                else:
+                    if cached_eval:
+                        evaluation = cached_eval
+                    else:
+                        evaluation = evaluate_code_by_tests(answer, tests_data)
+                        await cache.set_json(step_cache_key, evaluation, ttl_seconds=3600)
+
+                    # AI review — detailed for both passed and failed
+                    has_execution_error = "\n" in evaluation.get("feedback", "")
+                    all_passed = evaluation.get("passed", False)
+                    evaluation["aiComment"] = None  # will be set below
+                    if len(answer) >= 10 and not has_execution_error:
+                        ai_cache_key = f"gradus:ai:{step_id}:{cache.sha256_text(answer)}"
+                        cached_ai = await cache.get_json(ai_cache_key)
+                        if cached_ai and cached_ai.get("comment"):
+                            evaluation["aiComment"] = cached_ai["comment"]
+                        elif time.monotonic() < _ai_rate_limited_until:
+                            evaluation["aiComment"] = "Верно." if all_passed else "Решение неверное."
+                        else:
+                            try:
+                                if all_passed:
+                                    ai_prompt = (
+                                        f"Задание: «{lesson['title']}»\n\n"
+                                        f"Код:\n```\n{answer[:1500]}\n```\n\n"
+                                        "Все тесты пройдены.\n\n"
+                                        "Напиши развёрнутый разбор по двум блокам.\n\n"
+                                        "ЧТО ХОРОШО:\n"
+                                        "- назови конкретные конструкции и решения, которые использованы правильно\n"
+                                        "- объясни, почему это хороший подход\n"
+                                        "- если есть элегантные решения — отметь их отдельно\n\n"
+                                        "ЧТО МОЖНО ДОРАБОТАТЬ:\n"
+                                        "- укажи конкретные места в коде, которые можно улучшить\n"
+                                        "- предложи альтернативные подходы с примером кода\n"
+                                        "- упомяни про читаемость, производительность или best practices\n\n"
+                                        "Пиши по делу, конкретно, без воды. На русском языке."
+                                    )
+                                else:
+                                    failed_tests = [r for r in (evaluation.get("checkResults") or []) if not r.get("passed")]
+                                    tests_info = "\n".join(
+                                        f"- {t.get('name', 'Тест')}: ожидалось «{t.get('expected', '?')}», получено «{t.get('output', '?')}»"
+                                        for t in failed_tests[:5]
+                                    ) if failed_tests else "Не все тесты пройдены."
+                                    ai_prompt = (
+                                        f"Задание: «{lesson['title']}»\n\n"
+                                        f"Код:\n```\n{answer[:1500]}\n```\n\n"
+                                        f"Провальные тесты:\n{tests_info}\n\n"
+                                        "Объясни конкретно:\n"
+                                        "1. В чём именно ошибка в коде\n"
+                                        "2. Почему тесты не проходят — разбери логику\n"
+                                        "3. В каком направлении думать чтобы исправить (НЕ показывай готовое решение — только наводящие подсказки)\n\n"
+                                        "Будь прямым и конкретным. На русском языке."
+                                    )
+                                ai_comment = await _ai_generate(
+                                    ai_prompt,
+                                    "Ты строгий ментор-программист на платформе Gradus. "
+                                    "Обращайся к пользователю напрямую на 'ты': 'ты написал...', 'у тебя...', 'ты использовал...'. "
+                                    "Никогда не упоминай слово 'студент'. "
+                                    "Анализируешь ТОЛЬКО предоставленный код, не придумываешь контекст. "
+                                    "Пиши ТОЛЬКО на русском языке. Никаких иероглифов, китайских, японских или других символов. "
+                                    "Даёшь конкретный и полезный разбор на русском языке. "
+                                    "Используй заголовки блоков и дефисы для списков. Без эмодзи."
+                                )
+                                evaluation["aiComment"] = ai_comment.strip()
+                                await cache.set_json(ai_cache_key, {"comment": ai_comment.strip()}, ttl_seconds=86400)
+                            except Exception as exc:
+                                if "429" in str(exc):
+                                    _ai_rate_limited_until = time.monotonic() + _AI_COOLDOWN_SECONDS
+                                evaluation["aiComment"] = "Верно." if all_passed else "Решение неверное."
 
                 passed = evaluation["passed"]
                 score = 25 if passed else max(0, round(evaluation.get("scorePercent", 0) / 100 * 25))
-                feedback = evaluation["feedback"]
+                feedback = "Верно" if passed else evaluation["feedback"]
                 check_results = evaluation.get("checkResults")
         else:
             kind = "theory"

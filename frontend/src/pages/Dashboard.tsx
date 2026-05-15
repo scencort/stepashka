@@ -1,15 +1,10 @@
-// главная страница после входа — показывает статистику, прогресс и активность
-// данные: GET /dashboard → бэк собирает всё в один запрос (stats, courses, activities, continue)
-// weeklyGoal хранится на сервере, PATCH /student/weekly-goal обновляет его при изменении
-// continueStep — последний незавершённый шаг, клик ведёт на /course/:id?step=:stepId
 import { useEffect, useState } from "react";
 import MainLayout from "../layout/MainLayout";
 import { useNavigate } from "react-router-dom";
-import { Flame, Award, CalendarDays, ArrowRight, BookOpen, Clock, TrendingUp } from "lucide-react";
+import { Flame, Award, ArrowRight, BookOpen, Clock, TrendingUp } from "lucide-react";
 import { api } from "../lib/api";
 import { useAppStore } from "../store/AppStore";
 
-// всё что приходит с сервера для дашборда
 type DashboardPayload = {
   stats: { activeCourses: number; streakDays: number; averageScore: string; tasksWeek: number };
   continue: { courseId: number; courseTitle: string; stepId: number; stepTitle: string; stepOrder: number } | null;
@@ -24,61 +19,37 @@ export default function Dashboard() {
   const { user } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // недельная цель — можно менять прямо на странице, синхронизируется с сервером
-  const [weeklyGoal, setWeeklyGoal] = useState(10);
+  const [weeklyGoal, setWeeklyGoal] = useState<number | null>(null);
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
 
-  // useEffect с [] — запускается ОДИН РАЗ когда компонент появляется на экране
-  // [] означает "нет зависимостей" → эффект не повторяется при перерисовках
-  // без [] — запускался бы после каждого рендера → бесконечный цикл запросов
   useEffect(() => {
     const load = async () => {
-      setLoading(true);  // покажет скелетон пока данные летят
-      setError("");      // сбрасываем старую ошибку если была
+      setLoading(true);
+      setError("");
       try {
-        // один запрос возвращает всё сразу: статистику, курсы, активность, план
-        // бэк специально собирает это в один endpoint чтобы не делать 4 отдельных запроса
         const data = await api.get<DashboardPayload>("/dashboard");
-        setPayload(data);                         // кладём весь объект в стейт
-        setWeeklyGoal(data.weeklyPlan.goalSteps); // дублируем цель отдельно — она редактируемая
+        setPayload(data);
+        setWeeklyGoal(data.weeklyPlan.goalSteps);
       } catch (err) {
-        // instanceof Error — проверяем тип чтобы безопасно взять .message
-        // если err не Error (например строка) — показываем дефолтный текст
         setError(err instanceof Error ? err.message : "Не удалось загрузить данные");
       } finally {
-        // finally выполнится и при успехе и при ошибке
-        // гарантирует что скелетон исчезнет в любом случае
         setLoading(false);
       }
     };
-    void load(); // void говорит TypeScript что мы намеренно не ждём Promise
+    void load();
   }, []);
 
-  // обновляет недельную цель — это паттерн "optimistic update"
-  // optimistic update = UI обновляется СРАЗУ не дожидаясь ответа сервера
-  // пользователь видит изменение мгновенно, а запрос летит в фоне
-  // если сервер вернёт ошибку — мы её тихо игнорируем (.catch(() => {}))
-  // это нормально для некритичных данных — хуже было бы если бы интерфейс "подвисал"
-  //
-  // Math.max(3, Math.min(50, next)) — ограничиваем значение диапазоном 3..50
-  // Math.min(50, next) → не больше 50
-  // Math.max(3, ...) → не меньше 3
-  // это защита от того что пользователь введёт 0 или 9999
   const updateWeeklyGoal = (next: number) => {
     const safe = Math.max(3, Math.min(50, Math.round(next)));
-    setWeeklyGoal(safe);                                                      // сразу в UI
-    api.patch<{ goal: number }>("/student/weekly-goal", { goal: safe }).catch(() => {}); // потом на сервер
+    setWeeklyGoal(safe);
+    api.patch<{ goal: number }>("/student/weekly-goal", { goal: safe }).catch(() => {});
   };
 
   const completedSteps = payload?.weeklyPlan.completedSteps ?? 0;
-  const weeklyPercent = weeklyGoal ? Math.min(100, Math.round((completedSteps / weeklyGoal) * 100)) : 0;
-  // шаг с которого можно продолжить обучение
+  const resolvedGoal = weeklyGoal ?? payload?.weeklyPlan.goalSteps ?? 10;
+  const weeklyPercent = resolvedGoal ? Math.min(100, Math.round((completedSteps / resolvedGoal) * 100)) : 0;
   const continueStep = payload?.continue;
 
-  // statCards — массив объектов вместо четырёх отдельных JSX-блоков
-  // это паттерн "data-driven rendering": данные отдельно, шаблон отдельно
-  // одна карточка рендерится через .map() — если добавить 5-ю карточку,
-  // достаточно добавить объект в массив — JSX менять не нужно
   const statCards = [
     { label: "Активные курсы", value: String(payload?.stats.activeCourses ?? 0), icon: BookOpen, color: "text-primary", bg: "bg-primary-50 dark:bg-primary-900/20" },
     { label: "Серия дней", value: `${payload?.stats.streakDays ?? 0}`, icon: Flame, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/20" },
@@ -86,17 +57,12 @@ export default function Dashboard() {
     { label: "Задач за неделю", value: String(payload?.stats.tasksWeek ?? 0), icon: TrendingUp, color: "text-green-500", bg: "bg-green-50 dark:bg-green-900/20" },
   ];
 
-  // берём только имя для обращения "Привет, Иван" вместо "Привет, Иван Петров"
-  // user?.name — optional chaining: если user=null → не падаем, возвращаем undefined
-  // ?.split(" ") — то же самое: если name=undefined → не падаем
-  // [0] — берём первое слово (имя), игнорируем фамилию и отчество
-  // || "студент" — если имя не задано вообще — дефолтное обращение
   const firstName = user?.name?.split(" ")[0] || "студент";
 
   return (
     <MainLayout>
       <div className="space-y-6 max-w-7xl">
-        {/* приветствие с именем */}
+        {/* Page header */}
         <div>
           <h1 className="font-display font-bold text-3xl md:text-4xl text-[var(--text)] mb-1">
             Привет, {firstName}
@@ -104,11 +70,6 @@ export default function Dashboard() {
           <p className="text-[var(--muted)]">Вот ваш прогресс на сегодня</p>
         </div>
 
-        {/* три состояния интерфейса — только одно видно в каждый момент времени:
-            loading=true  → скелетон (данные ещё летят с сервера)
-            error!=""     → карточка с ошибкой (запрос упал)
-            иначе         → реальные данные (всё ок)
-            && — короткое замыкание: если левая часть false — правая не рендерится */}
         {loading && (
           <div className="space-y-4">
             {[1,2,3].map(i => (
@@ -125,7 +86,7 @@ export default function Dashboard() {
 
         {!loading && !error && (
           <div className="space-y-5">
-            {/* ряд карточек со статистикой */}
+            {/* Stats row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {statCards.map((s) => {
                 const Icon = s.icon;
@@ -141,36 +102,30 @@ export default function Dashboard() {
               })}
             </div>
 
-            {/* большой блок: план на неделю + кнопка продолжить */}
+            {/* Main grid: weekly plan + continue */}
             <div className="grid lg:grid-cols-5 gap-4">
-              {/* план на неделю — цветной блок с прогресс-баром */}
+              {/* Weekly plan */}
               <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-primary p-6 text-white">
-                {/* декоративный круг в углу */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/4" />
                 <div className="relative z-10">
                   <p className="text-xs font-semibold uppercase tracking-widest text-white/60 mb-4">План на неделю</p>
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="font-display font-bold text-5xl">{completedSteps}</span>
-                    <span className="text-xl font-semibold text-white/50">/ {weeklyGoal}</span>
+                    <span className="font-display font-bold text-5xl">{loading ? "—" : completedSteps}</span>
+                    <span className="text-xl font-semibold text-white/50">/ {loading ? "—" : resolvedGoal}</span>
                   </div>
-                  <p className="text-sm text-white/70 mb-5">{weeklyPercent}% цели выполнено</p>
+                  <p className="text-sm text-white/70 mb-5">{loading ? "Загрузка..." : `${weeklyPercent}% цели выполнено`}</p>
                   <div className="h-2 rounded-full bg-white/20 overflow-hidden mb-5">
                     <div
                       className="h-full rounded-full bg-white transition-all duration-700"
-                      // width через inline style а не через Tailwind класс
-                      // потому что процент динамический (любое число 0-100)
-                      // Tailwind генерирует классы статически при сборке — w-[37%] не будет в бандле
-                      // inline style работает с любым значением в рантайме
-                      style={{ width: `${weeklyPercent}%` }}
+                      style={{ width: loading ? "0%" : `${weeklyPercent}%` }}
                     />
                   </div>
-                  {/* инпут для изменения цели — сразу сохраняет на сервере */}
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-white/60">Цель:</span>
                     <input
                       type="number"
                       min={3} max={50}
-                      value={weeklyGoal}
+                      value={loading ? "" : resolvedGoal}
                       onChange={(e) => updateWeeklyGoal(Number(e.target.value || 10))}
                       className="w-14 bg-white/20 border border-white/30 text-white text-center rounded-lg px-2 py-1 text-sm font-bold outline-none focus:bg-white/30 transition-colors"
                     />
@@ -179,7 +134,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* блок "продолжить обучение" — показывает последний незавершённый шаг */}
+              {/* Continue learning */}
               <div className="lg:col-span-3 card p-6 flex flex-col">
                 <p className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)] mb-4">Я прохожу</p>
 
@@ -199,7 +154,6 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  // заглушка если всё пройдено или курсов нет
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="w-12 h-12 rounded-2xl bg-[var(--surface)] flex items-center justify-center text-[var(--muted)] mb-3">
                       <BookOpen size={22} />
@@ -214,9 +168,9 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* нижняя строка: список курсов + лента активности */}
+            {/* Courses + Activity */}
             <div className="grid lg:grid-cols-3 gap-4">
-              {/* мои курсы с прогрессом */}
+              {/* My courses */}
               <div className="lg:col-span-2 card p-6">
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="font-display font-semibold text-lg text-[var(--text)]">Мои курсы</h2>
@@ -235,10 +189,6 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {/* .map() превращает массив данных в массив JSX-элементов
-                        key={c.id} — обязательный уникальный ключ для каждого элемента
-                        React использует key чтобы понять какой элемент изменился/удалился
-                        без key — React перерисует весь список при любом изменении */}
                     {(payload?.courses ?? []).map((c) => (
                       <div key={c.id}
                         className="flex items-center gap-4 p-4 rounded-xl bg-[var(--surface)] hover:border-primary/20 border border-transparent cursor-pointer group transition-all"
@@ -266,34 +216,21 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* лента последних действий на платформе */}
+              {/* Activity feed */}
               <div className="card p-6">
                 <h2 className="font-display font-semibold text-lg text-[var(--text)] mb-5">Активность</h2>
 
-                {/* дедлайн если есть — выводим отдельным блоком наверху */}
-                {payload?.deadline.title && !payload.deadline.title.includes("Ожидание") && (
-                  <div className="mb-4 p-3 rounded-xl border border-primary/20 bg-primary-50 dark:bg-primary-900/10 flex items-start gap-3">
-                    <CalendarDays size={16} className="text-primary mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs font-semibold text-primary">{payload.deadline.title}</p>
-                      <p className="text-xs text-[var(--muted)] mt-0.5">{payload.deadline.text}</p>
-                    </div>
-                  </div>
-                )}
-
-                {(payload?.activities ?? []).length === 0 ? (
+{(payload?.activities ?? []).length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <Clock size={28} className="text-[var(--border)] mb-3" />
                     <p className="text-xs text-[var(--muted)]">Активность появится после первых шагов</p>
                   </div>
                 ) : (
-                  // timeline с вертикальной линией между точками
                   <div className="space-y-3">
                     {(payload?.activities ?? []).map((a, i) => (
                       <div key={a.id} className="flex gap-3">
                         <div className="relative flex flex-col items-center">
                           <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
-                          {/* вертикальная линия — только не у последнего элемента */}
                           {i < (payload?.activities?.length ?? 0) - 1 && (
                             <div className="w-px flex-1 bg-[var(--border)] mt-1" />
                           )}

@@ -456,27 +456,35 @@ async def estimate_essay(answer_text: str, rubric: dict | None = None) -> dict:
     keyword_list = [kw.strip() for kw in re.split(r"[,;\n]", keywords_str) if kw.strip()] if keywords_str else []
 
     system_prompt = (
-        "Ты — строгий, но справедливый преподаватель. Оцени студенческое эссе по четырём критериям "
+        "Ты — строгий, но справедливый ментор. Оцени эссе по четырём критериям "
         "от 0 до 25 баллов каждый:\n"
         "1. content — соответствие теме и полнота раскрытия\n"
         "2. creativity — оригинальность мышления, неожиданные идеи\n"
         "3. clarity — чёткость изложения, структура, грамотность\n"
         "4. depth — глубина анализа, аргументация\n\n"
+        "Обращайся к автору напрямую на 'ты': 'ты раскрыл...', 'у тебя...', 'ты мог бы...'. "
+        "Никогда не упоминай слово 'студент'.\n\n"
         "Верни ТОЛЬКО JSON без лишнего текста в формате:\n"
-        '{"content":N,"creativity":N,"clarity":N,"depth":N,"feedback":"...","hints":["...","..."]}'
+        '{"content":N,"creativity":N,"clarity":N,"depth":N,'
+        '"feedback":"краткое общее резюме",'
+        '"strengths":["что конкретно хорошо в эссе (2-3 пункта)"],'
+        '"improvements":["что конкретно можно доработать (2-3 пункта)"],'
+        '"hints":["конкретный совет 1","конкретный совет 2"]}'
     )
 
     keyword_note = ""
     if keyword_list:
         keyword_note = f"\n\nОбязательные ключевые слова/фразы: {', '.join(keyword_list)}"
 
-    user_prompt = f"Эссе студента:{keyword_note}\n\n{text}"
+    user_prompt = f"Эссе:{keyword_note}\n\n{text}"
 
     ai_text = await _ai_complete(user_prompt, system_prompt)
 
     # Parse AI JSON response
     scores = {"content": 0, "creativity": 0, "clarity": 0, "depth": 0}
     feedback_text = ""
+    strengths: list[str] = []
+    improvements: list[str] = []
     hints: list[str] = []
     try:
         json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
@@ -485,6 +493,8 @@ async def estimate_essay(answer_text: str, rubric: dict | None = None) -> dict:
             for k in scores:
                 scores[k] = max(0, min(25, int(parsed.get(k, 0))))
             feedback_text = str(parsed.get("feedback", ""))
+            strengths = [str(h) for h in (parsed.get("strengths") or [])]
+            improvements = [str(h) for h in (parsed.get("improvements") or [])]
             hints = [str(h) for h in (parsed.get("hints") or [])]
     except Exception:
         pass
@@ -504,25 +514,31 @@ async def estimate_essay(answer_text: str, rubric: dict | None = None) -> dict:
 
     total = sum(scores.values())
 
-    # Check keyword presence
+    # Check keyword presence — missing required keywords = hard fail
     keyword_matches = []
+    keyword_fail = False
     if keyword_list:
         text_lower = text.lower()
         for kw in keyword_list:
             found = kw.lower() in text_lower
             keyword_matches.append({"keyword": kw, "found": found})
-        missing_count = sum(1 for m in keyword_matches if not m["found"])
-        if missing_count > 0:
-            total = max(0, total - missing_count * 3)
+        missing = [m["keyword"] for m in keyword_matches if not m["found"]]
+        if missing:
+            keyword_fail = True
+            total = 0  # hard zero — required keywords missing
             if not hints:
                 hints = []
-            hints.append(f"Не хватает ключевых слов: {', '.join(m['keyword'] for m in keyword_matches if not m['found'])}")
+            hints.insert(0, f"Обязательные ключевые слова не найдены: {', '.join(missing)}. Без них задание не засчитывается.")
+
+    passed = not keyword_fail and total >= 60
 
     return {
         "score": total,
         "metrics": scores,
-        "status": "passed" if total >= 60 else "manual_review",
-        "feedback": feedback_text or ("Ответ содержательный." if total >= 60 else "Ответ требует доработки."),
+        "status": "passed" if passed else "failed",
+        "feedback": feedback_text or ("Ответ содержательный." if passed else "Ответ требует доработки."),
+        "strengths": strengths[:3],
+        "improvements": improvements[:3],
         "hints": hints[:4],
         "keywordMatches": keyword_matches,
     }

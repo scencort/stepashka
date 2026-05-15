@@ -1,8 +1,4 @@
-// лендинг — главная страница для незарегистрированных пользователей
-// секции: nav, hero с частицами, marquee статистики, глобус сообщества,
-// возможности платформы, треки обучения, популярные курсы, команда разработчиков, CTA, футер
-// данные курсов и статистики грузятся с сервера при монтировании
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -37,7 +33,7 @@ import ParticleNetwork from "../components/ParticleNetwork";
 import { useTheme } from "../context/theme";
 import { useAppStore } from "../store/AppStore";
 
-// ─── Team revolver component — карусель команды расположена по кругу ─────────
+// ─── Team revolver component ───────────────────────────────────────────────
 type Member = {
   name: string; roles: string[]; photo: string; link: string;
   objectPosition: string; scale: number;
@@ -138,8 +134,8 @@ export default function Landing() {
   const { theme, toggleTheme } = useTheme();
   const { user, loadingUser } = useAppStore();
 
-  // стабильные ссылки на палитру глобуса — useMemo чтобы живая лента достижений
-  // не пересоздавала пропсы BinaryGlobe и не рвала анимацию
+  // Stable references per theme so re-renders (e.g. from the live
+  // achievements ticker) don't tear down the BinaryGlobe animation loop.
   const globePalette = useMemo<string[]>(
     () =>
       theme === "dark"
@@ -207,9 +203,7 @@ export default function Landing() {
     [landingStats.averageRating]
   );
 
-  // ── живая лента активности — генерируется на клиенте, не из БД ──
-  // имитирует реальную активность: новые записи каждые 3.6 секунды
-  // тикер времени обновляется каждые 10 секунд чтобы метки были актуальны
+  // ── Live activity feed (mock, decoupled from DB) ──
   type ActivityItem = {
     id: number;
     name: string;
@@ -289,7 +283,6 @@ export default function Landing() {
     };
   }, []);
 
-  // форматирует метку времени для карточек ленты — "только что", "30 с назад", "5 мин назад"
   const feedTimeLabel = (createdAt: number) => {
     const sec = Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
     if (sec < 5) return "только что";
@@ -797,7 +790,6 @@ export default function Landing() {
               { name: "Вартанян Вячеслав", roles: ["Разработчик", "Бэкенд"],    photo: "/developers/vartanyan-vyacheslav.jpg", link: "https://t.me/A597MP97",                        objectPosition: "center 5%",  scale: 1.00 },
             ];
 
-            const colStarts = ["lg:col-start-1","lg:col-start-3","lg:col-start-5","lg:col-start-2","lg:col-start-4","lg:col-start-6"];
 
             const cardJsx = (dev: typeof members[0], i: number, compact = false) => {
               const [firstName, ...rest] = dev.name.split(" ");

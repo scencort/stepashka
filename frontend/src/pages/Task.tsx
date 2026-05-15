@@ -1,26 +1,3 @@
-// страница AI Code Review — редактор кода + AI-анализ качества, ошибок и улучшений
-// поддерживает 15 языков программирования (auto = GPT сам определяет язык)
-//
-// КАК РАБОТАЕТ РЕВЬЮ:
-//   пользователь вставляет код → выбирает язык (или оставляет "Авто") → нажимает кнопку
-//     → handleCheck() → setLoading(true), setResult(null) — сбрасываем старый результат
-//       → POST /ai/review/check { sourceCode: code, language }
-//         → бэк отправляет в GPT и ждёт ответ
-//           → возвращает { quality, correctness, style, summary, issues[], improvements[], goodParts[] }
-//             → setResult(data) → React рендерит карточки с оценками и советами
-//             → await loadHistory() — обновляем историю справа сразу после ревью
-//
-// КАК СЧИТАЕТСЯ ОЦЕНКА:
-//   avgScore = Math.round((quality + correctness + style) / 3) — среднее трёх метрик
-//   scoreColor: >=80 → зелёный (emerald), >=50 → жёлтый (amber), <50 → красный
-//   тот же расчёт повторяется и для карточек в истории
-//
-// ИСТОРИЯ РЕВЬЮ:
-//   GET /ai/review/history при монтировании → массив прошлых ревью → список в сайдбаре
-//   expandedId — какой элемент истории раскрыт: click → setExpandedId(isOpen ? null : item.id)
-//   null закрывает текущий открытый, id открывает нужный
-//
-// CodeEditor — компонент с подсветкой синтаксиса (prism-react-renderer + textarea поверх)
 import MainLayout from "../layout/MainLayout";
 import { useEffect, useState } from "react";
 import Button from "../components/ui/Button";
@@ -28,13 +5,13 @@ import Card from "../components/ui/Card";
 import CodeEditor from "../components/ui/CodeEditor";
 import {
   Code2,
-  Sparkles,
   CheckCircle,
   AlertTriangle,
   Lightbulb,
   ThumbsUp,
   ChevronDown,
   ChevronUp,
+  Trash2,
 } from "lucide-react";
 import { api } from "../lib/api";
 import EmptyState from "../components/ui/EmptyState";
@@ -81,6 +58,7 @@ export default function Task() {
   >([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [clearing, setClearing] = useState(false);
   const toast = useToast();
 
   const loadHistory = async () => {
@@ -126,7 +104,19 @@ export default function Task() {
     }
   };
 
-  // средний балл — среднее из трёх метрик: качество, корректность, стиль
+  const handleClearHistory = async () => {
+    setClearing(true);
+    try {
+      await api.delete("/ai/review/history");
+      setHistory([]);
+      toast.success("История очищена");
+    } catch {
+      toast.error("Не удалось очистить историю");
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const avgScore = result
     ? Math.round((result.quality + result.correctness + result.style) / 3)
     : 0;
@@ -140,6 +130,7 @@ export default function Task() {
   return (
     <MainLayout>
       <div className="space-y-6 lg:space-y-8">
+        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2">
           <div>
             <h2 className="text-2xl md:text-4xl font-extrabold mb-2 tracking-tight">
@@ -162,19 +153,21 @@ export default function Task() {
           </select>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
-          {/* Editor */}
-          <div className="xl:col-span-2 flex flex-col card overflow-hidden self-start">
-            <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
-              <h3 className="text-sm font-bold inline-flex items-center gap-2 text-[var(--text)]">
-                <Code2 size={16} className="text-primary" /> Ваш код
-              </h3>
-              <p className="text-xs font-semibold text-[var(--muted)] px-3 py-1 rounded-full bg-[var(--surface)]">
-                {LANGUAGES.find((l) => l.value === language)?.label || language}
-              </p>
-            </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8 items-start">
 
-            <div>
+          {/* ── Left column: editor + results + run button ── */}
+          <div className="xl:col-span-2 flex flex-col gap-6">
+
+            {/* Code editor card */}
+            <div className="card overflow-hidden">
+              <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
+                <h3 className="text-sm font-bold inline-flex items-center gap-2 text-[var(--text)]">
+                  <Code2 size={16} className="text-primary" /> Ваш код
+                </h3>
+                <p className="text-xs font-semibold text-[var(--muted)] px-3 py-1 rounded-full bg-[var(--surface)]">
+                  {LANGUAGES.find((l) => l.value === language)?.label || language}
+                </p>
+              </div>
               <CodeEditor
                 value={code}
                 onChange={setCode}
@@ -182,66 +175,24 @@ export default function Task() {
                 placeholder="# вставьте код для ревью..."
               />
             </div>
-          </div>
 
-          {/* Side panel */}
-          <div className="space-y-6">
-            <Button
-              onClick={handleCheck}
-              disabled={loading || !code.trim()}
-              className="w-full !rounded-[2rem] py-4 text-lg"
-            >
-              {loading ? "Анализирую..." : "Запустить ревью"}
-            </Button>
 
-            {loading && (
-              <Card className="flex flex-col items-center justify-center py-8 px-6 !rounded-[2rem] border border-primary/20 bg-primary/5 dark:bg-primary/10 text-center overflow-hidden relative">
-                {/* Анимированный прогресс-бар сверху */}
-                <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden rounded-t-[2rem]">
-                  <div
-                    className="h-full bg-gradient-to-r from-transparent via-primary to-transparent"
-                    style={{
-                      width: "40%",
-                      animation: "slide-shimmer 1.6s ease-in-out infinite",
-                    }}
-                  />
-                  <style>{`@keyframes slide-shimmer { 0%{transform:translateX(-250%)} 100%{transform:translateX(650%)} }`}</style>
-                </div>
-
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-4 relative">
-                  <Sparkles size={26} className="text-primary animate-pulse" />
-                  {/* Пульсирующий ободок */}
-                  <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-ping" />
-                </div>
-
-                <p className="font-bold text-[var(--text)] text-base mb-1">
-                  ИИ генерирует ответ
-                  <span className="inline-flex gap-0.5 ml-1">
-                    <span className="animate-[bounce_1s_infinite_0ms] inline-block">.</span>
-                    <span className="animate-[bounce_1s_infinite_150ms] inline-block">.</span>
-                    <span className="animate-[bounce_1s_infinite_300ms] inline-block">.</span>
-                  </span>
-                </p>
-                <p className="text-xs text-[var(--muted)] leading-relaxed max-w-[200px]">
-                  Анализирую качество кода, ищу ошибки и формирую рекомендации
-                </p>
+            {/* Error */}
+            {!loading && error && (
+              <Card className="!rounded-[2rem]">
+                <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</p>
               </Card>
             )}
 
-            {result && (
-              <div className="space-y-6">
+            {/* Results */}
+            {result && !loading && (
+              <div className="space-y-5">
                 {/* Scores */}
                 <Card className="space-y-4 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 relative overflow-hidden group">
                   <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform duration-700" />
                   <div className="flex items-start justify-between relative z-10">
                     <p className="font-bold text-slate-500">Общая оценка</p>
-                    <div className="flex flex-col items-end">
-                      <p
-                        className={`text-4xl font-black tracking-tight leading-none ${scoreColor}`}
-                      >
-                        {avgScore}%
-                      </p>
-                    </div>
+                    <p className={`text-4xl font-black tracking-tight leading-none ${scoreColor}`}>{avgScore}%</p>
                   </div>
                   <div className="grid grid-cols-3 gap-3 relative z-10 mt-4">
                     {[
@@ -249,19 +200,11 @@ export default function Task() {
                       { label: "Логика", value: result.correctness },
                       { label: "Стиль", value: result.style },
                     ].map((m) => (
-                      <div
-                        key={m.label}
-                        className="flex flex-col gap-1.5 p-3 rounded-2xl bg-white/50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-700/50 items-center justify-center text-center shadow-sm"
-                      >
+                      <div key={m.label} className="flex flex-col gap-1.5 p-3 rounded-2xl bg-white/50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-700/50 items-center justify-center text-center shadow-sm">
                         <p className="text-xl font-bold">{m.value}%</p>
-                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
-                          {m.label}
-                        </p>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{m.label}</p>
                         <div className="w-full h-1.5 rounded-full overflow-hidden bg-slate-200/70 dark:bg-zinc-700/70 mt-1">
-                          <div
-                            className="h-full bg-gradient-to-r from-rose-400 to-red-500"
-                            style={{ width: `${m.value}%` }}
-                          />
+                          <div className="h-full bg-gradient-to-r from-rose-400 to-red-500" style={{ width: `${m.value}%` }} />
                         </div>
                       </div>
                     ))}
@@ -272,18 +215,11 @@ export default function Task() {
                 <Card className="!rounded-[2rem] border border-blue-200/50 dark:border-blue-500/20 bg-blue-50/30 dark:bg-blue-900/10">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
-                      <CheckCircle
-                        size={16}
-                        className="text-blue-600 dark:text-blue-400"
-                      />
+                      <CheckCircle size={16} className="text-blue-600 dark:text-blue-400" />
                     </div>
-                    <p className="font-bold text-blue-900 dark:text-blue-200">
-                      Резюме
-                    </p>
+                    <p className="font-bold text-blue-900 dark:text-blue-200">Резюме</p>
                   </div>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
-                    {result.summary}
-                  </p>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">{result.summary}</p>
                 </Card>
 
                 {/* Issues */}
@@ -291,20 +227,12 @@ export default function Task() {
                   <Card className="space-y-3 !rounded-[2rem] border border-rose-200/50 dark:border-rose-500/20 bg-rose-50/30 dark:bg-rose-900/10">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center">
-                        <AlertTriangle
-                          size={16}
-                          className="text-rose-600 dark:text-rose-400"
-                        />
+                        <AlertTriangle size={16} className="text-rose-600 dark:text-rose-400" />
                       </div>
-                      <p className="font-bold text-rose-900 dark:text-rose-200">
-                        Проблемы ({result.issues.length})
-                      </p>
+                      <p className="font-bold text-rose-900 dark:text-rose-200">Проблемы ({result.issues.length})</p>
                     </div>
                     {result.issues.map((issue, i) => (
-                      <p
-                        key={i}
-                        className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2"
-                      >
+                      <p key={i} className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2">
                         <span className="text-rose-400 mt-0.5">•</span>
                         <span>{issue}</span>
                       </p>
@@ -317,20 +245,12 @@ export default function Task() {
                   <Card className="space-y-3 !rounded-[2rem] border border-amber-200/50 dark:border-amber-500/20 bg-amber-50/30 dark:bg-amber-900/10">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
-                        <Lightbulb
-                          size={16}
-                          className="text-amber-600 dark:text-amber-400"
-                        />
+                        <Lightbulb size={16} className="text-amber-600 dark:text-amber-400" />
                       </div>
-                      <p className="font-bold text-amber-900 dark:text-amber-200">
-                        Улучшения ({result.improvements.length})
-                      </p>
+                      <p className="font-bold text-amber-900 dark:text-amber-200">Улучшения ({result.improvements.length})</p>
                     </div>
                     {result.improvements.map((item, i) => (
-                      <p
-                        key={i}
-                        className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2"
-                      >
+                      <p key={i} className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2">
                         <span className="text-amber-400 mt-0.5">•</span>
                         <span>{item}</span>
                       </p>
@@ -343,20 +263,12 @@ export default function Task() {
                   <Card className="space-y-3 !rounded-[2rem] border border-emerald-200/50 dark:border-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-900/10">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
-                        <ThumbsUp
-                          size={16}
-                          className="text-emerald-600 dark:text-emerald-400"
-                        />
+                        <ThumbsUp size={16} className="text-emerald-600 dark:text-emerald-400" />
                       </div>
-                      <p className="font-bold text-emerald-900 dark:text-emerald-200">
-                        Что хорошо ({result.goodParts.length})
-                      </p>
+                      <p className="font-bold text-emerald-900 dark:text-emerald-200">Что хорошо ({result.goodParts.length})</p>
                     </div>
                     {result.goodParts.map((item, i) => (
-                      <p
-                        key={i}
-                        className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2"
-                      >
+                      <p key={i} className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2">
                         <span className="text-emerald-400 mt-0.5">•</span>
                         <span>{item}</span>
                       </p>
@@ -366,39 +278,54 @@ export default function Task() {
               </div>
             )}
 
-            {!loading && error && (
-              <Card className="!rounded-[2rem]">
-                <p className="text-sm font-medium text-rose-600 dark:text-rose-400">
-                  {error}
-                </p>
-              </Card>
-            )}
-
+            {/* Placeholder hint */}
             {!result && !loading && !error && (
               <Card className="!rounded-[2rem] border border-white/60 dark:border-slate-700/60 bg-white/40 dark:bg-zinc-900/40">
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Вставьте код, выберите язык и запустите ревью. AI
-                  проанализирует качество, найдёт баги и предложит улучшения.
+                  Вставьте код, выберите язык и нажмите «Запустить ревью». AI проанализирует качество, найдёт баги и предложит улучшения.
                 </p>
               </Card>
             )}
 
-            {/* History */}
+            {/* Run review button — below code and results */}
+            <Button
+              onClick={handleCheck}
+              disabled={loading || !code.trim()}
+              className="w-full !rounded-[2rem] py-4 text-lg"
+            >
+              Запустить ревью
+            </Button>
+          </div>
+
+          {/* ── Right column: history ── */}
+          <div className="space-y-4">
             <Card className="space-y-4 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 bg-white/40 dark:bg-zinc-900/40">
-              <h5 className="font-bold text-lg px-1">История ревью</h5>
+              {/* History header with clear button */}
+              <div className="flex items-center justify-between">
+                <h5 className="font-bold text-lg px-1">История ревью</h5>
+                {history.length > 0 && (
+                  <button
+                    onClick={handleClearHistory}
+                    disabled={clearing}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors hover:bg-red-50 dark:hover:bg-red-900/10 hover:border-red-300 dark:hover:border-red-700 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 disabled:pointer-events-none"
+                    style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+                  >
+                    <Trash2 size={12} />
+                    Очистить
+                  </button>
+                )}
+              </div>
+
               {historyLoading && (
-                <p className="text-sm font-medium text-slate-500 px-1">
-                  Загрузка...
-                </p>
+                <p className="text-sm font-medium text-slate-500 px-1">Загрузка...</p>
               )}
+
               {!historyLoading && history.length === 0 && (
-                <EmptyState
-                  title="Пока пусто"
-                  description="Отправьте первый код на ревью."
-                />
+                <EmptyState title="Пока пусто" description="Отправьте первый код на ревью." />
               )}
+
               {!historyLoading && history.length > 0 && (
-                <div className="space-y-3 max-h-[600px] overflow-auto pr-1">
+                <div className="space-y-3 max-h-[700px] overflow-auto pr-1">
                   {history.map((item) => {
                     const avg = Math.round(
                       (item.quality + item.correctness + item.style) / 3,
@@ -415,7 +342,6 @@ export default function Task() {
                         key={item.id}
                         className="rounded-2xl border border-slate-100 dark:border-zinc-800 bg-white/60 dark:bg-zinc-800/60 overflow-hidden shadow-sm transition-all"
                       >
-                        {/* Header row — click to expand */}
                         <button
                           onClick={() => setExpandedId(isOpen ? null : item.id)}
                           className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-zinc-700/50 transition-colors"
@@ -454,10 +380,8 @@ export default function Task() {
                           </p>
                         </button>
 
-                        {/* Expanded content */}
                         {isOpen && (
                           <div className="border-t border-slate-100 dark:border-zinc-700 px-4 pb-4 pt-3 space-y-4">
-                            {/* Code */}
                             {item.sourceCode && (
                               <div>
                                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
@@ -469,13 +393,11 @@ export default function Task() {
                               </div>
                             )}
 
-                            {/* Summary */}
                             <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-blue-50/50 dark:bg-blue-900/10 rounded-xl p-3 border border-blue-100 dark:border-blue-800/30">
                               <p className="font-bold text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1.5"><CheckCircle size={12} /> Резюме</p>
                               {item.summary}
                             </div>
 
-                            {/* Issues */}
                             {item.issues && item.issues.length > 0 && (
                               <div className="bg-rose-50/50 dark:bg-rose-900/10 rounded-xl p-3 border border-rose-100 dark:border-rose-800/30 space-y-1.5">
                                 <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5"><AlertTriangle size={12} /> Проблемы</p>
@@ -487,7 +409,6 @@ export default function Task() {
                               </div>
                             )}
 
-                            {/* Improvements */}
                             {item.improvements && item.improvements.length > 0 && (
                               <div className="bg-amber-50/50 dark:bg-amber-900/10 rounded-xl p-3 border border-amber-100 dark:border-amber-800/30 space-y-1.5">
                                 <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5"><Lightbulb size={12} /> Улучшения</p>
@@ -499,7 +420,6 @@ export default function Task() {
                               </div>
                             )}
 
-                            {/* Good parts */}
                             {item.goodParts && item.goodParts.length > 0 && (
                               <div className="bg-emerald-50/50 dark:bg-emerald-900/10 rounded-xl p-3 border border-emerald-100 dark:border-emerald-800/30 space-y-1.5">
                                 <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5"><ThumbsUp size={12} /> Что хорошо</p>

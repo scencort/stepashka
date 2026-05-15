@@ -1,21 +1,6 @@
-// CourseStep — компонент одного шага курса (теория / квиз / код / эссе)
-// получает данные о шаге снаружи через props, отправляет ответ на бэкенд
-//
-// ЧЕТЫРЕ ТИПА ШАГОВ:
-//   theory — только текст для чтения, кнопка "Дальше" сразу доступна
-//   quiz   — вопрос с вариантами ответа, нужно выбрать правильный
-//   code   — редактор кода, ответ отправляется на бэк и проверяется
-//   essay  — текстовое поле, ответ оценивается вручную преподавателем
-//
-// КАК РАБОТАЕТ ПРОВЕРКА ОТВЕТА:
-//   студент вводит ответ → нажимает "Проверить"
-//     → POST /steps/:id/check { answer } → бэк проверяет
-//       → возвращает { correct: true/false, feedback: "..." }
-//         → компонент показывает результат и разблокирует кнопку "Дальше"
-//           → "Дальше" вызывает onNext() который переключает шаг в родителе
+import React from "react";
 import {
   CheckCircle2,
-  Circle,
   Zap,
   ArrowLeft,
   ArrowRight,
@@ -31,44 +16,32 @@ import {
 } from "lucide-react";
 import { useState as useStateLocal, useRef, useMemo, useEffect as useEffectLocal } from "react";
 
-// useIsDark — локальный хук для определения текущей темы
-// НЕ использует ThemeContext намеренно: редактор кода рендерится отдельно
-// и ThemeContext может быть недоступен если компонент используется в изоляции
-// механика: MutationObserver следит за атрибутом class на теге <html>
-// когда ThemeContext меняет тему — он добавляет/убирает класс "dark" на documentElement
-// MutationObserver это замечает → вызывает callback → обновляем isDark
-// attributeFilter: ["class"] — следим ТОЛЬКО за классом, не за другими атрибутами
+// ── Dark mode detector ───────────────────────────────────────────
 function useIsDark() {
   const [isDark, setIsDark] = useStateLocal(() =>
     document.documentElement.classList.contains("dark")
   );
   useEffectLocal(() => {
-    // следим только за атрибутом class чтобы не триггерить на другие изменения
     const obs = new MutationObserver(() =>
       setIsDark(document.documentElement.classList.contains("dark"))
     );
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => obs.disconnect(); // отписываемся при unmount
+    return () => obs.disconnect();
   }, []);
   return isDark;
 }
 
-// экранирует html-спецсимволы для безопасной вставки в innerHTML
-// @param s — исходная строка кода
-// @returns строка с &amp; &lt; &gt; вместо & < >
-// предотвращает XSS при рендере подсветки через dangerouslySetInnerHTML
+// ── Python syntax highlighter ────────────────────────────────────
 function escHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// зарезервированные слова питона для подсветки синтаксиса
 const PY_KEYWORDS = new Set([
   "def","class","import","from","return","if","elif","else","for","while",
   "in","not","and","or","is","None","True","False","try","except","finally",
   "with","as","raise","pass","break","continue","lambda","async","await",
   "yield","global","nonlocal","del","assert","self","cls",
 ]);
-// встроенные функции питона
 const PY_BUILTINS = new Set([
   "print","len","range","str","int","float","list","dict","set","tuple",
   "bool","type","isinstance","hasattr","getattr","setattr","enumerate",
@@ -79,19 +52,7 @@ const PY_BUILTINS = new Set([
   "BaseModel","Field","FastAPI","List","Optional","Dict","Union",
 ]);
 
-// подсвечивает одну строку python-кода вручную (без сторонних библиотек)
-// @param line — одна строка кода без символа переноса
-// @param dark — true для тёмной темы, false для светлой
-// @returns html-строка с <span style="color:..."> вокруг каждого токена
-// лексический анализ идёт слева направо через while(i < line.length):
-//   # → комментарий до конца строки
-//   f/r/b → префикс строкового литерала
-//   " / ' → строковый литерал (одинарные, двойные, тройные)
-//   0-9 → числовой литерал
-//   буква/_ → идентификатор → проверяем: keyword, builtin, или просто имя
-//   всё остальное → оператор/пунктуация
 function highlightLine(line: string, dark: boolean): string {
-  // цвета для тёмной и светлой темы — kw=ключевые слова, str=строки, cmt=комментарии
   const c = dark
     ? { kw:"#c084fc", str:"#4ade80", cmt:"#6b7280", num:"#fb923c", builtin:"#38bdf8", fn:"#60a5fa", op:"#818cf8", plain:"#e2e8f0" }
     : { kw:"#7c3aed", str:"#15803d", cmt:"#6b7280", num:"#ea580c", builtin:"#0369a1", fn:"#1d4ed8", op:"#6366f1", plain:"#1e293b" };
@@ -99,17 +60,16 @@ function highlightLine(line: string, dark: boolean): string {
   let out = "";
   let i = 0;
   while (i < line.length) {
-    // комментарий — всё от # до конца строки
     if (line[i] === "#") {
       out += `<span style="color:${c.cmt};font-style:italic">${escHtml(line.slice(i))}</span>`;
       break;
     }
-    // префикс строки: f, r, b
+    // f/r/b prefix
     let pfx = "";
     if ("frbrb".includes(line[i]) && (line[i+1] === '"' || line[i+1] === "'")) {
       pfx = line[i++];
     }
-    // строковый литерал — одинарные или двойные кавычки, в том числе тройные
+    // String
     if (line[i] === '"' || line[i] === "'") {
       const q = line[i];
       const triple = line.slice(i, i+3) === q+q+q;
@@ -124,21 +84,21 @@ function highlightLine(line: string, dark: boolean): string {
       i = j; continue;
     }
     if (pfx) { out += escHtml(pfx); continue; }
-    // декоратор (@something)
+    // Decorator
     if (line[i] === "@") {
       let j = i+1;
       while (j < line.length && /[\w.]/.test(line[j])) j++;
       out += `<span style="color:#f59e0b">${escHtml(line.slice(i, j))}</span>`;
       i = j; continue;
     }
-    // числовой литерал
+    // Number
     if (/[0-9]/.test(line[i]) && (i === 0 || !/\w/.test(line[i-1]))) {
       let j = i;
       while (j < line.length && /[0-9._xXbBoOeEjJ]/.test(line[j])) j++;
       out += `<span style="color:${c.num}">${escHtml(line.slice(i, j))}</span>`;
       i = j; continue;
     }
-    // идентификатор — проверяем не ключевое ли слово и вызов ли это функции
+    // Identifier
     if (/[a-zA-Z_]/.test(line[i])) {
       let j = i;
       while (j < line.length && /\w/.test(line[j])) j++;
@@ -155,7 +115,7 @@ function highlightLine(line: string, dark: boolean): string {
         out += `<span style="color:${c.plain}">${escHtml(word)}</span>`;
       i = j; continue;
     }
-    // оператор
+    // Operator
     if ("+-*/%=<>!&|^~".includes(line[i]))
       out += `<span style="color:${c.op}">${escHtml(line[i++])}</span>`;
     else
@@ -164,40 +124,27 @@ function highlightLine(line: string, dark: boolean): string {
   return out;
 }
 
-// подсвечивает весь блок кода построчно
 function highlightCode(code: string, dark: boolean): string {
   return code.split("\n").map(l => highlightLine(l, dark)).join("\n");
 }
 
-// стили для редактора кода — моноширинный шрифт
+// ── Code editor with syntax highlighting ─────────────────────────
 const FONT: React.CSSProperties = {
   fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code','Consolas',monospace",
   fontSize: "13px",
   lineHeight: "22px",
 };
-const PAD = 14;    // отступы внутри редактора
-const GUTTER = 46; // ширина колонки с номерами строк
+const PAD = 14;
+const GUTTER = 46;
 
-// CodeEditor — редактор кода с подсветкой синтаксиса Python
-// ТРЮК "overlaid editor" — два слоя один поверх другого:
-//   нижний слой: <pre> с HTML-подсветкой (dangerouslySetInnerHTML) — только для отображения
-//   верхний слой: <textarea> прозрачная (color: transparent, background: transparent)
-//   пользователь печатает в textarea, видит подсветку из pre
-//   syncScroll() синхронизирует прокрутку обоих слоёв чтобы подсветка не "уезжала"
-// Tab в textarea — перехватываем e.preventDefault() и вставляем 4 пробела вручную
-//   без перехвата Tab переключал бы фокус между элементами страницы
 function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const dark = useIsDark();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
 
   const lines = Math.max((value || "").split("\n").length, 10);
-  // useMemo кешируует результат highlightCode — не пересчитывает при каждом рендере
-  // highlightCode — дорогая операция: парсит каждый символ, создаёт HTML-строку
-  // пересчитываем только когда изменился сам код (value) или тема (dark)
   const highlighted = useMemo(() => highlightCode(value || "", dark), [value, dark]);
 
-  // синхронизируем скролл textarea и pre чтобы подсветка не уезжала
   const syncScroll = () => {
     if (textareaRef.current && preRef.current) {
       preRef.current.scrollTop = textareaRef.current.scrollTop;
@@ -205,7 +152,6 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
     }
   };
 
-  // цвета для разных частей редактора в зависимости от темы
   const bg    = dark ? "#18181b" : "#f8fafc";
   const gutBg = dark ? "#1e1e24" : "#f1f5f9";
   const gutBorder = dark ? "#3f3f46" : "#e2e8f0";
@@ -215,22 +161,22 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
 
   return (
     <div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${border}`, boxShadow: "0 1px 4px 0 rgba(0,0,0,0.06)" }}>
-      {/* строка заголовка в стиле macOS */}
+      {/* Title bar */}
       <div style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 12px", background: gutBg, borderBottom:`1px solid ${gutBorder}` }}>
         <span style={{ width:10,height:10,borderRadius:"50%",background:"#f87171",display:"inline-block" }}/>
         <span style={{ width:10,height:10,borderRadius:"50%",background:"#fbbf24",display:"inline-block" }}/>
         <span style={{ width:10,height:10,borderRadius:"50%",background:"#34d399",display:"inline-block" }}/>
         <span style={{ ...FONT, fontSize:11, color: gutColor, marginLeft:8 }}>solution.py</span>
       </div>
-      {/* тело редактора */}
+      {/* Editor body */}
       <div style={{ display:"flex", background: bg, minHeight: lines*22 + PAD*2 }}>
-        {/* нумерация строк */}
+        {/* Gutter */}
         <div style={{ width:GUTTER, flexShrink:0, background:gutBg, borderRight:`1px solid ${gutBorder}`, paddingTop:PAD, paddingBottom:PAD, userSelect:"none" }}>
           {Array.from({ length: lines }, (_, i) => (
             <div key={i} style={{ ...FONT, textAlign:"right", paddingRight:10, color: gutColor }}>{i+1}</div>
           ))}
         </div>
-        {/* область ввода — pre с подсветкой + прозрачная textarea поверх */}
+        {/* Overlay area */}
         <div style={{ position:"relative", flex:1, overflow:"hidden" }}>
           <pre
             ref={preRef}
@@ -244,22 +190,21 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
             onChange={(e) => onChange(e.target.value)}
             onScroll={syncScroll}
             onKeyDown={(e) => {
-              // tab вставляет 4 пробела вместо переключения фокуса
               if (e.key === "Tab") {
                 e.preventDefault();
                 const el = e.currentTarget;
                 const start = el.selectionStart;
                 const end = el.selectionEnd;
-                const TAB = "    "; // 4 пробела
+                const TAB = "    "; // 4 spaces
                 if (start === end) {
-                  // одиночный курсор — вставляем пробелы
+                  // Single cursor — insert 4 spaces
                   const next = value.slice(0, start) + TAB + value.slice(end);
                   onChange(next);
                   requestAnimationFrame(() => {
                     el.selectionStart = el.selectionEnd = start + TAB.length;
                   });
                 } else {
-                  // выделено несколько строк — отступаем или убираем отступ
+                  // Multi-line selection — indent/unindent each line
                   const lines = value.split("\n");
                   let charCount = 0;
                   const startLine = lines.findIndex(l => { charCount += l.length + 1; return charCount > start; });
@@ -268,7 +213,6 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
                   const sl = Math.max(0, startLine);
                   const el2 = Math.min(lines.length - 1, endLine < 0 ? lines.length - 1 : endLine);
                   if (e.shiftKey) {
-                    // shift+tab убирает отступ
                     for (let i = sl; i <= el2; i++) {
                       if (lines[i].startsWith(TAB)) lines[i] = lines[i].slice(4);
                       else if (lines[i].startsWith(" ")) lines[i] = lines[i].replace(/^ +/, "");
@@ -279,7 +223,7 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
                   onChange(lines.join("\n"));
                 }
               }
-              // умный перенос строки — сохраняет отступ и добавляет если предыдущая заканчивается на :
+              // Auto-close brackets
               if (e.key === "Enter") {
                 e.preventDefault();
                 const el = e.currentTarget;
@@ -308,27 +252,154 @@ function CodeEditor({ value, onChange }: { value: string; onChange: (v: string) 
     </div>
   );
 }
+// ────────────────────────────────────────────────────────────────
 
-// определяет является ли строка кодом питона или обычным текстом
-// нужно для разбивки теории на блоки текста и блоки кода
+// ── AI inline renderer ───────────────────────────────────────────
+function renderInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+  return parts.map((p, i) => {
+    if (p.startsWith("**") && p.endsWith("**"))
+      return <strong key={i} className="font-semibold text-slate-800 dark:text-slate-100">{p.slice(2, -2)}</strong>;
+    if (p.startsWith("*") && p.endsWith("*") && p.length > 2)
+      return <em key={i}>{p.slice(1, -1)}</em>;
+    if (p.startsWith("`") && p.endsWith("`"))
+      return <code key={i} className="font-mono text-[11px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded text-rose-600 dark:text-rose-400">{p.slice(1, -1)}</code>;
+    return p;
+  });
+}
+
+// ── AI inline code block ─────────────────────────────────────────
+function AiCodeBlock({ lang, code }: { lang: string; code: string }) {
+  const [copied, setCopied] = useStateLocal(false);
+  const copy = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 my-2 text-left">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-slate-800 dark:bg-slate-900">
+        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">{lang || "code"}</span>
+        <button onClick={copy} className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-white transition-colors">
+          {copied ? <><CheckCheck size={11} />скопировано</> : <><Copy size={11} />копировать</>}
+        </button>
+      </div>
+      <pre className="text-xs font-mono overflow-x-auto p-4 leading-relaxed whitespace-pre bg-slate-900 text-slate-200">{code}</pre>
+    </div>
+  );
+}
+
+// ── AI Markdown renderer ─────────────────────────────────────────
+function AiMarkdown({ text }: { text: string }) {
+  // Split by fenced code blocks
+  const parts = text.split(/(```[\w]*\n[\s\S]*?```)/g);
+
+  const renderText = (chunk: string) => {
+    const lines = chunk.split("\n");
+    const nodes: React.ReactNode[] = [];
+    let idx = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // blank line
+      if (!trimmed) {
+        if (nodes.length > 0) nodes.push(<div key={idx++} className="h-1.5" />);
+        continue;
+      }
+
+      // Heading: ### / ## / #
+      if (/^#{1,3}\s/.test(trimmed)) {
+        const level = (trimmed.match(/^#+/) || [""])[0].length;
+        const content = trimmed.replace(/^#+\s*/, "");
+        const cls = level === 1
+          ? "text-base font-bold text-slate-800 dark:text-slate-100 mt-3 mb-1"
+          : level === 2
+          ? "text-[13px] font-bold text-slate-700 dark:text-slate-200 mt-2.5 mb-1"
+          : "text-[12px] font-semibold text-slate-600 dark:text-slate-300 mt-2 mb-0.5";
+        nodes.push(<p key={idx++} className={cls}>{renderInline(content)}</p>);
+        continue;
+      }
+
+      // Section header: ALL CAPS ending with : e.g. "ЧТО ХОРОШО:"
+      if (/^[А-ЯA-Z\s\-]{4,}:$/.test(trimmed)) {
+        const isGood = /хорошо|верно|правильно|отлично|молодец/i.test(trimmed);
+        const isBad  = /доработ|ошиб|неверно|улучш|исправ/i.test(trimmed);
+        const color  = isGood
+          ? "text-emerald-700 dark:text-emerald-400"
+          : isBad
+          ? "text-amber-700 dark:text-amber-400"
+          : "text-violet-700 dark:text-violet-300";
+        nodes.push(
+          <p key={idx++} className={`text-[11px] font-extrabold uppercase tracking-widest mt-4 mb-1.5 ${color}`}>
+            {trimmed}
+          </p>
+        );
+        continue;
+      }
+
+      // Numbered list: 1. 2. 3.
+      if (/^\d+\.\s/.test(trimmed)) {
+        const num = (trimmed.match(/^(\d+)\./) || ["","1"])[1];
+        const content = trimmed.replace(/^\d+\.\s*/, "");
+        nodes.push(
+          <div key={idx++} className="flex gap-2.5 pl-1 my-0.5">
+            <span className="shrink-0 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 text-[10px] font-bold flex items-center justify-center mt-0.5">
+              {num}
+            </span>
+            <span className="text-[13px] text-slate-800 dark:text-slate-100 leading-relaxed">{renderInline(content)}</span>
+          </div>
+        );
+        continue;
+      }
+
+      // Bullet point: - or • or *
+      if (/^[-•*]\s/.test(trimmed)) {
+        const content = trimmed.replace(/^[-•*]\s*/, "");
+        nodes.push(
+          <div key={idx++} className="flex gap-2 pl-1 my-0.5">
+            <span className="text-violet-400 dark:text-violet-500 shrink-0 mt-1.5 text-[8px]">●</span>
+            <span className="text-[13px] text-slate-800 dark:text-slate-100 leading-relaxed">{renderInline(content)}</span>
+          </div>
+        );
+        continue;
+      }
+
+      // Regular paragraph
+      nodes.push(
+        <p key={idx++} className="text-[13px] text-slate-800 dark:text-slate-100 leading-relaxed">{renderInline(trimmed)}</p>
+      );
+    }
+    return nodes;
+  };
+
+  return (
+    <div className="leading-relaxed space-y-0.5">
+      {parts.map((part, i) => {
+        const codeMatch = part.match(/^```([\w]*)\n([\s\S]*?)```$/);
+        if (codeMatch) return <AiCodeBlock key={i} lang={codeMatch[1]} code={codeMatch[2]} />;
+        return <div key={i}>{renderText(part)}</div>;
+      })}
+    </div>
+  );
+}
+// ────────────────────────────────────────────────────────────────
+
+// ── Theory renderer ──────────────────────────────────────────────
 function isCodeLine(line: string): boolean {
   if (!line.trim()) return false;
-  // отступы — признак кода
   if (line.startsWith("    ") || line.startsWith("\t")) return true;
   const s = line.trimStart();
-  // если много кириллицы — скорее всего это текст
   const cyrillic = (s.match(/[а-яА-ЯёЁ]/g) || []).length;
   if (cyrillic > 4) return false;
-  // проверяем питоновские конструкции
   return /^(def |class |import |from |for |while |if |elif |else:|return |print\(|try:|except|finally:|with |raise |pass\b|break\b|continue\b|async |await |#|lambda )/.test(s)
     || /^[a-zA-Z_]\w*(\s*[+\-*\/]?=(?!=)\s*|\s*\(|\s*\[)/.test(s);
 }
 
-// сегмент теоретического текста — или обычный текст или блок кода
 type Segment = { type: "text"; lines: string[] } | { type: "code"; lines: string[] };
 
-// разбирает теоретический текст на сегменты
-// чередует обычный текст с блоками кода чтобы красиво отобразить
 function parseTheory(text: string): Segment[] {
   const raw = text.split("\n");
   const segments: Segment[] = [];
@@ -338,7 +409,7 @@ function parseTheory(text: string): Segment[] {
     const line = raw[i];
 
     if (!line.trim()) {
-      // пустая строка — добавляем к предыдущему текстовому сегменту
+      // blank line — attach to previous text segment or skip
       if (segments.length && segments[segments.length - 1].type === "text") {
         segments[segments.length - 1].lines.push("");
       }
@@ -347,11 +418,11 @@ function parseTheory(text: string): Segment[] {
     }
 
     if (isCodeLine(line)) {
-      // собираем подряд идущие строки кода в один блок
+      // collect consecutive code lines
       const codeLines: string[] = [];
       while (i < raw.length && (isCodeLine(raw[i]) || (raw[i].trim() === "" && i + 1 < raw.length && isCodeLine(raw[i + 1])))) {
         if (raw[i].trim() === "") {
-          // пустая строка внутри кода — включаем только если следующая тоже код
+          // blank inside code block — include if next is also code
           if (i + 1 < raw.length && isCodeLine(raw[i + 1])) {
             codeLines.push("");
           } else {
@@ -375,13 +446,11 @@ function parseTheory(text: string): Segment[] {
   return segments.filter(s => s.lines.some(l => l.trim()));
 }
 
-// блок с кодом — с кнопкой копирования
 function CodeBlock({ code }: { code: string }) {
   const [copied, setCopied] = useStateLocal(false);
   const copy = () => {
     navigator.clipboard.writeText(code).catch(() => {});
     setCopied(true);
-    // через 1.8 секунды сбрасываем статус
     setTimeout(() => setCopied(false), 1800);
   };
   return (
@@ -401,7 +470,6 @@ function CodeBlock({ code }: { code: string }) {
   );
 }
 
-// рендерит теоретический текст чередуя текстовые блоки и блоки кода
 function TheoryRenderer({ text }: { text: string }) {
   const segments = parseTheory(text);
   return (
@@ -411,7 +479,6 @@ function TheoryRenderer({ text }: { text: string }) {
           <CodeBlock key={i} code={seg.lines.join("\n")} />
         ) : (
           <div key={i} className="text-[var(--text)] whitespace-pre-wrap space-y-3">
-            {/* разделитель --- превращается в визуальный разделитель */}
             {seg.lines.join("\n").trim().split(/^---$/m).map((part, j, arr) => (
               <span key={j}>
                 {part.trim() && <span className="block whitespace-pre-wrap">{part.trim()}</span>}
@@ -430,23 +497,22 @@ function TheoryRenderer({ text }: { text: string }) {
     </div>
   );
 }
+// ────────────────────────────────────────────────────────────────
 
-// тип шага с полями для всех видов: теория, квиз, код, эссе
 type CourseStepType = {
   id: number;
   title: string;
   kind: "theory" | "quiz" | "code" | "essay";
   taskTypeLabel?: string;
   theoryText: string;
-  quizQuestion?: string;   // вопрос для квиза
-  checks?: string[];       // описание проверок для кода
+  quizQuestion?: string;
+  checks?: string[];
   checkCount?: number;
-  options: string[];       // варианты ответа для квиза
+  options: string[];
   stepOrder: number;
   xp: number;
 };
 
-// прогресс по конкретному шагу
 type StepProgress = {
   stepId: number;
   status: "started" | "completed";
@@ -456,7 +522,6 @@ type StepProgress = {
   completedAt: string | null;
 };
 
-// одна попытка сдачи
 type AttemptEntry = {
   id: number;
   stepId: number;
@@ -465,14 +530,14 @@ type AttemptEntry = {
   feedback: string;
   createdAt: string;
   checkResults?: Array<{ name: string; passed: boolean; expected?: string; actual?: string; error?: string }> | null;
+  aiComment?: string | null;
 };
 
-// пропсы компонента — всё приходит из CourseDetail
 type Props = {
   activeStep: CourseStepType | null;
   activeProgress: StepProgress | null;
-  previousStep: CourseStepType | null;   // для навигации назад
-  nextStep: CourseStepType | null;       // для кнопки "следующий шаг"
+  previousStep: CourseStepType | null;
+  nextStep: CourseStepType | null;
   contentLoading: boolean;
   stepAnswer: string;
   setStepAnswer: (v: string) => void;
@@ -484,6 +549,7 @@ type Props = {
   attemptHistory: AttemptEntry[];
   selectedStepId: number | null;
   submitLabel: string;
+  isEnrolled: boolean;
   onSubmitStep: () => void;
   onSelectStep: (stepId: number, answerText: string) => void;
 };
@@ -505,20 +571,18 @@ export default function CourseStep(props: Props) {
     attemptHistory,
     selectedStepId,
     submitLabel,
+    isEnrolled,
     onSubmitStep,
     onSelectStep,
   } = props;
 
-  // фильтруем историю попыток только для текущего шага
   const filteredAttempts = attemptHistory.filter(
     (a) => a.stepId === selectedStepId,
   );
-  // id раскрытой попытки в истории (accordion)
   const [expandedAttemptId, setExpandedAttemptId] = useStateLocal<number | null>(null);
 
   return (
     <>
-      {/* если шаг не выбран — подсказка */}
       {!activeStep && !contentLoading && (
         <div className="card p-10 flex flex-col items-center justify-center text-center">
           <BookOpen size={32} className="text-[var(--border)] mb-3" />
@@ -531,14 +595,12 @@ export default function CourseStep(props: Props) {
         </div>
       )}
 
-      {/* основная карточка шага */}
       {activeStep && (
         <div className="card p-6 space-y-5" id="active-step-container">
-          {/* заголовок шага — тип, номер, xp, количество попыток */}
+          {/* Step header */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                {/* бейдж с типом шага — цвет зависит от вида */}
                 <span
                   className={`badge ${
                     activeStep.kind === "theory"
@@ -567,7 +629,6 @@ export default function CourseStep(props: Props) {
                     {activeStep.xp} XP
                   </span>
                 )}
-                {/* сколько попыток уже было */}
                 {activeProgress && activeProgress.attempts > 0 && (
                   <span className="text-xs text-[var(--muted)]">
                     {activeProgress.attempts}{" "}
@@ -583,7 +644,6 @@ export default function CourseStep(props: Props) {
                 {activeStep.title}
               </h2>
             </div>
-            {/* галочка если шаг уже выполнен */}
             {activeProgress?.status === "completed" && (
               <CheckCircle2
                 size={20}
@@ -592,14 +652,14 @@ export default function CourseStep(props: Props) {
             )}
           </div>
 
-          {/* теория — рендерим через TheoryRenderer который умеет разделять текст и код */}
+          {/* Theory */}
           {activeStep.kind === "theory" && (
             activeStep.theoryText
               ? <TheoryRenderer text={activeStep.theoryText} />
               : <span className="text-[var(--muted)] italic text-sm">Теоретический материал будет добавлен.</span>
           )}
 
-          {/* квиз — показываем вопрос и кнопки с вариантами ответа */}
+          {/* Quiz */}
           {activeStep.kind === "quiz" && (
             <div className="space-y-3">
               {activeStep.theoryText && (
@@ -620,7 +680,6 @@ export default function CourseStep(props: Props) {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    {/* радио-кнопка */}
                     <div
                       className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                         stepAnswer === option
@@ -640,13 +699,12 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* эссе — большое текстовое поле с счётчиком символов */}
+          {/* Essay */}
           {activeStep.kind === "essay" && (
             <div className="space-y-3">
               {activeStep.theoryText && (
                 <TheoryRenderer text={activeStep.theoryText} />
               )}
-              {/* подсказка что эссе проверяет ИИ */}
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/40">
                 <span className="text-base">🤖</span>
                 <p className="text-xs text-purple-700 dark:text-purple-300 leading-snug">
@@ -668,13 +726,12 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* код — либо редактор с подсветкой либо обычный textarea для свободного ответа */}
+          {/* Code */}
           {activeStep.kind === "code" && (
             <div className="space-y-3">
               {activeStep.theoryText && (
                 <TheoryRenderer text={activeStep.theoryText} />
               )}
-              {/* список требований для кода */}
               {activeStep.checks && activeStep.checks.length > 0 && (
                 <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] space-y-1.5">
                   <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-2">
@@ -695,7 +752,6 @@ export default function CourseStep(props: Props) {
                   ))}
                 </div>
               )}
-              {/* выбор типа ввода — кодовый редактор или свободный текст */}
               {activeStep.taskTypeLabel === "Свободный ответ" ? (
                 <textarea
                   value={stepAnswer}
@@ -712,7 +768,7 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* результаты тест-кейсов — показываем каждый тест отдельно */}
+          {/* Check results — show all tests */}
           {stepCheckResults && stepCheckResults.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">Проверки</p>
@@ -728,7 +784,6 @@ export default function CourseStep(props: Props) {
                         : "border-red-200 dark:border-red-800/40"
                     }`}
                   >
-                    {/* заголовок теста */}
                     <div className={`flex items-center gap-2 px-3 py-2 text-xs font-medium ${
                       r.passed
                         ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
@@ -737,7 +792,6 @@ export default function CourseStep(props: Props) {
                       {r.passed ? <Check size={13} /> : <X size={13} />}
                       <span>{r.name}</span>
                     </div>
-                    {/* детали провала — что ожидалось и что получилось */}
                     {!r.passed && hasIO && (
                       <div className="bg-[var(--surface)]">
                         {r.error ? (
@@ -765,27 +819,31 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* комментарий ии-наставника — появляется после проверки */}
+          {/* AI Comment */}
           {stepAiComment && (
             <div className="rounded-2xl overflow-hidden border border-violet-200 dark:border-violet-700/40 shadow-sm">
+              {/* Header */}
               <div className="flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600">
-                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-base leading-none shrink-0">🤖</div>
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                  <Code2 size={13} className="text-white" />
+                </div>
                 <span className="text-xs font-bold text-white tracking-wide uppercase">AI-наставник</span>
                 <span className="ml-auto text-[10px] text-white/60 font-medium">Gradus AI</span>
               </div>
+              {/* Body */}
               <div className="px-4 py-3.5 bg-violet-50 dark:bg-violet-950/30">
-                <p className="text-sm text-violet-900 dark:text-violet-200 leading-relaxed whitespace-pre-wrap">{stepAiComment}</p>
+                <AiMarkdown text={stepAiComment} />
               </div>
             </div>
           )}
 
-          {/* фидбек после проверки — зелёный или красный блок */}
+          {/* Feedback */}
           {(stepMessage || stepError) && (() => {
             const msg = stepError || stepMessage;
             const isError = !!stepError;
             const isMultiline = msg.includes("\n");
             if (isError && isMultiline) {
-              // многострочная ошибка — показываем как терминал
+              // Terminal-style error block
               return (
                 <div className="rounded-xl overflow-hidden border border-red-200 dark:border-red-800/40">
                   <div className="flex items-center gap-2 px-4 py-2 bg-red-600 dark:bg-red-800">
@@ -796,22 +854,34 @@ export default function CourseStep(props: Props) {
                 </div>
               );
             }
-            // однострочный фидбек — простой блок
+            const SUCCESS_VARIANTS = [
+              "Верно!", "Хорошая работа!", "Всё получилось!", "Успешно!",
+              "Молодец!", "Правильно!", "Отлично!", "Так держать!",
+              "Именно так!", "Зачёт!",
+            ];
+            const displayMsg = (!isError && (msg === "Верно" || msg === "Принято"))
+              ? SUCCESS_VARIANTS[Math.floor(Math.abs(Math.sin((selectedStepId ?? 0) + (attemptHistory.length))) * SUCCESS_VARIANTS.length)]
+              : msg;
             return (
-              <div className={`px-4 py-3 rounded-xl text-sm font-medium ${
+              <div className={`px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2.5 ${
                 isError
                   ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400"
                   : "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40 text-green-700 dark:text-green-400"
               }`}>
-                {msg}
+                {!isError && (
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-green-500 dark:bg-green-500 flex items-center justify-center">
+                    <Check size={12} strokeWidth={3} className="text-white" />
+                  </span>
+                )}
+                {displayMsg}
               </div>
             );
           })()}
 
-          {/* баннер успеха — появляется когда шаг уже выполнен */}
+          {/* ── SUCCESS BANNER ── */}
           {activeProgress?.status === "completed" && !stepLoading && (
             <div className="relative overflow-hidden rounded-2xl border-2 border-green-300 dark:border-green-700/60 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/40 dark:to-emerald-950/40 px-5 py-4 flex items-center gap-4">
-              {/* декоративное свечение */}
+              {/* glow */}
               <div className="absolute -right-8 -top-8 w-32 h-32 bg-green-400/20 rounded-full blur-2xl pointer-events-none" />
               <div className="w-11 h-11 rounded-full bg-green-100 dark:bg-green-900/50 border-2 border-green-300 dark:border-green-700 flex items-center justify-center shrink-0">
                 <PartyPopper size={20} className="text-green-600 dark:text-green-400" />
@@ -834,38 +904,8 @@ export default function CourseStep(props: Props) {
             </div>
           )}
 
-          {/* анимация загрузки пока ии проверяет ответ */}
-          {stepLoading && (
-            <div className="relative overflow-hidden rounded-xl border border-violet-200 dark:border-violet-700/40 bg-violet-50 dark:bg-violet-950/30 px-4 py-3 flex items-center gap-3">
-              {/* скользящий прогресс-бар */}
-              <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden">
-                <div
-                  style={{ width: "40%", animation: "ai-shimmer 1.6s ease-in-out infinite" }}
-                  className="h-full bg-gradient-to-r from-transparent via-violet-500 to-transparent"
-                />
-                <style>{`@keyframes ai-shimmer{0%{transform:translateX(-250%)}100%{transform:translateX(650%)}}`}</style>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center shrink-0 relative">
-                <span className="text-base leading-none">🤖</span>
-                <span className="absolute inset-0 rounded-full border-2 border-violet-400/50 animate-ping" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-violet-900 dark:text-violet-200 leading-snug">
-                  ИИ-наставник проверяет ответ
-                  <span className="inline-flex gap-0.5 ml-1">
-                    <span style={{ animation: "bounce 1s infinite 0ms" }} className="inline-block">.</span>
-                    <span style={{ animation: "bounce 1s infinite 150ms" }} className="inline-block">.</span>
-                    <span style={{ animation: "bounce 1s infinite 300ms" }} className="inline-block">.</span>
-                  </span>
-                </p>
-                <p className="text-xs text-violet-600 dark:text-violet-400 mt-0.5">
-                  Анализирую решение, пожалуйста подождите
-                </p>
-              </div>
-            </div>
-          )}
 
-          {/* кнопки действий — назад, отправить, вперёд */}
+          {/* Actions */}
           <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border)]">
             <div className="flex items-center gap-2">
               {previousStep && (
@@ -879,25 +919,24 @@ export default function CourseStep(props: Props) {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* главная кнопка — текст зависит от типа шага */}
-              <button
-                onClick={onSubmitStep}
-                disabled={
-                  stepLoading ||
-                  (activeStep.kind !== "theory" && activeStep.kind !== "essay" && !stepAnswer.trim()) ||
-                  (activeStep.kind === "essay" && !stepAnswer.trim())
-                }
-                className="btn-primary px-5 py-2.5 text-sm gap-2"
-              >
-                {stepLoading ? (
-                  <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <span>{submitLabel}</span>
-                  </>
-                )}
-              </button>
-              {/* кнопка следующего шага — только если текущий выполнен */}
+              {!isEnrolled ? (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 text-amber-700 dark:text-amber-400 text-sm font-medium">
+                  <BookOpen size={14} className="shrink-0" />
+                  Запишитесь на курс, чтобы сдавать задания
+                </div>
+              ) : (
+                <button
+                  onClick={onSubmitStep}
+                  disabled={
+                    stepLoading ||
+                    (activeStep.kind !== "theory" && activeStep.kind !== "essay" && !stepAnswer.trim()) ||
+                    (activeStep.kind === "essay" && !stepAnswer.trim())
+                  }
+                  className="btn-primary px-5 py-2.5 text-sm gap-2"
+                >
+                  <span>{stepLoading ? "Проверка..." : submitLabel}</span>
+                </button>
+              )}
               {activeProgress?.status === "completed" && nextStep && (
                 <button
                   onClick={() => onSelectStep(nextStep.id, "")}
@@ -912,7 +951,7 @@ export default function CourseStep(props: Props) {
         </div>
       )}
 
-      {/* история попыток — аккордеон с деталями каждой попытки */}
+      {/* Attempt history */}
       {filteredAttempts.length > 0 && (
         <div className="card p-5 space-y-3">
           <div className="flex items-center gap-2">
@@ -923,7 +962,6 @@ export default function CourseStep(props: Props) {
           </div>
 
           <div className="space-y-2">
-            {/* показываем в обратном порядке — последняя попытка сверху */}
             {[...filteredAttempts].reverse().map((attempt, idx) => {
               const isOpen = expandedAttemptId === attempt.id;
               const checks = attempt.checkResults ?? [];
@@ -938,7 +976,7 @@ export default function CourseStep(props: Props) {
                       : "border-red-200 dark:border-red-800/30"
                   }`}
                 >
-                  {/* заголовок попытки — кликабельный для разворачивания */}
+                  {/* Header */}
                   <button
                     onClick={() => setExpandedAttemptId(isOpen ? null : attempt.id)}
                     className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${
@@ -947,10 +985,9 @@ export default function CourseStep(props: Props) {
                         : "bg-red-50 dark:bg-red-900/10 hover:bg-red-100/60 dark:hover:bg-red-900/20"
                     }`}
                   >
-                    {attempt.passed
-                      ? <CheckCircle2 size={16} className="text-green-500 shrink-0" />
-                      : <X size={16} className="text-red-500 shrink-0" />
-                    }
+                    {attempt.passed && (
+                      <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`text-sm font-semibold ${attempt.passed ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
@@ -975,14 +1012,29 @@ export default function CourseStep(props: Props) {
                     }
                   </button>
 
-                  {/* развёрнутые детали попытки — фидбек, код, результаты тестов */}
+                  {/* Expanded */}
                   {isOpen && (
                     <div className="px-4 pb-4 pt-3 space-y-3 bg-[var(--bg)] border-t border-[var(--border)]">
 
-                      {/* текстовый фидбек */}
+                      {/* Feedback */}
                       <p className="text-sm text-[var(--text)] leading-relaxed">{attempt.feedback}</p>
 
-                      {/* код который отправил юзер */}
+                      {/* AI Comment in history */}
+                      {attempt.aiComment && (
+                        <div className="rounded-xl overflow-hidden border border-violet-200 dark:border-violet-700/40">
+                          <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-violet-600 to-indigo-600">
+                            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                              <Code2 size={10} className="text-white" />
+                            </div>
+                            <span className="text-[11px] font-bold text-white uppercase tracking-wide">AI-наставник</span>
+                          </div>
+                          <div className="px-3 py-2.5 bg-violet-50 dark:bg-violet-950/30">
+                            <AiMarkdown text={attempt.aiComment} />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Code */}
                       {attempt.answer && (
                         <div>
                           <p className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
@@ -994,7 +1046,7 @@ export default function CourseStep(props: Props) {
                         </div>
                       )}
 
-                      {/* результаты тест-кейсов этой попытки */}
+                      {/* Check results */}
                       {checks.length > 0 && (
                         <div className="space-y-1.5">
                           <p className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wide">Тесты</p>

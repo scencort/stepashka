@@ -404,8 +404,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
           )}
           <NavLink to="/dashboard" label="Панель" icon={LayoutDashboard} />
           <NavLink to="/course" label="Курсы" icon={BookOpen} />
-          <NavLink to="/task" label="AI Code Review" icon={Code} />
-          <NavLink to="/ai-review" label="AI-чат" icon={Brain} />
+          <NavLink to="/ai-review" label="AI Code Review" icon={Code} />
+          <NavLink to="/ai-chat" label="AI-чат" icon={Brain} />
 
           {/* раздел для преподавателей и администраторов */}
           {isTeacherOrAdmin && (
@@ -535,8 +535,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   icon={LayoutDashboard}
                 />
                 <MobileNavLink to="/course" label="Курсы" icon={BookOpen} />
-                <MobileNavLink to="/task" label="AI Code Review" icon={Code} />
-                <MobileNavLink to="/ai-review" label="AI-чат" icon={Brain} />
+                <MobileNavLink to="/ai-review" label="AI Code Review" icon={Code} />
+                <MobileNavLink to="/ai-chat" label="AI-чат" icon={Brain} />
                 {isTeacherOrAdmin && (
                   <>
                     <div className="h-px bg-[var(--border)] mx-3 my-2" />
@@ -997,8 +997,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
           {[
             { to: "/dashboard", label: "Панель",  icon: LayoutDashboard },
             { to: "/course",    label: "Курсы",   icon: BookOpen },
-            { to: "/task",      label: "Review",  icon: Code },
-            { to: "/ai-review", label: "AI-чат",  icon: Brain },
+            { to: "/ai-review", label: "Review",  icon: Code },
+            { to: "/ai-chat",   label: "AI-чат",  icon: Brain },
           ].map(({ to, label, icon: Icon }) => {
             const active = isActive(to);
             return (

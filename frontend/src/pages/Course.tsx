@@ -117,6 +117,7 @@ type AttemptEntry = {
   feedback: string;
   createdAt: string;
   checkResults?: Array<{ name: string; passed: boolean; expected?: string; actual?: string; error?: string }> | null;
+  aiComment?: string | null;
 };
 
 // ключ в localStorage для хранения последнего открытого шага курса
@@ -198,11 +199,7 @@ export default function Course() {
 
   // возвращает url обложки курса — своя или дефолтная от picsum
   const courseCoverUrl = (course: { id: number; title: string; coverUrl?: string }) => {
-    if (course.coverUrl && course.coverUrl.trim()) return course.coverUrl;
-    const seed = `course-${course.id}-${(course.title || "").slice(0, 24)}`
-      .toLowerCase()
-      .replace(/[^a-z0-9-]+/g, "-");
-    return `https://picsum.photos/seed/${encodeURIComponent(seed)}/960/540`;
+    return (course.coverUrl && course.coverUrl.trim()) ? course.coverUrl : "";
   };
 
   // вытаскиваем id шага из query-параметра ?step=123
@@ -245,9 +242,14 @@ export default function Course() {
     setContentLoading(true);
     setContentError("");
     try {
-      const data = await api.get<CourseContentResponse>(
+      const data = await api.get<CourseContentResponse & { error?: string }>(
         `/courses/${cId}/steps`,
       );
+      if (data.error) {
+        setContentError(data.error);
+        setContentLoading(false);
+        return;
+      }
       setCourseContent(data);
       const firstStepId = data.steps[0]?.id ?? null;
 
@@ -467,6 +469,7 @@ export default function Course() {
           feedback: response.feedback,
           createdAt: new Date().toISOString(),
           checkResults: response.checkResults ?? null,
+          aiComment: response.aiComment ?? null,
         },
         ...prev,
       ]);

@@ -1008,7 +1008,6 @@ const TIMEZONES = [
   { value: "Asia/Kamchatka", label: "Камчатка (UTC+12)" },
   { value: "Europe/London", label: "Лондон (UTC+0)" },
   { value: "Europe/Berlin", label: "Берлин (UTC+1)" },
-  { value: "Europe/Kiev", label: "Киев (UTC+2)" },
   { value: "Asia/Almaty", label: "Алматы (UTC+6)" },
   { value: "Asia/Tashkent", label: "Ташкент (UTC+5)" },
   { value: "Asia/Tbilisi", label: "Тбилиси (UTC+4)" },

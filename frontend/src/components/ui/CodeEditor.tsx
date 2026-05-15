@@ -91,8 +91,7 @@ export default function CodeEditor({ value, onChange, language, placeholder }: P
   return (
     <div
       className="relative flex overflow-hidden"
-      style={{ minHeight: "230px", height: `${Math.max(230, lines.length * 21 + 40)}px` }}
-      style={{ background: bg }}
+      style={{ minHeight: "230px", height: `${Math.max(230, lines.length * 21 + 40)}px`, background: bg }}
     >
       {/* Line numbers column */}
       <div
@@ -147,6 +146,41 @@ export default function CodeEditor({ value, onChange, language, placeholder }: P
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Tab") {
+              e.preventDefault()
+              const el = e.currentTarget
+              const start = el.selectionStart
+              const end = el.selectionEnd
+              const TAB = "    " // 4 spaces
+              if (start === end) {
+                // Single cursor — insert 4 spaces
+                const next = value.slice(0, start) + TAB + value.slice(end)
+                onChange(next)
+                requestAnimationFrame(() => {
+                  el.selectionStart = el.selectionEnd = start + TAB.length
+                })
+              } else {
+                // Multi-line selection — indent / unindent each line
+                const ls = value.split("\n")
+                let chars = 0
+                const startLine = ls.findIndex(l => { chars += l.length + 1; return chars > start })
+                chars = 0
+                const endLine = ls.findIndex(l => { chars += l.length + 1; return chars > end })
+                const sl = Math.max(0, startLine)
+                const el2 = Math.min(ls.length - 1, endLine < 0 ? ls.length - 1 : endLine)
+                if (e.shiftKey) {
+                  for (let i = sl; i <= el2; i++) {
+                    if (ls[i].startsWith(TAB)) ls[i] = ls[i].slice(4)
+                    else if (ls[i].startsWith(" ")) ls[i] = ls[i].replace(/^ +/, "")
+                  }
+                } else {
+                  for (let i = sl; i <= el2; i++) ls[i] = TAB + ls[i]
+                }
+                onChange(ls.join("\n"))
+              }
+            }
+          }}
           spellCheck={false}
           className="absolute inset-0 w-full h-full py-5 pl-5 pr-4 font-mono text-[13px] leading-[1.625] bg-transparent text-transparent outline-none resize-none overflow-auto"
           style={{
