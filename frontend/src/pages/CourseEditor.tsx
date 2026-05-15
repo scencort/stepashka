@@ -1387,7 +1387,7 @@ export default function CourseEditor() {
                 >
                   {coverUploading
                     ? <Loader2 size={32} className="animate-spin text-primary" />
-                    : <ImagePlus size={32} className="group-hover:scale-110 transition-transform" />
+                    : <ImagePlus size={32} className="text-[var(--muted)]" />
                   }
                   <span className="text-sm font-medium">
                     {coverUploading ? "Загружаю..." : "Выбрать изображение"}

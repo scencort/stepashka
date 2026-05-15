@@ -344,7 +344,7 @@ export default function CourseDetail(props: Props) {
         <div className="flex-1 max-w-xs">
           <div className="h-2 rounded-full bg-[var(--border)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-primary transition-all duration-700"
+              className="h-full rounded-full bg-primary transition-all duration-300"
               style={{ width: `${percent}%` }}
             />
           </div>

@@ -529,10 +529,7 @@ export default function Landing() {
                   </div>
                 </div>
                 <span className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--muted)]">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inset-0 rounded-full bg-emerald-500 opacity-75 animate-ping" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                  </span>
+                  <span className="inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                   LIVE
                 </span>
               </div>

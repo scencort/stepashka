@@ -116,7 +116,7 @@ export default function Dashboard() {
                   <p className="text-sm text-white/70 mb-5">{loading ? "Загрузка..." : `${weeklyPercent}% цели выполнено`}</p>
                   <div className="h-2 rounded-full bg-white/20 overflow-hidden mb-5">
                     <div
-                      className="h-full rounded-full bg-white transition-all duration-700"
+                      className="h-full rounded-full bg-white transition-all duration-300"
                       style={{ width: loading ? "0%" : `${weeklyPercent}%` }}
                     />
                   </div>
@@ -202,7 +202,7 @@ export default function Dashboard() {
                           <div className="flex items-center gap-2 mt-1.5">
                             <div className="flex-1 h-1.5 rounded-full bg-[var(--border)] overflow-hidden">
                               <div
-                                className="h-full rounded-full bg-primary transition-all duration-700"
+                                className="h-full rounded-full bg-primary transition-all duration-300"
                                 style={{ width: `${c.progress}%` }}
                               />
                             </div>

@@ -202,7 +202,7 @@ export default function Analytics() {
                   </span>
                   <div className="flex-1 h-2.5 rounded-full bg-[var(--surface)] border border-[var(--border)] overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-700"
+                      className="h-full rounded-full transition-all duration-300"
                       style={{
                         width: `${(v / max) * 100}%`,
                         background: "linear-gradient(135deg, var(--btn-grad-from) 0%, var(--btn-grad-to) 100%)",

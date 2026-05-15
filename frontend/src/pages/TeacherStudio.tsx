@@ -175,7 +175,7 @@ export default function TeacherStudio() {
               <p className="text-sm font-bold font-display text-[var(--text)]">
                 Заявки на запись · {pendingTotal}
               </p>
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse ml-1" />
+              <span className="w-2 h-2 rounded-full bg-primary ml-1" />
             </div>
 
             {/* аккордеон — один элемент на каждый курс у которого есть заявки */}
@@ -376,7 +376,7 @@ export default function TeacherStudio() {
                         {course.progress > 0 && (
                           <div className="mt-2 h-1.5 rounded-full bg-[var(--surface)] border border-[var(--border)] overflow-hidden w-40">
                             <div
-                              className="h-full rounded-full transition-all duration-500"
+                              className="h-full rounded-full transition-all duration-300"
                               style={{
                                 width: `${course.progress}%`,
                                 background: "linear-gradient(135deg, var(--btn-grad-from) 0%, var(--btn-grad-to) 100%)",

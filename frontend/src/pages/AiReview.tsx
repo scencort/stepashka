@@ -281,7 +281,7 @@ export default function AiReview() {
                     Gradus AI
                   </h3>
                   <p className="text-xs font-medium text-emerald-500 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                     Online
                   </p>
                 </div>

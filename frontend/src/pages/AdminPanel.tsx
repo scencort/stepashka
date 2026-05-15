@@ -286,7 +286,7 @@ export default function AdminPanel() {
                   <p className="text-sm font-bold font-display text-[var(--text)]">
                     На модерации · {pendingCourses.length}
                   </p>
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse ml-1" />
+                  <span className="w-2 h-2 rounded-full bg-amber-500 ml-1" />
                 </div>
                 <div className="space-y-3">
                   {pendingCourses.map(course => (

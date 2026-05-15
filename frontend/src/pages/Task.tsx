@@ -213,7 +213,7 @@ export default function Task() {
               <div className="space-y-5">
                 {/* Scores */}
                 <Card className="space-y-4 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 relative overflow-hidden group">
-                  <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform duration-700" />
+                  <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
                   <div className="flex items-start justify-between relative z-10">
                     <p className="font-bold text-slate-500">Общая оценка</p>
                     <p className={`text-4xl font-black tracking-tight leading-none ${scoreColor}`}>{avgScore}%</p>
