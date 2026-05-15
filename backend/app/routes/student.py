@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import date, timedelta
 
@@ -664,40 +665,19 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
                     feedback = "Ответ слишком короткий. Напишите развёрнутый ответ."
                     check_results = None
                 else:
-                    essay_eval = await estimate_essay(answer, rubric_data)
-                    passed = essay_eval["status"] == "passed"
-                    score = max(0, min(20, round(essay_eval["score"] / 5)))
-                    # Short pass/fail message in the feedback box
-                    total_score = essay_eval.get("score", 0)
-                    feedback = (
-                        "Верно"
-                        if passed
-                        else f"Эссе требует доработки. Набрано {total_score}/100 баллов."
-                    )
-                    # AI detailed analysis → shown in the robot box
-                    ai_feedback = essay_eval.get("feedback", "")
-                    ai_strengths = essay_eval.get("strengths", [])
-                    ai_improvements = essay_eval.get("improvements", [])
-                    ai_hints = essay_eval.get("hints", [])
-                    ai_comment_parts = []
-                    if ai_feedback:
-                        ai_comment_parts.append(ai_feedback)
-                    if ai_strengths:
-                        ai_comment_parts.append(
-                            "ЧТО ХОРОШО:\n" + "\n".join(f"- {s}" for s in ai_strengths)
-                        )
-                    if ai_improvements:
-                        ai_comment_parts.append(
-                            "ЧТО ДОРАБОТАТЬ:\n" + "\n".join(f"- {s}" for s in ai_improvements)
-                        )
-                    elif ai_hints:
-                        ai_comment_parts.append("СОВЕТЫ:\n" + "\n".join(f"- {s}" for s in ai_hints))
-                    evaluation["aiComment"] = "\n\n".join(ai_comment_parts) if ai_comment_parts else None
-                    kw_matches = essay_eval.get("keywordMatches", [])
-                    check_results = [
-                        {"name": f"Ключевое слово: {m['keyword']}", "passed": m["found"]}
-                        for m in kw_matches
-                    ] if kw_matches else None
+                    essay_eval = estimate_essay(answer, rubric_data)
+                    passed = essay_eval["passed"]
+                    score = 20 if passed else 0
+                    feedback = essay_eval["feedback"]
+                    # Показываем список ключевых слов как чекбоксы в UI
+                    missing = essay_eval.get("missingKeywords", [])
+                    rubric_kws = [kw.strip() for kw in re.split(r"[,;\n]", (rubric_data or {}).get("keywords", "")) if kw.strip()]
+                    if rubric_kws:
+                        check_results = [
+                            {"name": f"Ключевое слово: «{kw}»", "passed": kw not in missing}
+                            for kw in rubric_kws
+                        ]
+                    evaluation["aiComment"] = None
 
             else:
                 kind = "code"

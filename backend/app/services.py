@@ -450,108 +450,28 @@ async def _ai_complete(prompt: str, system: str = "") -> str:
         return ""
 
 
-async def estimate_essay(answer_text: str, rubric: dict | None = None) -> dict:
+def estimate_essay(answer_text: str, rubric: dict | None = None) -> dict:
+    """Проверяет эссе только по ключевым словам — без баллов и AI.
+    Возвращает passed=True если все обязательные слова найдены (или их нет вовсе).
+    """
     text = (answer_text or "").strip()
     rubric = rubric or {}
     keywords_str = rubric.get("keywords", "")
 
     if not text:
-        return {
-            "score": 0,
-            "metrics": {"content": 0, "creativity": 0, "clarity": 0, "keywords": 0},
-            "status": "failed",
-            "feedback": "Эссе не заполнено.",
-            "hints": ["Напишите ответ на задание."],
-            "keywordMatches": [],
-        }
+        return {"passed": False, "feedback": "Эссе не заполнено.", "missingKeywords": []}
 
-    # Build keyword hint list
     keyword_list = [kw.strip() for kw in re.split(r"[,;\n]", keywords_str) if kw.strip()] if keywords_str else []
 
-    system_prompt = (
-        "Ты — строгий, но справедливый ментор. Оцени эссе по четырём критериям "
-        "от 0 до 25 баллов каждый:\n"
-        "1. content — соответствие теме и полнота раскрытия\n"
-        "2. creativity — оригинальность мышления, неожиданные идеи\n"
-        "3. clarity — чёткость изложения, структура, грамотность\n"
-        "4. depth — глубина анализа, аргументация\n\n"
-        "Обращайся к автору напрямую на 'ты': 'ты раскрыл...', 'у тебя...', 'ты мог бы...'. "
-        "Никогда не упоминай слово 'студент'.\n\n"
-        "Верни ТОЛЬКО JSON без лишнего текста в формате:\n"
-        '{"content":N,"creativity":N,"clarity":N,"depth":N,'
-        '"feedback":"краткое общее резюме",'
-        '"strengths":["что конкретно хорошо в эссе (2-3 пункта)"],'
-        '"improvements":["что конкретно можно доработать (2-3 пункта)"],'
-        '"hints":["конкретный совет 1","конкретный совет 2"]}'
-    )
+    # Если ключевых слов нет — любой непустой ответ засчитывается
+    if not keyword_list:
+        return {"passed": True, "feedback": "Верно", "missingKeywords": []}
 
-    keyword_note = ""
-    if keyword_list:
-        keyword_note = f"\n\nОбязательные ключевые слова/фразы: {', '.join(keyword_list)}"
+    text_lower = text.lower()
+    missing = [kw for kw in keyword_list if kw.lower() not in text_lower]
 
-    user_prompt = f"Эссе:{keyword_note}\n\n{text}"
+    if missing:
+        hint = "Не найдены обязательные слова: " + ", ".join(f'«{w}»' for w in missing)
+        return {"passed": False, "feedback": hint, "missingKeywords": missing}
 
-    ai_text = await _ai_complete(user_prompt, system_prompt)
-
-    # Parse AI JSON response
-    scores = {"content": 0, "creativity": 0, "clarity": 0, "depth": 0}
-    feedback_text = ""
-    strengths: list[str] = []
-    improvements: list[str] = []
-    hints: list[str] = []
-    try:
-        json_match = re.search(r'\{.*\}', ai_text, re.DOTALL)
-        if json_match:
-            parsed = json.loads(json_match.group())
-            for k in scores:
-                scores[k] = max(0, min(25, int(parsed.get(k, 0))))
-            feedback_text = str(parsed.get("feedback", ""))
-            strengths = [str(h) for h in (parsed.get("strengths") or [])]
-            improvements = [str(h) for h in (parsed.get("improvements") or [])]
-            hints = [str(h) for h in (parsed.get("hints") or [])]
-    except Exception:
-        pass
-
-    # Fallback heuristic if AI failed
-    if not any(scores.values()):
-        scores["content"] = min(25, 20 if len(text) > 80 else 10)
-        scores["creativity"] = min(25, 15 if len(text) > 200 else 8)
-        scores["clarity"] = min(25, 18 if "\n" in text else 10)
-        scores["depth"] = min(25, 16 if re.search(r"пример|метрика|шаг|план|вывод|аргумент", text, re.I) else 9)
-        feedback_text = "Оценка по базовым критериям (AI недоступен)"
-        hints = [
-            "Сформулируйте тезис в первом абзаце.",
-            "Добавьте конкретные примеры.",
-            "Разделите текст на смысловые блоки.",
-        ]
-
-    total = sum(scores.values())
-
-    # Check keyword presence — missing required keywords = hard fail
-    keyword_matches = []
-    keyword_fail = False
-    if keyword_list:
-        text_lower = text.lower()
-        for kw in keyword_list:
-            found = kw.lower() in text_lower
-            keyword_matches.append({"keyword": kw, "found": found})
-        missing = [m["keyword"] for m in keyword_matches if not m["found"]]
-        if missing:
-            keyword_fail = True
-            total = 0  # hard zero — required keywords missing
-            if not hints:
-                hints = []
-            hints.insert(0, f"Обязательные ключевые слова не найдены: {', '.join(missing)}. Без них задание не засчитывается.")
-
-    passed = not keyword_fail and total >= 60
-
-    return {
-        "score": total,
-        "metrics": scores,
-        "status": "passed" if passed else "failed",
-        "feedback": feedback_text or ("Ответ содержательный." if passed else "Ответ требует доработки."),
-        "strengths": strengths[:3],
-        "improvements": improvements[:3],
-        "hints": hints[:4],
-        "keywordMatches": keyword_matches,
-    }
+    return {"passed": True, "feedback": "Верно", "missingKeywords": []}
