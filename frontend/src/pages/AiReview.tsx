@@ -23,7 +23,19 @@ type ChatMessage = {
 };
 
 // ── Markdown renderer ────────────────────────────────────────────────────────
+// Эти три компонента отвечают за красивое отображение ответа AI в чате.
+// AI возвращает обычный текст с markdown-разметкой, мы сами его парсим и рисуем.
+//
+// Цепочка вызовов:
+//   AiMarkdown (точка входа)
+//     → разбивает текст на блоки: обычный текст и блоки кода (``` ... ```)
+//     → AiTextBlock — рендерит обычный текст (заголовки, списки, параграфы)
+//         → renderInline — рендерит инлайн-разметку: **жирный**, *курсив*, `код`
+//     → AiCodeBlock — рендерит блок кода с тёмным фоном и кнопкой "копировать"
 
+// AiCodeBlock — тёмный блок кода с шапкой (язык + кнопка копировать)
+// Пример входа от AI: ```python\nprint("hello")\n```
+// lang = "python", code = 'print("hello")'
 function AiCodeBlock({ code, lang }: { code: string; lang: string }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
@@ -34,18 +46,22 @@ function AiCodeBlock({ code, lang }: { code: string; lang: string }) {
   };
   return (
     <div className="rounded-xl overflow-hidden border my-3" style={{ borderColor: "var(--border)" }}>
+      {/* Шапка блока: название языка слева, кнопка копировать справа */}
       <div className="flex items-center justify-between px-3 py-1.5 text-[11px] font-semibold" style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", color: "var(--muted)" }}>
         <span>{lang || "code"}</span>
         <button onClick={copy} className="hover:opacity-70 transition-opacity">{copied ? "✓ скопировано" : "копировать"}</button>
       </div>
+      {/* Сам код — тёмный фон (#1e1e2e — тема Catppuccin), моноширинный шрифт */}
       <pre className="text-xs font-mono overflow-x-auto p-4 leading-relaxed whitespace-pre" style={{ background: "#1e1e2e", color: "#cdd6f4" }}>{code}</pre>
     </div>
   );
 }
 
+// renderInline — парсит инлайн-разметку внутри одной строки текста
+// Превращает: **жирный** → <strong>, *курсив* → <em>, `код` → <code>
+// Всё остальное остаётся обычным текстом
 function renderInline(text: string): ReactNode[] {
   const parts: ReactNode[] = [];
-  // split on **bold**, *italic*, `code`
   const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`)/g;
   let last = 0;
   let m: RegExpExecArray | null;
@@ -61,10 +77,12 @@ function renderInline(text: string): ReactNode[] {
   return parts;
 }
 
+// AiMarkdown — точка входа, принимает весь текст ответа AI
+// Сначала вырезает блоки кода (``` ... ```), остальное отдаёт AiTextBlock
+// Порядок важен: код парсим до текста, иначе markdown внутри кода будет сломан
 function AiMarkdown({ text }: { text: string }) {
   if (!text) return null;
 
-  // Split by fenced code blocks first
   const segments: ReactNode[] = [];
   const fenceRe = /```(\w*)\n?([\s\S]*?)```/g;
   let last = 0;
@@ -72,12 +90,15 @@ function AiMarkdown({ text }: { text: string }) {
   let si = 0;
 
   while ((m = fenceRe.exec(text)) !== null) {
+    // текст перед блоком кода → AiTextBlock
     if (m.index > last) {
       segments.push(<AiTextBlock key={si++} text={text.slice(last, m.index)} />);
     }
+    // сам блок кода → AiCodeBlock
     segments.push(<AiCodeBlock key={si++} lang={m[1] || "code"} code={m[2].trimEnd()} />);
     last = m.index + m[0].length;
   }
+  // остаток после последнего блока кода
   if (last < text.length) {
     segments.push(<AiTextBlock key={si++} text={text.slice(last)} />);
   }
@@ -85,6 +106,8 @@ function AiMarkdown({ text }: { text: string }) {
   return <div className="space-y-0.5">{segments}</div>;
 }
 
+// AiTextBlock — рендерит обычный текст построчно
+// Поддерживает: заголовки (# ## ###), горизонтальную черту (---), списки (- * 1.), параграфы
 function AiTextBlock({ text }: { text: string }) {
   const lines = text.split("\n");
   const nodes: ReactNode[] = [];
@@ -95,10 +118,10 @@ function AiTextBlock({ text }: { text: string }) {
     const raw = lines[i];
     const trimmed = raw.trim();
 
-    // Skip blank lines (used as separators)
+    // пустая строка — просто пропускаем
     if (!trimmed) { i++; continue; }
 
-    // Heading: # ## ###
+    // заголовок: # Заголовок 1, ## Заголовок 2, ### Заголовок 3
     const hMatch = trimmed.match(/^(#{1,3})\s+(.+)/);
     if (hMatch) {
       const level = hMatch[1].length;
@@ -107,13 +130,13 @@ function AiTextBlock({ text }: { text: string }) {
       i++; continue;
     }
 
-    // Horizontal rule
+    // горизонтальная черта: --- или ***
     if (/^[-*]{3,}$/.test(trimmed)) {
       nodes.push(<hr key={li++} className="my-2 border-[var(--border)]" />);
       i++; continue;
     }
 
-    // List block: collect consecutive list items
+    // список: собираем подряд идущие пункты (- текст, * текст, 1. текст)
     if (/^[-*+]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) {
       const items: ReactNode[] = [];
       while (i < lines.length) {
@@ -123,6 +146,7 @@ function AiTextBlock({ text }: { text: string }) {
         if (listMatch) {
           items.push(
             <li key={items.length} className="flex gap-2 text-sm leading-relaxed" style={{ color: "var(--text)" }}>
+              {/* розовая точка вместо стандартного маркера списка */}
               <span className="shrink-0 mt-0.5 text-rose-400">•</span>
               <span>{renderInline(listMatch[1])}</span>
             </li>
@@ -134,7 +158,7 @@ function AiTextBlock({ text }: { text: string }) {
       continue;
     }
 
-    // Regular paragraph
+    // обычный параграф — просто текст с инлайн-разметкой
     nodes.push(<p key={li++} className="text-sm leading-relaxed" style={{ color: "var(--text)" }}>{renderInline(trimmed)}</p>);
     i++;
   }

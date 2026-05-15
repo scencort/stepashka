@@ -315,7 +315,6 @@ export default function Landing() {
           {/* Truly centered nav links — absolute so logo/buttons widths don't shift them */}
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-[var(--muted)] absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <a href="#features" className="hover:text-[var(--text)] transition-colors">Возможности</a>
-            <a href="#tracks" className="hover:text-[var(--text)] transition-colors">Треки</a>
             <a href="#community" className="hover:text-[var(--text)] transition-colors">Сообщество</a>
             <a href="#courses" className="hover:text-[var(--text)] transition-colors">Каталог</a>
             <a href="#developers" className="hover:text-[var(--text)] transition-colors">Команда</a>
@@ -648,43 +647,6 @@ export default function Landing() {
       </section>
 
       {/* ── TRACKS ── */}
-      <section id="tracks" className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-24">
-        <motion.div
-          className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 md:mb-12"
-          initial={{ opacity: 0, y: 32 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Направления</p>
-            <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl">Выберите свой трек</h2>
-          </div>
-          <Link to="/register" className="btn-secondary px-5 py-2.5 text-sm w-fit gap-1.5 shrink-0">
-            Все треки <ArrowRight size={15} />
-          </Link>
-        </motion.div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {tracks.map((track, i) => (
-            <motion.div
-              key={i}
-              className="card p-5 flex items-center gap-4 hover:shadow-card-md hover:border-primary/20 transition-all group cursor-pointer"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 0.45, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="w-11 h-11 rounded-xl bg-[var(--surface)] flex items-center justify-center text-[var(--muted)] group-hover:bg-primary-50 group-hover:text-primary dark:group-hover:bg-primary-900/20 transition-colors shrink-0">
-                {track.icon}
-              </div>
-              <span className="font-semibold text-sm">{track.name}</span>
-              <ChevronRight size={16} className="ml-auto text-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
       {/* ── COURSES ── */}
       <section id="courses" className="bg-[var(--surface)] border-t border-[var(--border)] py-24">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16">

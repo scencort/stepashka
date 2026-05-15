@@ -244,7 +244,9 @@ def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
     tests = tests_raw if isinstance(tests_raw, list) else []
 
     # Determine if any test is IO-based (will run code itself)
-    has_io = any(("expectedOutput" in t or "input" in t) for t in tests)
+    # Note: outputLineCount/outputContainsLine also have "input" but are NOT IO-comparison tests
+    _io_types = {"outputLineCount", "outputContainsLine", "regex", "includesAny", "includesAll", "minCountRegex"}
+    has_io = any(("expectedOutput" in t or ("input" in t and t.get("type") not in _io_types)) for t in tests)
 
     # For pattern-only tests: ALWAYS run code first.
     # If it crashes → fail all checks immediately.
@@ -281,7 +283,7 @@ def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
 
     for idx, raw_test in enumerate(tests):
         test = raw_test or {}
-        if "expectedOutput" in test or "input" in test:
+        if "expectedOutput" in test or ("input" in test and test.get("type") not in _io_types):
             # IO-based test: run code, compare stdout
             test_input = str(test.get("input") or "")
             expected = str(test.get("expectedOutput") or "").strip()
@@ -368,11 +370,22 @@ def evaluate_code_by_tests(answer: str, tests_raw: list | None) -> dict:
                 # Run code, check stdout has >= min non-empty lines
                 _inp = str(test.get("input") or "")
                 _stdout, _stderr, _rc = _run_code_with_input(answer, _inp)
+                _min = int(test.get("min", 1))
                 if _rc != 0:
                     ok = False
+                    check_results.append({"name": name, "passed": False, "error": _format_python_error(_stderr)})
                 else:
                     _non_empty = [l for l in _stdout.split("\n") if l.strip()]
-                    ok = len(_non_empty) >= int(test.get("min", 1))
+                    ok = len(_non_empty) >= _min
+                    check_results.append({
+                        "name": name,
+                        "passed": ok,
+                        "expected": f"минимум {_min} строк",
+                        "actual": f"{len(_non_empty)} строк: {_stdout.strip()[:200]}",
+                    })
+                if check_results[-1]["passed"]:
+                    passed_count += 1
+                continue
             else:
                 ok = len(answer.strip()) >= 20
             check_results.append({"name": name, "passed": ok})
