@@ -650,7 +650,7 @@ async def check_step(step_id: int, request: Request, user: CurrentUser):
                 elif answer:
                     passed = False
                     score = 0
-                    feedback = f"Неверно. Правильный ответ: {correct_answer}" if correct_answer else "Неверно, попробуйте ещё раз."
+                    feedback = "Неверно, попробуйте ещё раз."
                 else:
                     passed = False
                     score = 0
