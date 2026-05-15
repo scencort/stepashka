@@ -443,12 +443,12 @@ async def _ai_generate(prompt: str, system: str = "") -> str:
     # Default: Gemini with tunnel fallback
     try:
         return await _gemini_generate(prompt, system)
-    except Exception:
+    except Exception as exc:
         if settings.openai_api_key:
             return await _openai_generate(prompt, system)
         if settings.groq_api_key:
             return await _groq_generate(prompt, system)
-        raise
+        raise ValueError(str(exc)) from exc
 
 
 def _current_model() -> str:
@@ -473,18 +473,11 @@ async def ai_chat(body: AiChatBody, user: CurrentUser):
         system = "Ты учебный AI-ассистент платформы Gradus. Отвечай на русском, структурно и практично."
 
         answer = await _ai_generate(prompt, system)
-    except ValueError as exc:
+    except Exception as exc:
         import logging
 
         logging.getLogger(__name__).warning("AI chat fallback: %s", exc)
-        if _current_model().startswith("accounts/fireworks"):
-            answer = (
-                "AI-провайдер Fireworks недоступен для текущего ключа: "
-                f"{str(exc)[:220]}. "
-                "Проверьте billing/лимиты Fireworks или переключитесь на другой провайдер."
-            )
-        else:
-            answer = _chat_fallback(body.message)
+        answer = _chat_fallback(body.message)
         model_used = "fallback"
 
     await write_audit(
