@@ -411,11 +411,11 @@ export default function CourseCatalog(props: Props) {
           {catalogFiltered.map((course) => {
             const catMeta = getCatMeta(course.category || "");
             const levelMeta = getLevelMeta(course.level || "");
+            // карточка курса — hover-эффекты через класс "group" на родителе:
+            // group-hover:scale-105 на обложке → при наведении картинка увеличивается на 5%
+            // overflow-hidden на контейнере обрезает картинку по границам блока
+            // group-hover:text-primary на заголовке → цвет меняется одновременно с zoom
             return (
-              // карточка курса — hover-эффекты через класс "group" на родителе:
-              // group-hover:scale-105 на обложке → при наведении картинка увеличивается на 5%
-              // overflow-hidden на контейнере обрезает картинку по границам блока
-              // group-hover:text-primary на заголовке → цвет меняется одновременно с zoom
               <div
                 key={course.id}
                 className="card p-0 overflow-hidden cursor-pointer group flex flex-col"
