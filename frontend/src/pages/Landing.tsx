@@ -11,12 +11,10 @@ import {
   Zap,
   Star,
   Users,
-  Clock3,
   CheckCircle2,
   Brain,
   Shield,
   Trophy,
-  Play,
   ChevronRight,
   Sparkles,
   Send,
@@ -150,39 +148,24 @@ export default function Landing() {
     { icon: <Trophy size={22} />, title: "Сертификаты", desc: "Подтвердите свои навыки официальным сертификатом после завершения курса" },
   ];
 
-  const [courses, setCourses] = useState<Array<{
-    id: number; title: string; author: string; level: string;
-    rating: string; students: string; duration: string; price: string;
-  }>>([]);
-
   const [landingStats, setLandingStats] = useState({
     coursesTotal: 0, studentsTotal: 0, averageRating: 0, communityMembers: 0,
   });
-
-  const [coursesLoading, setCoursesLoading] = useState(true);
 
   const fmt = (v: number) =>
     new Intl.NumberFormat("ru-RU", { notation: "compact", compactDisplay: "short", maximumFractionDigits: 1 }).format(Math.max(0, Math.round(v)));
 
   useEffect(() => {
     const load = async () => {
-      setCoursesLoading(true);
       try {
-        const [cr, sr] = await Promise.allSettled([
-          api.get<typeof courses>("/courses"),
-          api.get<typeof landingStats>("/landing/stats"),
-        ]);
-        if (cr.status === "fulfilled") setCourses(cr.value.slice(0, 3));
-        if (sr.status === "fulfilled") {
-          const s = sr.value;
-          setLandingStats({
-            coursesTotal:     Number(s.coursesTotal     || 0),
-            studentsTotal:    Number(s.studentsTotal    || 0),
-            averageRating:    Number(s.averageRating    || 0),
-            communityMembers: Number(s.communityMembers || 0),
-          });
-        }
-      } finally { setCoursesLoading(false); }
+        const sr = await api.get<typeof landingStats>("/landing/stats");
+        setLandingStats({
+          coursesTotal:     Number(sr.coursesTotal     || 0),
+          studentsTotal:    Number(sr.studentsTotal    || 0),
+          averageRating:    Number(sr.averageRating    || 0),
+          communityMembers: Number(sr.communityMembers || 0),
+        });
+      } catch { /* ignore */ }
     };
     void load();
   }, []);
@@ -305,7 +288,6 @@ export default function Landing() {
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-[var(--muted)] absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <a href="#features" className="hover:text-[var(--text)] transition-colors">Возможности</a>
             <a href="#community" className="hover:text-[var(--text)] transition-colors">Сообщество</a>
-            <a href="#courses" className="hover:text-[var(--text)] transition-colors">Каталог</a>
             <a href="#developers" className="hover:text-[var(--text)] transition-colors">Команда</a>
           </div>
 
@@ -379,11 +361,6 @@ export default function Landing() {
             Начать бесплатно
             <ArrowRight size={18} />
           </Link>
-          <a href="#courses"
-            className="btn-ghost px-7 py-3.5 text-base gap-2">
-            <Play size={16} className="fill-current" />
-            Смотреть курсы
-          </a>
         </div>
 
         {/* Floating cards — chaotically scattered around the hero */}
@@ -637,79 +614,6 @@ export default function Landing() {
 
       {/* ── TRACKS ── */}
       {/* ── COURSES ── */}
-      <section id="courses" className="bg-[var(--surface)] border-t border-[var(--border)] py-24">
-        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16">
-          <motion.div
-            className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12"
-            initial={{ opacity: 0, y: 32 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Каталог</p>
-              <h2 className="font-display font-bold text-2xl sm:text-4xl md:text-5xl">Популярные курсы</h2>
-            </div>
-            <Link to="/register" className="btn-primary px-5 py-2.5 text-sm w-fit gap-1.5">
-              Все курсы <ArrowRight size={15} />
-            </Link>
-          </motion.div>
-
-          {coursesLoading ? (
-            <div className="grid md:grid-cols-3 gap-5">
-              {[1,2,3].map(i => (
-                <div key={i} className="card p-6 animate-pulse space-y-3">
-                  <div className="h-4 bg-[var(--border)] rounded w-3/4" />
-                  <div className="h-3 bg-[var(--border)] rounded w-1/2" />
-                  <div className="h-3 bg-[var(--border)] rounded w-2/3" />
-                </div>
-              ))}
-            </div>
-          ) : courses.length > 0 ? (
-            <div className="grid md:grid-cols-3 gap-5">
-              {courses.map((course, _i) => (
-                <motion.div
-                  key={course.id}
-                  className="card p-6 flex flex-col hover:shadow-card-md hover:border-primary/20 transition-all"
-                  initial={{ opacity: 0, y: 40 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-40px" }}
-                  transition={{ duration: 0.5, delay: _i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary shrink-0">
-                      <Code size={18} />
-                    </div>
-                    <span className="badge-neutral text-xs">{course.level}</span>
-                  </div>
-                  <h3 className="font-display font-semibold text-base mb-1">{course.title}</h3>
-                  <p className="text-sm text-[var(--muted)] mb-4">{course.author}</p>
-                  <div className="mt-auto pt-4 border-t border-[var(--border)] flex items-center gap-4 text-xs text-[var(--muted)]">
-                    <span className="flex items-center gap-1">
-                      <Star size={12} className="text-amber-400 fill-amber-400" />
-                      {course.rating}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Users size={12} />
-                      {course.students}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock3 size={12} />
-                      {course.duration}
-                    </span>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-[var(--muted)]">
-              <p className="text-lg">Курсы пока не добавлены</p>
-              <p className="text-sm mt-2">Скоро здесь появятся курсы — следите за обновлениями</p>
-            </div>
-          )}
-        </div>
-      </section>
-
       {/* ── DEVELOPERS ── */}
       <section id="developers" className="relative bg-[var(--surface)] border-t border-[var(--border)] py-16 lg:py-28 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
