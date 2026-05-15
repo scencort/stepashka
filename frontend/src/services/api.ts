@@ -689,21 +689,10 @@ const routeMappings: RouteMapping[] = [
       passthrough<T>("/ai/chat", m, rawBody),
   },
   {
-    pattern: "/ai-review/check",
-    method: "POST",
-    transform: <T>(_p: string, m: string, rawBody?: unknown) =>
-      passthrough<T>("/ai/review/check", m, rawBody),
-  },
-  {
     pattern: "/ai/review/check",
     method: "POST",
     transform: <T>(_p: string, m: string, rawBody?: unknown) =>
       passthrough<T>("/ai/review/check", m, rawBody),
-  },
-  {
-    pattern: "/ai-review/history",
-    method: "GET",
-    transform: <T>() => backendRequest<T>("/ai/review/history"),
   },
   {
     pattern: "/ai/review/history",

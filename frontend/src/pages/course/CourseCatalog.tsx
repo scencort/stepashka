@@ -13,7 +13,8 @@
 //   overflow-hidden на контейнере обложки → обрезает картинку по границам блока
 //   group-hover:text-primary на заголовке → заголовок краснеет одновременно с zoom
 //   transition-transform duration-300 → анимация за 300мс, плавно
-import React, { useMemo } from "react";
+import { useMemo } from "react";
+import type { ReactNode } from "react";
 import {
   Users,
   Star,
@@ -62,7 +63,7 @@ type CourseItem = {
 
 const CATEGORY_META: Record<
   string,
-  { label: string; icon: React.ReactNode; color: string }
+  { label: string; icon: ReactNode; color: string }
 > = {
   // lowercase keys — matches CourseEditor values
   programming: {

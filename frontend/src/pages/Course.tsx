@@ -162,7 +162,6 @@ export default function Course() {
   const [search, setSearch] = useState("");
   // история попыток текущего шага
   const [attemptHistory, setAttemptHistory] = useState<AttemptEntry[]>([]);
-  const [_autoAdvance] = useState(false);
   // какие модули открыты/закрыты в боковом меню
   const [openModules, setOpenModules] = useState<Record<number, boolean>>({});
   // записан ли юзер на этот курс

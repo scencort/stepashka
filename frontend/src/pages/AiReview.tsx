@@ -11,7 +11,7 @@
 // AiMarkdown — свой рендерер markdown: парсит ```код```, **жирный**, *курсив*, списки
 // context: последние 8 сообщений — чтобы GPT помнил контекст разговора
 import { useEffect, useState, useRef } from "react";
-import React from "react";
+import type { ReactNode } from "react";
 import MainLayout from "../layout/MainLayout";
 import Card from "../components/ui/Card";
 import { api } from "../lib/api";
@@ -43,8 +43,8 @@ function AiCodeBlock({ code, lang }: { code: string; lang: string }) {
   );
 }
 
-function renderInline(text: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
+function renderInline(text: string): ReactNode[] {
+  const parts: ReactNode[] = [];
   // split on **bold**, *italic*, `code`
   const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`)/g;
   let last = 0;
@@ -65,7 +65,7 @@ function AiMarkdown({ text }: { text: string }) {
   if (!text) return null;
 
   // Split by fenced code blocks first
-  const segments: React.ReactNode[] = [];
+  const segments: ReactNode[] = [];
   const fenceRe = /```(\w*)\n?([\s\S]*?)```/g;
   let last = 0;
   let m: RegExpExecArray | null;
@@ -87,7 +87,7 @@ function AiMarkdown({ text }: { text: string }) {
 
 function AiTextBlock({ text }: { text: string }) {
   const lines = text.split("\n");
-  const nodes: React.ReactNode[] = [];
+  const nodes: ReactNode[] = [];
   let i = 0;
   let li = 0;
 
@@ -115,7 +115,7 @@ function AiTextBlock({ text }: { text: string }) {
 
     // List block: collect consecutive list items
     if (/^[-*+]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) {
-      const items: React.ReactNode[] = [];
+      const items: ReactNode[] = [];
       while (i < lines.length) {
         const l = lines[i].trim();
         const listMatch = l.match(/^(?:[-*+]|\d+\.)\s+(.*)/);
