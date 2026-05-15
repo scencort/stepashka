@@ -184,13 +184,14 @@ export default function Task() {
 
             {/* Code editor card */}
             <div className="card overflow-hidden">
-              <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
-                <h3 className="text-sm font-bold inline-flex items-center gap-2 text-[var(--text)]">
-                  <Code2 size={16} className="text-primary" /> Ваш код
-                </h3>
-                <p className="text-xs font-semibold text-[var(--muted)] px-3 py-1 rounded-full bg-[var(--surface)]">
+              {/* macOS-style title bar */}
+              <div className="px-4 py-2 border-b border-[var(--border)] flex items-center gap-2" style={{ background: "var(--surface)" }}>
+                <span className="w-3 h-3 rounded-full bg-rose-400 inline-block" />
+                <span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />
+                <span className="w-3 h-3 rounded-full bg-emerald-400 inline-block" />
+                <span className="ml-2 text-xs font-semibold text-[var(--muted)]">
                   {LANGUAGES.find((l) => l.value === language)?.label || language}
-                </p>
+                </span>
               </div>
               <CodeEditor
                 value={code}
