@@ -46,19 +46,27 @@ type NotificationItem = { id: number; title: string; time: string };
 const READ_NOTIFICATIONS_KEY = "gradus_read_notifications_v1";
 
 // грузим прочитанные id из localStorage — чтобы не показывать красную точку повторно
+// Set<number> удобнее массива: проверка .has(id) за O(1), нет дубликатов
+// оборачиваем в try/catch потому что localStorage может быть заблокирован (приватный режим, iframe)
+// если вдруг JSON сломан или там хранится не массив — тихо возвращаем пустой Set
+// v1 в ключе — чтобы при изменении формата не подхватить старые кривые данные
 function loadReadIds(): Set<number> {
   try {
     const raw = localStorage.getItem(READ_NOTIFICATIONS_KEY);
     if (!raw) return new Set();
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return new Set();
+    // фильтруем только числа — защита от ситуации когда в localStorage попало что-то чужое
     return new Set(arr.filter((v) => typeof v === "number"));
   } catch {
     return new Set();
   }
 }
 
-// сохраняем обновлённый список в localStorage
+// сохраняем обновлённый Set обратно в localStorage
+// Set нельзя сериализовать напрямую через JSON.stringify — нужно сначала превратить в массив
+// Array.from(ids) даёт [1, 2, 3, ...] — именно это и пишем в строку
+// try/catch здесь тоже нужен: localStorage может быть полон (5MB лимит) или заблокирован
 function persistReadIds(ids: Set<number>) {
   try {
     localStorage.setItem(
@@ -134,12 +142,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [activeDays, setActiveDays] = useState<string[]>([]); // список дат когда была активность
 
   // считаем непрочитанные — те что не в readNotificationIds
+  // useMemo здесь потому что этот счётчик используется в нескольких местах JSX сразу:
+  // в красной точке на колокольчике, в бейдже внутри дропдауна и в кнопке "Прочитать всё"
+  // без useMemo одно и то же .filter() выполнялось бы три раза при каждом рендере
+  // пересчёт происходит только когда меняется список уведомлений ИЛИ список прочитанных id
   const unreadNotificationsCount = useMemo(
     () => notifications.filter((n) => !readNotificationIds.has(n.id)).length,
     [notifications, readNotificationIds],
   );
 
-  // пометить все как прочитанные и сохранить в localStorage
+  // помечаем все уведомления как прочитанные и сохраняем в localStorage
+  // new Set(readNotificationIds) — делаем копию, а не мутируем оригинал
+  // Set автоматически игнорирует дубликаты: если id уже был — просто ничего не добавится
+  // forEach добавляет все id из списка в копию, затем одним вызовом обновляем стейт и localStorage
+  // ранний выход если notifications пуст — чтобы не делать лишний setState и запись в storage
   const markAllNotificationsRead = () => {
     if (notifications.length === 0) return;
     const next = new Set(readNotificationIds);
@@ -149,6 +165,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   // если пользователь долистал список до конца — помечаем всё прочитанным
+  // scrollTop — сколько пикселей уже прокручено сверху
+  // clientHeight — видимая высота контейнера
+  // scrollHeight — полная высота контента включая скрытое
+  // когда scrollTop + clientHeight >= scrollHeight значит пользователь увидел последний элемент
+  // погрешность -4px на случай дробных пикселей при devicePixelRatio != 1
+  // это "ленивая" пометка: не требует явного клика, просто долистал до конца = прочитал
   const handleNotificationsScroll = (
     event: React.UIEvent<HTMLDivElement>,
   ) => {
