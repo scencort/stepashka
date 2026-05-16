@@ -196,6 +196,11 @@ _ERROR_MAP = [
     ("RecursionError:",     "Слишком глубокая рекурсия:"),
     ("RuntimeError:",       "Ошибка выполнения:"),
     ("ImportError:",        "Ошибка импорта:"),
+    ("EOFError:",           "Ошибка ввода:"),
+    ("TimeoutError:",       "Превышено время:"),
+    ("MemoryError:",        "Недостаточно памяти:"),
+    ("OverflowError:",      "Переполнение числа:"),
+    ("StopIteration:",      "Итератор исчерпан:"),
 ]
 
 
@@ -204,6 +209,31 @@ def _format_python_error(stderr: str) -> str:
     lines = stderr.strip().splitlines()
     if not lines:
         return "Неизвестная ошибка"
+
+    # Special case: EOFError means input() was called but no stdin was provided by the test
+    if any("EOFError" in l for l in lines):
+        # Find the line number where input() was called
+        line_num = None
+        for l in lines:
+            m = re.search(r'line (\d+)', l)
+            if m:
+                line_num = m.group(1)
+        hint = f"Строка {line_num}:\n  " if line_num else ""
+        # Try to extract the code line with input()
+        for i, l in enumerate(lines):
+            if re.match(r'\s*File ".*", line \d+', l):
+                code_idx = i + 1
+                if code_idx < len(lines) and not re.match(r'\s*File "|^\w.*Error:', lines[code_idx]):
+                    hint += lines[code_idx].strip() + "\n"
+                    ptr_idx = code_idx + 1
+                    if ptr_idx < len(lines) and re.match(r'[\s~^]+$', lines[ptr_idx].strip()):
+                        hint += "  " + lines[ptr_idx].rstrip() + "\n"
+        return (
+            hint +
+            "Ошибка ввода: функция input() ожидала данные, но тест не передал ничего в stdin.\n"
+            "Убедитесь что тест содержит поле «input» с нужными данными,\n"
+            "или что ваш код не вызывает input() при запуске без ввода."
+        )
 
     # Find the last 'File "...", line N' in the traceback (the user's code, not stdlib)
     last_file_idx = -1
