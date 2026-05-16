@@ -5,7 +5,10 @@
 //   пользователь вставляет код → выбирает язык → нажимает "Запустить ревью"
 //     → handleCheck() → setLoading(true), setResult(null) — сбрасываем старый результат
 //       → POST /ai/review/check { sourceCode: code, language }
-//         → бэк отправляет в GPT → возвращает { quality, correctness, style, summary, issues[], improvements[], goodParts[] }
+//         → бэк отправляет в GPT → возвращает структурированный ответ:
+//           { quality, correctness, style, status, summary, issues[], improvements[], goodParts[] }
+//           issues[] — массив { line: number|null, message: string } — ошибки с номерами строк
+//           status — "passed" | "needs_review" | "failed" — общий вердикт
 //           → setResult(data) → карточки с оценками появляются под редактором (левая колонка)
 //           → await loadHistory() — обновляем историю в правой колонке сразу после ревью
 //
@@ -19,17 +22,24 @@
 //   expandedId: number | null — какая запись раскрыта; клик → isOpen ? null : item.id
 //   handleClearHistory() → DELETE /ai/review/history → setHistory([]) — очищает весь список
 //
+// ПОДСВЕТКА КОДА В ИСТОРИИ:
+//   highlightLine() / highlightCode() — самодостаточный Python-подсветчик без внешних зависимостей
+//   использует те же функции что CourseStep.tsx (regex-токенизация)
+//   dark-mode определяется через useIsDark() — MutationObserver на classList документа
+//
 // МАКЕТ: grid xl:grid-cols-3
 //   левая колонка (xl:col-span-2): редактор + результаты + ошибка
 //   правая колонка: кнопка запуска + история прошлых ревью
 import MainLayout from "../layout/MainLayout";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import CodeEditor from "../components/ui/CodeEditor";
 import {
   Code2,
   CheckCircle,
+  XCircle,
+  Clock,
   AlertTriangle,
   Lightbulb,
   ThumbsUp,
@@ -40,6 +50,95 @@ import {
 import { api } from "../lib/api";
 import EmptyState from "../components/ui/EmptyState";
 import { useToast } from "../hooks/useToast";
+
+// ── Python syntax highlighter (same as CourseStep.tsx) ──────────────
+function useIsDark() {
+  const [isDark, setIsDark] = useState(() =>
+    document.documentElement.classList.contains("dark")
+  );
+  useEffect(() => {
+    const obs = new MutationObserver(() =>
+      setIsDark(document.documentElement.classList.contains("dark"))
+    );
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return isDark;
+}
+
+function escHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+const PY_KEYWORDS = new Set([
+  "def","class","import","from","return","if","elif","else","for","while",
+  "in","not","and","or","is","None","True","False","try","except","finally",
+  "with","as","raise","pass","break","continue","lambda","async","await",
+  "yield","global","nonlocal","del","assert","self","cls",
+]);
+const PY_BUILTINS = new Set([
+  "print","len","range","str","int","float","list","dict","set","tuple",
+  "bool","type","isinstance","hasattr","getattr","setattr","enumerate",
+  "zip","map","filter","sorted","reversed","sum","min","max","abs","round",
+  "open","super","input","repr","format","any","all","id","hex","bin","oct",
+  "staticmethod","classmethod","property","Exception","ValueError","TypeError",
+  "KeyError","IndexError","AttributeError","RuntimeError","StopIteration",
+]);
+
+function highlightLine(line: string, dark: boolean): string {
+  const c = dark
+    ? { kw:"#c084fc", str:"#4ade80", cmt:"#6b7280", num:"#fb923c", builtin:"#38bdf8", fn:"#60a5fa", op:"#818cf8", plain:"#e2e8f0" }
+    : { kw:"#7c3aed", str:"#15803d", cmt:"#6b7280", num:"#ea580c", builtin:"#0369a1", fn:"#1d4ed8", op:"#6366f1", plain:"#1e293b" };
+  let out = ""; let i = 0;
+  while (i < line.length) {
+    if (line[i] === "#") { out += `<span style="color:${c.cmt};font-style:italic">${escHtml(line.slice(i))}</span>`; break; }
+    let pfx = "";
+    if ("frb".includes(line[i]) && (line[i+1] === '"' || line[i+1] === "'")) pfx = line[i++];
+    if (line[i] === '"' || line[i] === "'") {
+      const q = line[i], triple = line.slice(i,i+3)===q+q+q, end = triple ? q+q+q : q;
+      let j = i + (triple ? 3 : 1);
+      while (j < line.length) { if (line[j]==="\\"){j+=2;continue;} if(line.slice(j,j+end.length)===end){j+=end.length;break;} j++; }
+      out += `<span style="color:${c.str}">${escHtml(pfx+line.slice(i,j))}</span>`; i=j; continue;
+    }
+    if (pfx) { out += escHtml(pfx); continue; }
+    if (line[i]==="@") { let j=i+1; while(j<line.length&&/[\w.]/.test(line[j]))j++; out+=`<span style="color:#f59e0b">${escHtml(line.slice(i,j))}</span>`; i=j; continue; }
+    if (/[0-9]/.test(line[i])&&(i===0||!/\w/.test(line[i-1]))) { let j=i; while(j<line.length&&/[0-9._xXbBoOeEjJ]/.test(line[j]))j++; out+=`<span style="color:${c.num}">${escHtml(line.slice(i,j))}</span>`; i=j; continue; }
+    if (/[a-zA-Z_]/.test(line[i])) {
+      let j=i; while(j<line.length&&/\w/.test(line[j]))j++;
+      const word=line.slice(i,j); let k=j; while(k<line.length&&line[k]===" ")k++;
+      if (PY_KEYWORDS.has(word)) out+=`<span style="color:${c.kw};font-weight:600">${escHtml(word)}</span>`;
+      else if (PY_BUILTINS.has(word)) out+=`<span style="color:${c.builtin}">${escHtml(word)}</span>`;
+      else if (line[k]==="(") out+=`<span style="color:${c.fn}">${escHtml(word)}</span>`;
+      else out+=`<span style="color:${c.plain}">${escHtml(word)}</span>`;
+      i=j; continue;
+    }
+    if ("+-*/%=<>!&|^~".includes(line[i])) out+=`<span style="color:${c.op}">${escHtml(line[i++])}</span>`;
+    else out+=escHtml(line[i++]);
+  }
+  return out;
+}
+
+function highlightCode(code: string, dark: boolean): string {
+  return code.split("\n").map(l => highlightLine(l, dark)).join("\n");
+}
+
+// Highlighted code block component for history view
+function HighlightedCode({ code }: { code: string }) {
+  const dark = useIsDark();
+  const html = useMemo(() => highlightCode(code, dark), [code, dark]);
+  return (
+    <pre
+      className="text-xs font-mono rounded-xl p-3 overflow-auto max-h-48 whitespace-pre-wrap break-words border"
+      style={{
+        background: dark ? "#0f172a" : "#f8fafc",
+        borderColor: dark ? "#27272a" : "#e2e8f0",
+        fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace",
+        lineHeight: "20px",
+      }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
 
 const LANGUAGES = [
   { value: "auto", label: "Авто-определение" },
@@ -59,12 +158,17 @@ const LANGUAGES = [
   { value: "html", label: "HTML/CSS" },
 ];
 
+// issue — объект с номером строки (null если проблема глобальная) и описанием
+type Issue = { line: number | null; message: string };
+
 type CheckResult = {
   quality: number;
   correctness: number;
   style: number;
+  // статус: passed (>=70), needs_review (50-69), failed (<50)
+  status?: "passed" | "needs_review" | "failed";
   summary: string;
-  issues?: string[];
+  issues?: Issue[];
   improvements?: string[];
   goodParts?: string[];
   language?: string;
@@ -216,7 +320,19 @@ export default function Task() {
                 <Card className="space-y-4 !rounded-[2rem] border border-white/60 dark:border-slate-700/60 relative overflow-hidden group">
                   <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
                   <div className="flex items-start justify-between relative z-10">
-                    <p className="font-bold text-slate-500">Общая оценка</p>
+                    <div>
+                      <p className="font-bold text-slate-500">Общая оценка</p>
+                      {result.status && (
+                        <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          result.status === "passed" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          : result.status === "needs_review" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                          : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+                        }`}>
+                          {result.status === "passed" ? <CheckCircle size={11}/> : result.status === "needs_review" ? <Clock size={11}/> : <XCircle size={11}/>}
+                          {result.status === "passed" ? "Принято" : result.status === "needs_review" ? "На проверке" : "Не принято"}
+                        </span>
+                      )}
+                    </div>
                     <p className={`text-4xl font-black tracking-tight leading-none ${scoreColor}`}>{avgScore}%</p>
                   </div>
                   <div className="grid grid-cols-3 gap-3 relative z-10 mt-4">
@@ -254,13 +370,18 @@ export default function Task() {
                       <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center">
                         <AlertTriangle size={16} className="text-rose-600 dark:text-rose-400" />
                       </div>
-                      <p className="font-bold text-rose-900 dark:text-rose-200">Проблемы ({result.issues.length})</p>
+                      <p className="font-bold text-rose-900 dark:text-rose-200">Ошибки ({result.issues.length})</p>
                     </div>
                     {result.issues.map((issue, i) => (
-                      <p key={i} className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-start gap-2">
-                        <span className="text-rose-400 mt-0.5">•</span>
-                        <span>{issue}</span>
-                      </p>
+                      <div key={i} className="flex items-start gap-2">
+                        {issue.line != null && (
+                          <span className="shrink-0 text-[10px] font-bold bg-rose-200/70 dark:bg-rose-800/40 text-rose-700 dark:text-rose-300 px-1.5 py-0.5 rounded font-mono mt-0.5">
+                            стр.{issue.line}
+                          </span>
+                        )}
+                        {issue.line == null && <span className="text-rose-400 mt-0.5 shrink-0">•</span>}
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{issue.message}</p>
+                      </div>
                     ))}
                   </Card>
                 )}
@@ -412,9 +533,7 @@ export default function Task() {
                                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
                                   <Code2 size={12} /> Код
                                 </p>
-                                <pre className="text-xs font-mono bg-slate-50 dark:bg-zinc-900 rounded-xl p-3 overflow-auto max-h-48 whitespace-pre-wrap break-words text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-zinc-800">
-                                  {item.sourceCode}
-                                </pre>
+                                <HighlightedCode code={item.sourceCode} />
                               </div>
                             )}
 
@@ -425,11 +544,17 @@ export default function Task() {
 
                             {item.issues && item.issues.length > 0 && (
                               <div className="bg-rose-50/50 dark:bg-rose-900/10 rounded-xl p-3 border border-rose-100 dark:border-rose-800/30 space-y-1.5">
-                                <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5"><AlertTriangle size={12} /> Проблемы</p>
+                                <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5"><AlertTriangle size={12} /> Ошибки</p>
                                 {item.issues.map((issue, i) => (
-                                  <p key={i} className="text-xs text-slate-600 dark:text-slate-300 flex gap-1.5">
-                                    <span className="text-rose-400 shrink-0">•</span>{issue}
-                                  </p>
+                                  <div key={i} className="flex items-start gap-1.5">
+                                    {issue.line != null && (
+                                      <span className="shrink-0 text-[9px] font-bold bg-rose-200/70 dark:bg-rose-800/40 text-rose-700 dark:text-rose-300 px-1 py-0.5 rounded font-mono">
+                                        стр.{issue.line}
+                                      </span>
+                                    )}
+                                    {issue.line == null && <span className="text-rose-400 shrink-0">•</span>}
+                                    <p className="text-xs text-slate-600 dark:text-slate-300">{issue.message}</p>
+                                  </div>
                                 ))}
                               </div>
                             )}

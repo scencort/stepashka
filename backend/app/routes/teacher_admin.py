@@ -858,9 +858,13 @@ async def teacher_analytics(user: CurrentUser):
         """SELECT l.id, l.title,
                   COUNT(s.id) FILTER (WHERE s.status IN ('failed','manual_review'))::int AS "problemSubmissions"
            FROM lessons l
+           INNER JOIN courses c ON c.id=l.course_id
            LEFT JOIN assignments a ON a.lesson_id=l.id
            LEFT JOIN submissions s ON s.assignment_id=a.id
-           GROUP BY l.id, l.title ORDER BY "problemSubmissions" DESC LIMIT 5"""
+           WHERE c.teacher_id=$1 OR $2='admin'
+           GROUP BY l.id, l.title ORDER BY "problemSubmissions" DESC LIMIT 5""",
+        user["id"],
+        user["role"],
     )
     return {"summary": dict(summary), "weakLessons": [dict(r) for r in weak]}
 

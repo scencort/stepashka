@@ -544,11 +544,14 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
             '  "quality": <0-100>,\n'
             '  "correctness": <0-100>,\n'
             '  "style": <0-100>,\n'
+            '  "status": "passed" | "failed" | "needs_review",\n'
             '  "summary": "<честная оценка, 2-3 предложения>",\n'
-            '  "issues": ["<конкретная проблема с примером>", ...],\n'
+            '  "issues": [{"line": <номер строки или null>, "message": "<проблема>"}, ...],\n'
             '  "improvements": ["<конкретное улучшение с примером кода>", ...],\n'
             '  "goodParts": ["<что сделано хорошо>", ...]\n'
             "}\n"
+            "status: passed если качество>=70, needs_review если 50-69, failed если <50. "
+            "В issues ОБЯЗАТЕЛЬНО указывай номер строки (line) где проблема, null если проблема глобальная. "
             "В issues — конкретные баги, уязвимости, антипаттерны с объяснением почему плохо. "
             "В goodParts — только реально хорошие вещи, не хвали за минимум. Всё на русском."
         )
@@ -571,8 +574,17 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
         quality = max(0, min(100, int(result.get("quality", 50))))
         correctness = max(0, min(100, int(result.get("correctness", 50))))
         style = max(0, min(100, int(result.get("style", 50))))
+        avg = (quality + correctness + style) // 3
+        status = str(result.get("status", "passed" if avg >= 70 else "needs_review" if avg >= 50 else "failed"))
         summary = str(result.get("summary", "Нет комментариев"))
-        issues = [str(i) for i in result.get("issues", [])][:10]
+        # Normalize issues: accept both old string format and new {line, message} format
+        raw_issues = result.get("issues", [])
+        issues = []
+        for item in raw_issues[:10]:
+            if isinstance(item, dict):
+                issues.append({"line": item.get("line"), "message": str(item.get("message", ""))})
+            else:
+                issues.append({"line": None, "message": str(item)})
         improvements = [str(i) for i in result.get("improvements", [])][:10]
         good_parts = [str(i) for i in result.get("goodParts", [])][:10]
     except (ValueError, json.JSONDecodeError, KeyError) as exc:
@@ -581,6 +593,7 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
         quality = min(95, max(20, len(lines) * 3 + 30))
         correctness = min(90, max(25, quality - 5))
         style = min(85, max(20, quality - 10))
+        status = "needs_review"
         summary = "Не удалось получить AI-анализ. Базовая эвристика: код принят."
         if isinstance(exc, ValueError) and _current_model().startswith(
             "accounts/fireworks"
@@ -629,6 +642,7 @@ async def ai_code_review(body: AiCodeReviewBody, user: CurrentUser):
         "quality": quality,
         "correctness": correctness,
         "style": style,
+        "status": status,
         "summary": summary,
         "issues": issues,
         "improvements": improvements,
@@ -665,6 +679,14 @@ async def ai_review_history(user: CurrentUser):
                     row[field] = []
             elif val is None:
                 row[field] = []
+        # Normalize old string issues to {line, message} format
+        normalized = []
+        for item in row.get("issues", []):
+            if isinstance(item, dict):
+                normalized.append(item)
+            else:
+                normalized.append({"line": None, "message": str(item)})
+        row["issues"] = normalized
         result.append(row)
     return result
 
