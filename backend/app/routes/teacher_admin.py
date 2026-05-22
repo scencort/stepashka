@@ -858,7 +858,8 @@ async def teacher_analytics(user: CurrentUser):
         """SELECT l.id, l.title,
                   COUNT(s.id) FILTER (WHERE s.status IN ('failed','manual_review'))::int AS "problemSubmissions"
            FROM lessons l
-           INNER JOIN courses c ON c.id=l.course_id
+           INNER JOIN course_modules m ON m.id=l.module_id
+           INNER JOIN courses c ON c.id=m.course_id
            LEFT JOIN assignments a ON a.lesson_id=l.id
            LEFT JOIN submissions s ON s.assignment_id=a.id
            WHERE c.teacher_id=$1 OR $2='admin'
@@ -866,7 +867,9 @@ async def teacher_analytics(user: CurrentUser):
         user["id"],
         user["role"],
     )
-    return {"summary": dict(summary), "weakLessons": [dict(r) for r in weak]}
+    # summary — всегда одна строка (COUNT не вернёт NULL), но на всякий случай fallback
+    summary_dict = dict(summary) if summary else {"coursesTotal": 0, "studentsTotal": 0, "avgProgress": 0}
+    return {"summary": summary_dict, "weakLessons": [dict(r) for r in weak]}
 
 
 # ---- Submissions ----
