@@ -31,5 +31,12 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Uploaded user content (runtime data, not source)
+backend/covers/*.png
+backend/covers/*.jpg
+backend/covers/*.jpeg
+backend/covers/*.gif
+backend/covers/*.webp
+
 # Claude Code
-.claude/worktrees/
+.claude/
