@@ -18,12 +18,8 @@ class Settings(BaseSettings):
     jwt_refresh_days: int = 7
     reset_token_ttl_minutes: int = 30
 
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_secure: bool = False
-    smtp_user: str = ""
-    smtp_pass: str = ""
-    smtp_from: str = "Gradus <no-reply@gradus.dev>"
+    resend_api_key: str = ""
+    email_from: str = "Gradus <no-reply@gradus.dev>"
     show_dev_reset_code: bool = True
 
     openai_api_key: str = ""

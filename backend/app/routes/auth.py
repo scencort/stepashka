@@ -22,6 +22,7 @@ from app.two_factor import (
     verify_totp_code,
 )
 from app.config import settings
+from app.email_service import send_password_reset
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -137,7 +138,10 @@ async def forgot_password(body: ForgotPasswordBody):
     raw_code, _ = await create_reset_token_in_db(user["id"])
     await write_audit(None, "auth.password_reset_requested", "user", user["id"], {"email": email})
 
-    if settings.show_dev_reset_code:
+    # Отправляем письмо через Resend если API-ключ задан
+    sent = await send_password_reset(email, user["full_name"], raw_code)
+
+    if not sent and settings.show_dev_reset_code:
         return {**neutral, "devCode": raw_code, "devMode": True}
 
     return neutral

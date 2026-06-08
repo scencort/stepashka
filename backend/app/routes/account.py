@@ -20,6 +20,7 @@ from app.two_factor import (
     verify_totp_code, TOTP_ISSUER,
 )
 from app.config import settings
+from app.email_service import send_email_change
 
 router = APIRouter(prefix="/api/account", tags=["account"])
 
@@ -129,7 +130,9 @@ async def patch_profile(body: ProfilePatchBody, user: CurrentUser):
                    WHERE user_id=$4""",
                 next_email, code_hash, expires, user["id"],
             )
-            if settings.show_dev_reset_code:
+            # Отправляем письмо на новый адрес
+            sent = await send_email_change(next_email, user.get("fullName") or user["email"], code)
+            if not sent and settings.show_dev_reset_code:
                 dev_email_code = code
             email_change_required = True
 
