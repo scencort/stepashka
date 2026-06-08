@@ -70,7 +70,7 @@ export default function Terms() {
               <li><strong>Frontend:</strong> React, TypeScript, Vite, Tailwind CSS, Framer Motion</li>
               <li><strong>Backend:</strong> Python, FastAPI, asyncpg, PostgreSQL</li>
               <li><strong>Инфраструктура:</strong> Docker, Nginx</li>
-              <li><strong>AI-интеграция:</strong> OpenAI API, Google Gemini API, Groq API</li>
+              <li><strong>AI-модуль:</strong> встроенная система автоматической проверки заданий и чат-ассистента</li>
             </ul>
             <p>
               Все перечисленные технологии используются в соответствии с их лицензиями.
