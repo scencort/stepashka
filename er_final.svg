@@ -1,0 +1,277 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="1000" style="background:#ffffff;font-family:'Segoe UI',Arial,sans-serif;">
+<defs>
+<marker id="arrow" markerWidth="9" markerHeight="6" refX="8.5" refY="3" orient="auto"><polygon points="0,0 9,3 0,6" fill="#64748b"/></marker>
+<linearGradient id="hdr_users" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#2563ebbb"/></linearGradient>
+<linearGradient id="hdr_courses" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#dc2626"/><stop offset="100%" stop-color="#dc2626bb"/></linearGradient>
+<linearGradient id="hdr_course_modules" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#dc2626"/><stop offset="100%" stop-color="#dc2626bb"/></linearGradient>
+<linearGradient id="hdr_lessons" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#dc2626"/><stop offset="100%" stop-color="#dc2626bb"/></linearGradient>
+<linearGradient id="hdr_course_steps" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#7c3aedbb"/></linearGradient>
+<linearGradient id="hdr_enrollments" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#15803d"/><stop offset="100%" stop-color="#15803dbb"/></linearGradient>
+<linearGradient id="hdr_assignments" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#7c3aedbb"/></linearGradient>
+<linearGradient id="hdr_submissions" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#7c3aedbb"/></linearGradient>
+<linearGradient id="hdr_certificates" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#d97706"/><stop offset="100%" stop-color="#d97706bb"/></linearGradient>
+<linearGradient id="hdr_payments" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#0891b2"/><stop offset="100%" stop-color="#0891b2bb"/></linearGradient>
+</defs>
+<rect x="28" y="14" width="239" height="972" rx="12" fill="#eff6ff" stroke="#2563eb44" stroke-width="1.5"/>
+<text x="147" y="34" text-anchor="middle" font-size="13" font-weight="700" fill="#2563eb">Пользователи</text>
+<rect x="278" y="14" width="239" height="972" rx="12" fill="#fff1f2" stroke="#dc262644" stroke-width="1.5"/>
+<text x="397" y="34" text-anchor="middle" font-size="13" font-weight="700" fill="#dc2626">Учебный контент</text>
+<rect x="528" y="14" width="239" height="972" rx="12" fill="#f0fdf4" stroke="#15803d44" stroke-width="1.5"/>
+<text x="647" y="34" text-anchor="middle" font-size="13" font-weight="700" fill="#15803d">Прогресс / Задания</text>
+<rect x="778" y="14" width="239" height="972" rx="12" fill="#fffbeb" stroke="#d9770644" stroke-width="1.5"/>
+<text x="897" y="34" text-anchor="middle" font-size="13" font-weight="700" fill="#d97706">Результаты</text>
+<polyline points="255,87 290,87" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="244" y="77" width="56" height="14" rx="4" fill="white" opacity="0.85"/>
+<text x="272" y="88" text-anchor="middle" font-size="10" fill="#475569">преподаёт</text>
+<polyline points="505,87 540,87" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="397,274 397,310" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="397,460 397,540" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="397,690 397,760" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="505,557 540,557 540,327" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="647,487 647,540" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="43" y="73" width="215" height="177" rx="8" fill="#00000015"/>
+<rect x="40" y="70" width="215" height="177" rx="8" fill="white" stroke="#2563eb55" stroke-width="1.5"/>
+<rect x="40" y="70" width="215" height="34" rx="8" fill="url(#hdr_users)"/>
+<rect x="40" y="86" width="215" height="18" fill="#2563ebcc"/>
+<text x="147" y="96" text-anchor="middle" font-size="14" font-weight="800" fill="white">users</text>
+<line x1="40" y1="104" x2="255" y2="104" stroke="#2563eb44" stroke-width="1"/>
+<rect x="41" y="104" width="213" height="27" fill="#2563eb08"/>
+<rect x="48" y="112" width="22" height="14" rx="3" fill="#fef9c3" stroke="#eab308" stroke-width="1"/>
+<text x="59" y="122" text-anchor="middle" font-size="8" font-weight="900" fill="#ca8a04">PK</text>
+<text x="76" y="122" font-size="13" font-weight="700" fill="#0f172a">id</text>
+<line x1="50" y1="131" x2="245" y2="131" stroke="#e2e8f0" stroke-width="1"/>
+<text x="54" y="149" font-size="13" fill="#334155">email</text>
+<rect x="41" y="158" width="213" height="27" fill="#2563eb08"/>
+<line x1="50" y1="158" x2="245" y2="158" stroke="#e2e8f0" stroke-width="1"/>
+<text x="54" y="176" font-size="13" fill="#334155">full_name</text>
+<line x1="50" y1="185" x2="245" y2="185" stroke="#e2e8f0" stroke-width="1"/>
+<text x="54" y="203" font-size="13" fill="#334155">role</text>
+<rect x="41" y="212" width="213" height="27" fill="#2563eb08"/>
+<line x1="50" y1="212" x2="245" y2="212" stroke="#e2e8f0" stroke-width="1"/>
+<text x="54" y="230" font-size="13" fill="#334155">status</text>
+<rect x="41" y="244" width="213" height="3" rx="3" fill="#2563eb77"/>
+<rect x="293" y="73" width="215" height="204" rx="8" fill="#00000015"/>
+<rect x="290" y="70" width="215" height="204" rx="8" fill="white" stroke="#dc262655" stroke-width="1.5"/>
+<rect x="290" y="70" width="215" height="34" rx="8" fill="url(#hdr_courses)"/>
+<rect x="290" y="86" width="215" height="18" fill="#dc2626cc"/>
+<text x="397" y="96" text-anchor="middle" font-size="14" font-weight="800" fill="white">courses</text>
+<line x1="290" y1="104" x2="505" y2="104" stroke="#dc262644" stroke-width="1"/>
+<rect x="291" y="104" width="213" height="27" fill="#dc262608"/>
+<rect x="298" y="112" width="22" height="14" rx="3" fill="#fef9c3" stroke="#eab308" stroke-width="1"/>
+<text x="309" y="122" text-anchor="middle" font-size="8" font-weight="900" fill="#ca8a04">PK</text>
+<text x="326" y="122" font-size="13" font-weight="700" fill="#0f172a">id</text>
+<line x1="300" y1="131" x2="495" y2="131" stroke="#e2e8f0" stroke-width="1"/>
+<text x="304" y="149" font-size="13" fill="#334155">title</text>
+<rect x="291" y="158" width="213" height="27" fill="#dc262608"/>
+<line x1="300" y1="158" x2="495" y2="158" stroke="#e2e8f0" stroke-width="1"/>
+<text x="304" y="176" font-size="13" fill="#334155">level</text>
+<line x1="300" y1="185" x2="495" y2="185" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="298" y="193" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="309" y="203" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="326" y="203" font-size="13" fill="#6d28d9" font-style="italic">teacher_id</text>
+<rect x="291" y="212" width="213" height="27" fill="#dc262608"/>
+<line x1="300" y1="212" x2="495" y2="212" stroke="#e2e8f0" stroke-width="1"/>
+<text x="304" y="230" font-size="13" fill="#334155">status</text>
+<line x1="300" y1="239" x2="495" y2="239" stroke="#e2e8f0" stroke-width="1"/>
+<text x="304" y="257" font-size="13" fill="#334155">price_cents</text>
+<rect x="291" y="271" width="213" height="3" rx="3" fill="#dc262677"/>
+<rect x="293" y="313" width="215" height="150" rx="8" fill="#00000015"/>
+<rect x="290" y="310" width="215" height="150" rx="8" fill="white" stroke="#dc262655" stroke-width="1.5"/>
+<rect x="290" y="310" width="215" height="34" rx="8" fill="url(#hdr_course_modules)"/>
+<rect x="290" y="326" width="215" height="18" fill="#dc2626cc"/>
+<text x="397" y="336" text-anchor="middle" font-size="14" font-weight="800" fill="white">course_modules</text>
+<line x1="290" y1="344" x2="505" y2="344" stroke="#dc262644" stroke-width="1"/>
+<rect x="291" y="344" width="213" height="27" fill="#dc262608"/>
+<rect x="298" y="352" width="22" height="14" rx="3" fill="#fef9c3" stroke="#eab308" stroke-width="1"/>
+<text x="309" y="362" text-anchor="middle" font-size="8" font-weight="900" fill="#ca8a04">PK</text>
+<text x="326" y="362" font-size="13" font-weight="700" fill="#0f172a">id</text>
+<line x1="300" y1="371" x2="495" y2="371" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="298" y="379" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="309" y="389" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="326" y="389" font-size="13" fill="#6d28d9" font-style="italic">course_id</text>
+<rect x="291" y="398" width="213" height="27" fill="#dc262608"/>
+<line x1="300" y1="398" x2="495" y2="398" stroke="#e2e8f0" stroke-width="1"/>
+<text x="304" y="416" font-size="13" fill="#334155">title</text>
+<line x1="300" y1="425" x2="495" y2="425" stroke="#e2e8f0" stroke-width="1"/>
+<text x="304" y="443" font-size="13" fill="#334155">module_order</text>
+<rect x="291" y="457" width="213" height="3" rx="3" fill="#dc262677"/>
+<rect x="293" y="543" width="215" height="150" rx="8" fill="#00000015"/>
+<rect x="290" y="540" width="215" height="150" rx="8" fill="white" stroke="#dc262655" stroke-width="1.5"/>
+<rect x="290" y="540" width="215" height="34" rx="8" fill="url(#hdr_lessons)"/>
+<rect x="290" y="556" width="215" height="18" fill="#dc2626cc"/>
+<text x="397" y="566" text-anchor="middle" font-size="14" font-weight="800" fill="white">lessons</text>
+<line x1="290" y1="574" x2="505" y2="574" stroke="#dc262644" stroke-width="1"/>
+<rect x="291" y="574" width="213" height="27" fill="#dc262608"/>
+<rect x="298" y="582" width="22" height="14" rx="3" fill="#fef9c3" stroke="#eab308" stroke-width="1"/>
+<text x="309" y="592" text-anchor="middle" font-size="8" font-weight="900" fill="#ca8a04">PK</text>
+<text x="326" y="592" font-size="13" font-weight="700" fill="#0f172a">id</text>
+<line x1="300" y1="601" x2="495" y2="601" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="298" y="609" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="309" y="619" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="326" y="619" font-size="13" fill="#6d28d9" font-style="italic">module_id</text>
+<rect x="291" y="628" width="213" height="27" fill="#dc262608"/>
+<line x1="300" y1="628" x2="495" y2="628" stroke="#e2e8f0" stroke-width="1"/>
+<text x="304" y="646" font-size="13" fill="#334155">title</text>
+<line x1="300" y1="655" x2="495" y2="655" stroke="#e2e8f0" stroke-width="1"/>
+<text x="304" y="673" font-size="13" fill="#334155">lesson_type</text>
+<rect x="291" y="687" width="213" height="3" rx="3" fill="#dc262677"/>
+<rect x="293" y="763" width="215" height="177" rx="8" fill="#00000015"/>
+<rect x="290" y="760" width="215" height="177" rx="8" fill="white" stroke="#7c3aed55" stroke-width="1.5"/>
+<rect x="290" y="760" width="215" height="34" rx="8" fill="url(#hdr_course_steps)"/>
+<rect x="290" y="776" width="215" height="18" fill="#7c3aedcc"/>
+<text x="397" y="786" text-anchor="middle" font-size="14" font-weight="800" fill="white">course_steps</text>
+<line x1="290" y1="794" x2="505" y2="794" stroke="#7c3aed44" stroke-width="1"/>
+<rect x="291" y="794" width="213" height="27" fill="#7c3aed08"/>
+<rect x="298" y="802" width="22" height="14" rx="3" fill="#fef9c3" stroke="#eab308" stroke-width="1"/>
+<text x="309" y="812" text-anchor="middle" font-size="8" font-weight="900" fill="#ca8a04">PK</text>
+<text x="326" y="812" font-size="13" font-weight="700" fill="#0f172a">id</text>
+<line x1="300" y1="821" x2="495" y2="821" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="298" y="829" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="309" y="839" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="326" y="839" font-size="13" fill="#6d28d9" font-style="italic">course_id</text>
+<rect x="291" y="848" width="213" height="27" fill="#7c3aed08"/>
+<line x1="300" y1="848" x2="495" y2="848" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="298" y="856" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="309" y="866" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="326" y="866" font-size="13" fill="#6d28d9" font-style="italic">lesson_id</text>
+<line x1="300" y1="875" x2="495" y2="875" stroke="#e2e8f0" stroke-width="1"/>
+<text x="304" y="893" font-size="13" fill="#334155">step_type</text>
+<rect x="291" y="902" width="213" height="27" fill="#7c3aed08"/>
+<line x1="300" y1="902" x2="495" y2="902" stroke="#e2e8f0" stroke-width="1"/>
+<text x="304" y="920" font-size="13" fill="#334155">xp</text>
+<rect x="291" y="934" width="213" height="3" rx="3" fill="#7c3aed77"/>
+<rect x="543" y="73" width="215" height="177" rx="8" fill="#00000015"/>
+<rect x="540" y="70" width="215" height="177" rx="8" fill="white" stroke="#15803d55" stroke-width="1.5"/>
+<rect x="540" y="70" width="215" height="34" rx="8" fill="url(#hdr_enrollments)"/>
+<rect x="540" y="86" width="215" height="18" fill="#15803dcc"/>
+<text x="647" y="96" text-anchor="middle" font-size="14" font-weight="800" fill="white">enrollments</text>
+<line x1="540" y1="104" x2="755" y2="104" stroke="#15803d44" stroke-width="1"/>
+<rect x="541" y="104" width="213" height="27" fill="#15803d08"/>
+<rect x="548" y="112" width="22" height="14" rx="3" fill="#fef9c3" stroke="#eab308" stroke-width="1"/>
+<text x="559" y="122" text-anchor="middle" font-size="8" font-weight="900" fill="#ca8a04">PK</text>
+<text x="576" y="122" font-size="13" font-weight="700" fill="#0f172a">id</text>
+<line x1="550" y1="131" x2="745" y2="131" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="548" y="139" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="559" y="149" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="576" y="149" font-size="13" fill="#6d28d9" font-style="italic">user_id</text>
+<rect x="541" y="158" width="213" height="27" fill="#15803d08"/>
+<line x1="550" y1="158" x2="745" y2="158" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="548" y="166" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="559" y="176" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="576" y="176" font-size="13" fill="#6d28d9" font-style="italic">course_id</text>
+<line x1="550" y1="185" x2="745" y2="185" stroke="#e2e8f0" stroke-width="1"/>
+<text x="554" y="203" font-size="13" fill="#334155">status</text>
+<rect x="541" y="212" width="213" height="27" fill="#15803d08"/>
+<line x1="550" y1="212" x2="745" y2="212" stroke="#e2e8f0" stroke-width="1"/>
+<text x="554" y="230" font-size="13" fill="#334155">progress_%</text>
+<rect x="541" y="244" width="213" height="3" rx="3" fill="#15803d77"/>
+<rect x="543" y="313" width="215" height="177" rx="8" fill="#00000015"/>
+<rect x="540" y="310" width="215" height="177" rx="8" fill="white" stroke="#7c3aed55" stroke-width="1.5"/>
+<rect x="540" y="310" width="215" height="34" rx="8" fill="url(#hdr_assignments)"/>
+<rect x="540" y="326" width="215" height="18" fill="#7c3aedcc"/>
+<text x="647" y="336" text-anchor="middle" font-size="14" font-weight="800" fill="white">assignments</text>
+<line x1="540" y1="344" x2="755" y2="344" stroke="#7c3aed44" stroke-width="1"/>
+<rect x="541" y="344" width="213" height="27" fill="#7c3aed08"/>
+<rect x="548" y="352" width="22" height="14" rx="3" fill="#fef9c3" stroke="#eab308" stroke-width="1"/>
+<text x="559" y="362" text-anchor="middle" font-size="8" font-weight="900" fill="#ca8a04">PK</text>
+<text x="576" y="362" font-size="13" font-weight="700" fill="#0f172a">id</text>
+<line x1="550" y1="371" x2="745" y2="371" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="548" y="379" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="559" y="389" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="576" y="389" font-size="13" fill="#6d28d9" font-style="italic">lesson_id</text>
+<rect x="541" y="398" width="213" height="27" fill="#7c3aed08"/>
+<line x1="550" y1="398" x2="745" y2="398" stroke="#e2e8f0" stroke-width="1"/>
+<text x="554" y="416" font-size="13" fill="#334155">title</text>
+<line x1="550" y1="425" x2="745" y2="425" stroke="#e2e8f0" stroke-width="1"/>
+<text x="554" y="443" font-size="13" fill="#334155">assignment_type</text>
+<rect x="541" y="452" width="213" height="27" fill="#7c3aed08"/>
+<line x1="550" y1="452" x2="745" y2="452" stroke="#e2e8f0" stroke-width="1"/>
+<text x="554" y="470" font-size="13" fill="#334155">max_score</text>
+<rect x="541" y="484" width="213" height="3" rx="3" fill="#7c3aed77"/>
+<rect x="543" y="543" width="215" height="177" rx="8" fill="#00000015"/>
+<rect x="540" y="540" width="215" height="177" rx="8" fill="white" stroke="#7c3aed55" stroke-width="1.5"/>
+<rect x="540" y="540" width="215" height="34" rx="8" fill="url(#hdr_submissions)"/>
+<rect x="540" y="556" width="215" height="18" fill="#7c3aedcc"/>
+<text x="647" y="566" text-anchor="middle" font-size="14" font-weight="800" fill="white">submissions</text>
+<line x1="540" y1="574" x2="755" y2="574" stroke="#7c3aed44" stroke-width="1"/>
+<rect x="541" y="574" width="213" height="27" fill="#7c3aed08"/>
+<rect x="548" y="582" width="22" height="14" rx="3" fill="#fef9c3" stroke="#eab308" stroke-width="1"/>
+<text x="559" y="592" text-anchor="middle" font-size="8" font-weight="900" fill="#ca8a04">PK</text>
+<text x="576" y="592" font-size="13" font-weight="700" fill="#0f172a">id</text>
+<line x1="550" y1="601" x2="745" y2="601" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="548" y="609" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="559" y="619" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="576" y="619" font-size="13" fill="#6d28d9" font-style="italic">user_id</text>
+<rect x="541" y="628" width="213" height="27" fill="#7c3aed08"/>
+<line x1="550" y1="628" x2="745" y2="628" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="548" y="636" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="559" y="646" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="576" y="646" font-size="13" fill="#6d28d9" font-style="italic">assignment_id</text>
+<line x1="550" y1="655" x2="745" y2="655" stroke="#e2e8f0" stroke-width="1"/>
+<text x="554" y="673" font-size="13" fill="#334155">score</text>
+<rect x="541" y="682" width="213" height="27" fill="#7c3aed08"/>
+<line x1="550" y1="682" x2="745" y2="682" stroke="#e2e8f0" stroke-width="1"/>
+<text x="554" y="700" font-size="13" fill="#334155">status</text>
+<rect x="541" y="714" width="213" height="3" rx="3" fill="#7c3aed77"/>
+<rect x="793" y="73" width="215" height="177" rx="8" fill="#00000015"/>
+<rect x="790" y="70" width="215" height="177" rx="8" fill="white" stroke="#d9770655" stroke-width="1.5"/>
+<rect x="790" y="70" width="215" height="34" rx="8" fill="url(#hdr_certificates)"/>
+<rect x="790" y="86" width="215" height="18" fill="#d97706cc"/>
+<text x="897" y="96" text-anchor="middle" font-size="14" font-weight="800" fill="white">certificates</text>
+<line x1="790" y1="104" x2="1005" y2="104" stroke="#d9770644" stroke-width="1"/>
+<rect x="791" y="104" width="213" height="27" fill="#d9770608"/>
+<rect x="798" y="112" width="22" height="14" rx="3" fill="#fef9c3" stroke="#eab308" stroke-width="1"/>
+<text x="809" y="122" text-anchor="middle" font-size="8" font-weight="900" fill="#ca8a04">PK</text>
+<text x="826" y="122" font-size="13" font-weight="700" fill="#0f172a">id</text>
+<line x1="800" y1="131" x2="995" y2="131" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="798" y="139" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="809" y="149" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="826" y="149" font-size="13" fill="#6d28d9" font-style="italic">user_id</text>
+<rect x="791" y="158" width="213" height="27" fill="#d9770608"/>
+<line x1="800" y1="158" x2="995" y2="158" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="798" y="166" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="809" y="176" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="826" y="176" font-size="13" fill="#6d28d9" font-style="italic">course_id</text>
+<line x1="800" y1="185" x2="995" y2="185" stroke="#e2e8f0" stroke-width="1"/>
+<text x="804" y="203" font-size="13" fill="#334155">cert_code</text>
+<rect x="791" y="212" width="213" height="27" fill="#d9770608"/>
+<line x1="800" y1="212" x2="995" y2="212" stroke="#e2e8f0" stroke-width="1"/>
+<text x="804" y="230" font-size="13" fill="#334155">issued_at</text>
+<rect x="791" y="244" width="213" height="3" rx="3" fill="#d9770677"/>
+<rect x="793" y="313" width="215" height="177" rx="8" fill="#00000015"/>
+<rect x="790" y="310" width="215" height="177" rx="8" fill="white" stroke="#0891b255" stroke-width="1.5"/>
+<rect x="790" y="310" width="215" height="34" rx="8" fill="url(#hdr_payments)"/>
+<rect x="790" y="326" width="215" height="18" fill="#0891b2cc"/>
+<text x="897" y="336" text-anchor="middle" font-size="14" font-weight="800" fill="white">payments</text>
+<line x1="790" y1="344" x2="1005" y2="344" stroke="#0891b244" stroke-width="1"/>
+<rect x="791" y="344" width="213" height="27" fill="#0891b208"/>
+<rect x="798" y="352" width="22" height="14" rx="3" fill="#fef9c3" stroke="#eab308" stroke-width="1"/>
+<text x="809" y="362" text-anchor="middle" font-size="8" font-weight="900" fill="#ca8a04">PK</text>
+<text x="826" y="362" font-size="13" font-weight="700" fill="#0f172a">id</text>
+<line x1="800" y1="371" x2="995" y2="371" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="798" y="379" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="809" y="389" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="826" y="389" font-size="13" fill="#6d28d9" font-style="italic">user_id</text>
+<rect x="791" y="398" width="213" height="27" fill="#0891b208"/>
+<line x1="800" y1="398" x2="995" y2="398" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="798" y="406" width="22" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+<text x="809" y="416" text-anchor="middle" font-size="8" font-weight="900" fill="#7c3aed">FK</text>
+<text x="826" y="416" font-size="13" fill="#6d28d9" font-style="italic">course_id</text>
+<line x1="800" y1="425" x2="995" y2="425" stroke="#e2e8f0" stroke-width="1"/>
+<text x="804" y="443" font-size="13" fill="#334155">amount_cents</text>
+<rect x="791" y="452" width="213" height="27" fill="#0891b208"/>
+<line x1="800" y1="452" x2="995" y2="452" stroke="#e2e8f0" stroke-width="1"/>
+<text x="804" y="470" font-size="13" fill="#334155">status</text>
+<rect x="791" y="484" width="213" height="3" rx="3" fill="#0891b277"/>
+<rect x="335" y="942" width="390" height="44" rx="10" fill="white" stroke="#cbd5e1" stroke-width="1.5"/>
+<rect x="353" y="954" width="30" height="20" rx="4" fill="#fef9c3" stroke="#eab308" stroke-width="1.5"/>
+<text x="368" y="964" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="900" fill="#ca8a04">PK</text>
+<text x="391" y="964" dominant-baseline="central" font-size="13" font-weight="600" fill="#ca8a04">Primary Key</text>
+<rect x="503" y="954" width="30" height="20" rx="4" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1.5"/>
+<text x="518" y="964" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="900" fill="#7c3aed">FK</text>
+<text x="541" y="964" dominant-baseline="central" font-size="13" font-weight="600" fill="#7c3aed">Foreign Key</text>
+<line x1="645" y1="964" x2="669" y2="964" stroke="#64748b" stroke-width="2"/>
+<polygon points="663,959 673,964 663,969" fill="#64748b"/>
+<text x="679" y="964" dominant-baseline="central" font-size="13" font-weight="600" fill="#64748b">связь</text>
+<text x="530" y="992" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#94a3b8">Gradus EdTech — ER-диаграмма базы данных</text>
+</svg>

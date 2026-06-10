@@ -59,7 +59,7 @@ def _base_template(title: str, body_html: str) -> str:
                         border-top:1px solid #e2e8f0;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
                 Это письмо отправлено автоматически — отвечать на него не нужно.<br/>
-                © {2025} Gradus — учебная платформа
+                © 2026 Gradus — учебная платформа
               </p>
             </td>
           </tr>
